@@ -16,8 +16,7 @@ type URLTest struct {
 	fast     C.Proxy
 	interval time.Duration
 	done     chan struct{}
-	connErr  chan error
-	testNum  int32
+	once     int32
 }
 
 type URLTestOption struct {
@@ -42,11 +41,7 @@ func (u *URLTest) Now() string {
 func (u *URLTest) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err error) {
 	a, err := u.fast.Generator(metadata)
 	if err != nil {
-		select {
-		case u.connErr <- err:
-		default:
-			return a, err
-		}
+		u.speedTest()
 	}
 	return a, err
 }
@@ -63,8 +58,6 @@ Loop:
 		select {
 		case <-tick.C:
 			go u.speedTest()
-		case <-u.connErr:
-			go u.speedTest()
 		case <-u.done:
 			break Loop
 		}
@@ -72,10 +65,10 @@ Loop:
 }
 
 func (u *URLTest) speedTest() {
-	if atomic.AddInt32(&u.testNum, 1) != 1 {
+	if atomic.AddInt32(&u.once, 1) != 1 {
 		return
 	}
-	defer atomic.StoreInt32(&u.testNum, 0)
+	defer atomic.StoreInt32(&u.once, 0)
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(u.proxies))
@@ -126,8 +119,7 @@ func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {
 		fast:     proxies[0],
 		interval: interval,
 		done:     make(chan struct{}),
-		connErr:  make(chan error),
-		testNum:  0,
+		once:     0,
 	}
 	go urlTest.loop()
 	return urlTest, nil
