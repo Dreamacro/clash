@@ -41,7 +41,7 @@ func (u *URLTest) Now() string {
 func (u *URLTest) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err error) {
 	a, err := u.fast.Generator(metadata)
 	if err != nil {
-		u.speedTest()
+		go u.speedTest()
 	}
 	return a, err
 }
