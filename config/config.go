@@ -250,14 +250,10 @@ func (c *Config) parseProxies(cfg *RawConfig) error {
 	// parse proxy
 	for idx, mapping := range proxiesConfig {
 		proxyType, existType := mapping["type"].(string)
-		proxyName, existName := mapping["name"].(string)
-		if !existType && existName {
-			return fmt.Errorf("Proxy %d missing type or name", idx)
+		if !existType {
+			return fmt.Errorf("Proxy %d missing type", idx)
 		}
 
-		if _, exist := proxies[proxyName]; exist {
-			return fmt.Errorf("Proxy %s is the duplicate name", proxyName)
-		}
 		var proxy C.Proxy
 		var err error
 		switch proxyType {
@@ -285,10 +281,15 @@ func (c *Config) parseProxies(cfg *RawConfig) error {
 		default:
 			return fmt.Errorf("Unsupport proxy type: %s", proxyType)
 		}
+
 		if err != nil {
-			return fmt.Errorf("Proxy %s: %s", proxyName, err.Error())
+			return fmt.Errorf("Proxy [%d]: %s", idx, err.Error())
 		}
-		proxies[proxyName] = proxy
+
+		if _, exist := proxies[proxy.Name()]; exist {
+			return fmt.Errorf("Proxy %s is the duplicate name", proxy.Name())
+		}
+		proxies[proxy.Name()] = proxy
 	}
 
 	// parse proxy group

@@ -100,6 +100,12 @@ func authentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+type contextKey string
+
+func (c contextKey) String() string {
+	return "clash context key " + string(c)
+}
+
 func traffic(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 

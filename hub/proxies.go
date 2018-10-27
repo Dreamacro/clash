@@ -1,8 +1,10 @@
 package hub
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -16,10 +18,22 @@ import (
 func proxyRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", getProxies)
-	r.Get("/{name}", getProxy)
-	r.Get("/{name}/delay", getProxyDelay)
-	r.Put("/{name}", updateProxy)
+	r.With(parseProxyName).Get("/{name}", getProxy)
+	r.With(parseProxyName).Get("/{name}/delay", getProxyDelay)
+	r.With(parseProxyName).Put("/{name}", updateProxy)
 	return r
+}
+
+// When name is composed of a partial escape string, Golang does not unescape it
+func parseProxyName(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := chi.URLParam(r, "name")
+		if newName, err := url.PathUnescape(name); err == nil {
+			name = newName
+		}
+		ctx := context.WithValue(r.Context(), contextKey("proxy name"), name)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 type SampleProxy struct {
@@ -83,7 +97,7 @@ func getProxies(w http.ResponseWriter, r *http.Request) {
 }
 
 func getProxy(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
+	name := r.Context().Value(contextKey("proxy name")).(string)
 	proxies := cfg.Proxies()
 	proxy, exist := proxies[name]
 	if !exist {
@@ -110,7 +124,7 @@ func updateProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := chi.URLParam(r, "name")
+	name := r.Context().Value(contextKey("proxy name")).(string)
 	proxies := cfg.Proxies()
 	proxy, exist := proxies[name]
 	if !exist {
@@ -162,7 +176,7 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := chi.URLParam(r, "name")
+	name := r.Context().Value(contextKey("proxy name")).(string)
 	proxies := cfg.Proxies()
 	proxy, exist := proxies[name]
 	if !exist {
