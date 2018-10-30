@@ -120,7 +120,6 @@ func (c *Client) New(conn net.Conn, dst *DstAddr) (net.Conn, error) {
 			if resp != nil {
 				reason = resp.Status
 			}
-			println(uri.String(), err.Error())
 			return nil, fmt.Errorf("Dial %s error: %s", host, reason)
 		}
 
