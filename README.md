@@ -101,7 +101,7 @@ log-level: info
 external-controller: 127.0.0.1:9090
 
 # Secret for RESTful API (Optional)
-secret: ""
+# secret: ""
 
 Proxy:
 
@@ -114,11 +114,22 @@ Proxy:
 
 # vmess
 # cipher support auto/aes-128-gcm/chacha20-poly1305/none
-- { name: "vmess1", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto }
-- { name: "vmess2", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto, tls: true }
+- { name: "vmess", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto }
+# with tls
+- { name: "vmess", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto, tls: true }
+# with tls and skip-cert-verify
+- { name: "vmess", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto, tls: true, skip-cert-verify: true }
+# with ws
+- { name: "vmess", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto, network: ws, ws-path: /path }
+# with ws + tls
+- { name: "vmess", type: vmess, server: server, port: 443, uuid: uuid, alterId: 32, cipher: auto, network: ws, ws-path: /path, tls: true }
 
 # socks5
 - { name: "socks", type: socks5, server: server, port: 443 }
+# with tls
+- { name: "socks", type: socks5, server: server, port: 443, tls: true }
+# with tls and skip-cert-verify
+- { name: "socks", type: socks5, server: server, port: 443, tls: true, skip-cert-verify: true }
 
 Proxy Group:
 # url-test select which proxy will be used by benchmarking speed to a URL.
@@ -134,7 +145,9 @@ Proxy Group:
 Rule:
 - DOMAIN-SUFFIX,google.com,Proxy
 - DOMAIN-KEYWORD,google,Proxy
+- DOMAIN,google.com,Proxy
 - DOMAIN-SUFFIX,ad.com,REJECT
+- IP-CIDR,127.0.0.0/8,DIRECT
 - GEOIP,CN,DIRECT
 # note: there is two ","
 - FINAL,,Proxy

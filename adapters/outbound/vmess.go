@@ -31,13 +31,16 @@ type Vmess struct {
 }
 
 type VmessOption struct {
-	Name    string `proxy:"name"`
-	Server  string `proxy:"server"`
-	Port    int    `proxy:"port"`
-	UUID    string `proxy:"uuid"`
-	AlterID int    `proxy:"alterId"`
-	Cipher  string `proxy:"cipher"`
-	TLS     bool   `proxy:"tls,omitempty"`
+	Name           string `proxy:"name"`
+	Server         string `proxy:"server"`
+	Port           int    `proxy:"port"`
+	UUID           string `proxy:"uuid"`
+	AlterID        int    `proxy:"alterId"`
+	Cipher         string `proxy:"cipher"`
+	TLS            bool   `proxy:"tls,omitempty"`
+	Network        string `proxy:"network,omitempty"`
+	WSPath         string `proxy:"ws-path,omitempty"`
+	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
 func (ss *Vmess) Name() string {
@@ -54,17 +57,21 @@ func (ss *Vmess) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err er
 		return nil, fmt.Errorf("%s connect error", ss.server)
 	}
 	tcpKeepAlive(c)
-	c = ss.client.New(c, parseVmessAddr(metadata))
+	c, err = ss.client.New(c, parseVmessAddr(metadata))
 	return &VmessAdapter{conn: c}, err
 }
 
 func NewVmess(option VmessOption) (*Vmess, error) {
 	security := strings.ToLower(option.Cipher)
 	client, err := vmess.NewClient(vmess.Config{
-		UUID:     option.UUID,
-		AlterID:  uint16(option.AlterID),
-		Security: security,
-		TLS:      option.TLS,
+		UUID:           option.UUID,
+		AlterID:        uint16(option.AlterID),
+		Security:       security,
+		TLS:            option.TLS,
+		Host:           fmt.Sprintf("%s:%d", option.Server, option.Port),
+		NetWork:        option.Network,
+		WebSocketPath:  option.WSPath,
+		SkipCertVerify: option.SkipCertVerify,
 	})
 	if err != nil {
 		return nil, err
