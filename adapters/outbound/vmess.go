@@ -68,7 +68,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 		AlterID:        uint16(option.AlterID),
 		Security:       security,
 		TLS:            option.TLS,
-		Host:           fmt.Sprintf("%s:%d", option.Server, option.Port),
+		Host:           net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
 		NetWork:        option.Network,
 		WebSocketPath:  option.WSPath,
 		SkipCertVerify: option.SkipCertVerify,
@@ -80,7 +80,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 
 	return &Vmess{
 		name:   option.Name,
-		server: fmt.Sprintf("%s:%d", option.Server, option.Port),
+		server: net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
 		client: client,
 	}, nil
 }

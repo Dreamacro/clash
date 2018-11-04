@@ -72,7 +72,7 @@ func (ss *ShadowSocks) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, 
 }
 
 func NewShadowSocks(option ShadowSocksOption) (*ShadowSocks, error) {
-	server := fmt.Sprintf("%s:%d", option.Server, option.Port)
+	server := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
 	cipher := option.Cipher
 	password := option.Password
 	ciph, err := core.PickCipher(cipher, nil, password)

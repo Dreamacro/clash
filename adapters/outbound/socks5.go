@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	C "github.com/Dreamacro/clash/constant"
 
@@ -114,7 +115,7 @@ func NewSocks5(option Socks5Option) *Socks5 {
 	}
 
 	return &Socks5{
-		addr:           fmt.Sprintf("%s:%d", option.Server, option.Port),
+		addr:           net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
 		name:           option.Name,
 		tls:            option.TLS,
 		skipCertVerify: option.SkipCertVerify,
