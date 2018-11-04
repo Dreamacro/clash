@@ -19,10 +19,10 @@ type websocketConn struct {
 }
 
 type websocketConfig struct {
-	websocketPath string
-	host          string
-	tls           bool
-	tlsConfig     *tls.Config
+	host      string
+	path      string
+	tls       bool
+	tlsConfig *tls.Config
 }
 
 // Read implements net.Conn.Read()
@@ -124,7 +124,7 @@ func newWebsocketConn(conn net.Conn, c *websocketConfig) (net.Conn, error) {
 	uri := url.URL{
 		Scheme: scheme,
 		Host:   host,
-		Path:   c.websocketPath,
+		Path:   c.path,
 	}
 
 	wsConn, resp, err := dialer.Dial(uri.String(), nil)

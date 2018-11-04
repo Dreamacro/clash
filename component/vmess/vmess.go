@@ -95,7 +95,6 @@ func (c *Client) New(conn net.Conn, dst *DstAddr) (net.Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-
 	} else if c.tls {
 		conn = tls.Client(conn, c.tlsConfig)
 	}
@@ -144,10 +143,10 @@ func NewClient(config Config) (*Client, error) {
 	var wsConfig *websocketConfig
 	if config.NetWork == "ws" {
 		wsConfig = &websocketConfig{
-			websocketPath: config.WebSocketPath,
-			host:          config.Host,
-			tls:           config.TLS,
-			tlsConfig:     tlsConfig,
+			host:      config.Host,
+			path:      config.WebSocketPath,
+			tls:       config.TLS,
+			tlsConfig: tlsConfig,
 		}
 	}
 
