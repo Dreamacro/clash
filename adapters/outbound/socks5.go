@@ -79,7 +79,7 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	buf := make([]byte, socks.MaxAddrLen)
 	var err error
 
-	// VER, CMD, RSV
+	// VER, NMETHODS, METHODS
 	if len(ss.user) > 0 {
 		_, err = rw.Write([]byte{5, 1, 2})
 	} else {
@@ -89,6 +89,7 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 		return err
 	}
 
+	// VER, METHOD
 	if _, err := io.ReadFull(rw, buf[:2]); err != nil {
 		return err
 	}
@@ -98,15 +99,15 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	}
 
 	if buf[1] == 2 {
-		buf = buf[:0]
-		/* password protocol version */
-		buf = append(buf, 1)
-		buf = append(buf, uint8(len(ss.user)))
-		buf = append(buf, ss.user...)
-		buf = append(buf, uint8(len(ss.pass)))
-		buf = append(buf, ss.pass...)
+		// password protocol version
+		authMsg := bytes.NewBuffer(buf)
+		authMsg.WriteByte(1)
+		authMsg.WriteByte(uint8(len(ss.user)))
+		authMsg.WriteString(ss.user)
+		authMsg.WriteByte(uint8(len(ss.pass)))
+		authMsg.WriteString(ss.pass)
 
-		if _, err := rw.Write(buf); err != nil {
+		if _, err := rw.Write(authMsg.Bytes()); err != nil {
 			return err
 		}
 
