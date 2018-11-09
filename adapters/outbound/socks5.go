@@ -100,7 +100,7 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 
 	if buf[1] == 2 {
 		// password protocol version
-		authMsg := bytes.NewBuffer(buf)
+		authMsg := &bytes.Buffer{}
 		authMsg.WriteByte(1)
 		authMsg.WriteByte(uint8(len(ss.user)))
 		authMsg.WriteString(ss.user)
