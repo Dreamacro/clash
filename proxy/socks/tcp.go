@@ -39,6 +39,7 @@ func NewSocksProxy(addr string) (chan<- struct{}, <-chan struct{}, error) {
 
 	go func() {
 		<-done
+		close(done)
 		l.Close()
 		closed <- struct{}{}
 	}()
