@@ -13,21 +13,25 @@ var (
 	tun = tunnel.Instance()
 )
 
-func NewRedirProxy(addr string) (chan<- struct{}, <-chan struct{}, error) {
+type redirListener struct {
+	net.Listener
+	address string
+	closed  bool
+}
+
+func NewRedirProxy(addr string) (*redirListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	done := make(chan struct{})
-	closed := make(chan struct{})
+	rl := &redirListener{l, addr, false}
 
 	go func() {
 		log.Infof("Redir proxy listening at: %s", addr)
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				if _, open := <-done; !open {
+				if rl.closed {
 					break
 				}
 				continue
@@ -36,14 +40,16 @@ func NewRedirProxy(addr string) (chan<- struct{}, <-chan struct{}, error) {
 		}
 	}()
 
-	go func() {
-		<-done
-		close(done)
-		l.Close()
-		closed <- struct{}{}
-	}()
+	return rl, nil
+}
 
-	return done, closed, nil
+func (l *redirListener) Close() {
+	l.Close()
+	l.closed = false
+}
+
+func (l *redirListener) Address() string {
+	return l.address
 }
 
 func handleRedir(conn net.Conn) {

@@ -13,15 +13,14 @@ import (
 var (
 	allowLan = false
 
-	socksListener *listener
-	httpListener  *listener
-	redirListener *listener
+	socksListener listener
+	httpListener  listener
+	redirListener listener
 )
 
-type listener struct {
-	Address string
-	Done    chan<- struct{}
-	Closed  <-chan struct{}
+type listener interface {
+	Close()
+	Address() string
 }
 
 type Ports struct {
@@ -42,11 +41,10 @@ func ReCreateHTTP(port int) error {
 	addr := genAddr(port, allowLan)
 
 	if httpListener != nil {
-		if httpListener.Address == addr {
+		if httpListener.Address() == addr {
 			return nil
 		}
-		httpListener.Done <- struct{}{}
-		<-httpListener.Closed
+		httpListener.Close()
 		httpListener = nil
 	}
 
@@ -54,16 +52,12 @@ func ReCreateHTTP(port int) error {
 		return nil
 	}
 
-	done, closed, err := http.NewHttpProxy(addr)
+	var err error
+	httpListener, err = http.NewHttpProxy(addr)
 	if err != nil {
 		return err
 	}
 
-	httpListener = &listener{
-		Address: addr,
-		Done:    done,
-		Closed:  closed,
-	}
 	return nil
 }
 
@@ -71,11 +65,10 @@ func ReCreateSocks(port int) error {
 	addr := genAddr(port, allowLan)
 
 	if socksListener != nil {
-		if socksListener.Address == addr {
+		if socksListener.Address() == addr {
 			return nil
 		}
-		socksListener.Done <- struct{}{}
-		<-socksListener.Closed
+		socksListener.Close()
 		socksListener = nil
 	}
 
@@ -83,16 +76,12 @@ func ReCreateSocks(port int) error {
 		return nil
 	}
 
-	done, closed, err := socks.NewSocksProxy(addr)
+	var err error
+	socksListener, err = socks.NewSocksProxy(addr)
 	if err != nil {
 		return err
 	}
 
-	socksListener = &listener{
-		Address: addr,
-		Done:    done,
-		Closed:  closed,
-	}
 	return nil
 }
 
@@ -100,11 +89,10 @@ func ReCreateRedir(port int) error {
 	addr := genAddr(port, allowLan)
 
 	if redirListener != nil {
-		if redirListener.Address == addr {
+		if redirListener.Address() == addr {
 			return nil
 		}
-		redirListener.Done <- struct{}{}
-		<-redirListener.Closed
+		redirListener.Close()
 		redirListener = nil
 	}
 
@@ -112,16 +100,12 @@ func ReCreateRedir(port int) error {
 		return nil
 	}
 
-	done, closed, err := redir.NewRedirProxy(addr)
+	var err error
+	redirListener, err = redir.NewRedirProxy(addr)
 	if err != nil {
 		return err
 	}
 
-	redirListener = &listener{
-		Address: addr,
-		Done:    done,
-		Closed:  closed,
-	}
 	return nil
 }
 
@@ -130,19 +114,19 @@ func GetPorts() *Ports {
 	ports := &Ports{}
 
 	if httpListener != nil {
-		_, portStr, _ := net.SplitHostPort(httpListener.Address)
+		_, portStr, _ := net.SplitHostPort(httpListener.Address())
 		port, _ := strconv.Atoi(portStr)
 		ports.Port = port
 	}
 
 	if socksListener != nil {
-		_, portStr, _ := net.SplitHostPort(socksListener.Address)
+		_, portStr, _ := net.SplitHostPort(socksListener.Address())
 		port, _ := strconv.Atoi(portStr)
 		ports.SocksPort = port
 	}
 
 	if redirListener != nil {
-		_, portStr, _ := net.SplitHostPort(redirListener.Address)
+		_, portStr, _ := net.SplitHostPort(redirListener.Address())
 		port, _ := strconv.Atoi(portStr)
 		ports.RedirPort = port
 	}
