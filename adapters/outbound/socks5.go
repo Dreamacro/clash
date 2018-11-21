@@ -34,6 +34,8 @@ type Socks5 struct {
 	tls            bool
 	skipCertVerify bool
 	tlsConfig      *tls.Config
+	username       string
+	password       string
 }
 
 type Socks5Option struct {
@@ -42,6 +44,8 @@ type Socks5Option struct {
 	Port           int    `proxy:"port"`
 	TLS            bool   `proxy:"tls,omitempty"`
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
+	Username       string `proxy:"username",omitempty`
+	Password       string `proxy:"password",omitempty`
 }
 
 func (ss *Socks5) Name() string {
@@ -75,7 +79,7 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	buf := make([]byte, socks.MaxAddrLen)
 
 	// VER, CMD, RSV
-	_, err := rw.Write([]byte{5, 1, 0})
+	_, err := rw.Write([]byte{5, 2, 0, 2})
 	if err != nil {
 		return err
 	}
@@ -87,7 +91,33 @@ func (ss *Socks5) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	if buf[0] != 5 {
 		return errors.New("SOCKS version error")
 	} else if buf[1] != 0 {
-		return errors.New("SOCKS need auth")
+		if buf[1] == 2 {
+			// X'02' USERNAME/PASSWORD
+			// https://tools.ietf.org/html/rfc1929
+
+			// VER, ULEN, UNAME, PLEN, PASSWD
+			out := []byte{1, uint8(len(ss.username))}
+			out = append(out, ss.username...)
+			out = append(out, uint8(len(ss.password)))
+			out = append(out, ss.password...)
+			_, err := rw.Write(out)
+			if err != nil {
+				return err
+			}
+
+			// VER, STATUS
+			if _, err := io.ReadFull(rw, buf[:2]); err != nil {
+				return err
+			}
+			if buf[0] != 1 {
+				return errors.New("SOCKS version error")
+			}
+			if buf[1] != 0 {
+				return errors.New("SOCKS invalid username/password")
+			}
+		} else {
+			return errors.New("SOCKS need auth (unsupported method)")
+		}
 	}
 
 	// VER, CMD, RSV, ADDR
@@ -120,5 +150,7 @@ func NewSocks5(option Socks5Option) *Socks5 {
 		tls:            option.TLS,
 		skipCertVerify: option.SkipCertVerify,
 		tlsConfig:      tlsConfig,
+		username:       option.Username,
+		password:       option.Password,
 	}
 }
