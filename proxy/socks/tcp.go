@@ -45,8 +45,8 @@ func NewSocksProxy(addr string) (*sockListener, error) {
 }
 
 func (l *sockListener) Close() {
-	l.Close()
-	l.closed = false
+	l.closed = true
+	l.Listener.Close()
 }
 
 func (l *sockListener) Address() string {

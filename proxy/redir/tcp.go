@@ -44,8 +44,8 @@ func NewRedirProxy(addr string) (*redirListener, error) {
 }
 
 func (l *redirListener) Close() {
-	l.Close()
-	l.closed = false
+	l.closed = true
+	l.Listener.Close()
 }
 
 func (l *redirListener) Address() string {

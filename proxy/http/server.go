@@ -45,8 +45,8 @@ func NewHttpProxy(addr string) (*httpListener, error) {
 }
 
 func (l *httpListener) Close() {
-	l.Close()
-	l.closed = false
+	l.closed = true
+	l.Listener.Close()
 }
 
 func (l *httpListener) Address() string {
