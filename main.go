@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"flag"
 	"path"
+	"path/filepath"
 
 	"github.com/Dreamacro/clash/config"
 	"github.com/Dreamacro/clash/hub"
@@ -31,7 +32,7 @@ func main() {
 	hub.Run()
 
 	if (homedir != "") {
-		if !path.IsAbs(homedir) {
+		if !filepath.IsAbs(homedir) {
 			currentDir, _ := os.Getwd()
 			homedir = path.Join(currentDir, homedir)
 		}
