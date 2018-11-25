@@ -1,14 +1,12 @@
 package adapters
 
 import (
-	"encoding/json"
-	"errors"
+	"io"
 	"net"
+	"time"
 
 	C "github.com/Dreamacro/clash/constant"
 )
-
-var errReject = errors.New("Reject this request")
 
 // RejectAdapter is a reject connected adapter
 type RejectAdapter struct {
@@ -35,15 +33,37 @@ func (r *Reject) Type() C.AdapterType {
 }
 
 func (r *Reject) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err error) {
-	return nil, errReject
-}
-
-func (r *Reject) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{
-		"type": r.Type().String(),
-	})
+	return &RejectAdapter{conn: &NopConn{}}, nil
 }
 
 func NewReject() *Reject {
 	return &Reject{}
 }
+
+type NopConn struct{}
+
+func (rw *NopConn) Read(b []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (rw *NopConn) Write(b []byte) (int, error) {
+	return 0, io.EOF
+}
+
+// Close is fake function for net.Conn
+func (rw *NopConn) Close() error { return nil }
+
+// LocalAddr is fake function for net.Conn
+func (rw *NopConn) LocalAddr() net.Addr { return nil }
+
+// RemoteAddr is fake function for net.Conn
+func (rw *NopConn) RemoteAddr() net.Addr { return nil }
+
+// SetDeadline is fake function for net.Conn
+func (rw *NopConn) SetDeadline(time.Time) error { return nil }
+
+// SetReadDeadline is fake function for net.Conn
+func (rw *NopConn) SetReadDeadline(time.Time) error { return nil }
+
+// SetWriteDeadline is fake function for net.Conn
+func (rw *NopConn) SetWriteDeadline(time.Time) error { return nil }
