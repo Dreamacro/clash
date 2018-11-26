@@ -47,7 +47,7 @@ func Start(addr string, secret string) {
 	r.With(jsonContentType).Get("/logs", getLogs)
 	r.Mount("/configs", configRouter())
 	r.Mount("/proxies", proxyRouter())
-	// r.Mount("/rules", ruleRouter())
+	r.Mount("/rules", ruleRouter())
 
 	log.Infoln("RESTful API listening at: %s", addr)
 	err := http.ListenAndServe(addr, r)
