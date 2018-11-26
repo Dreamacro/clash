@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/Dreamacro/clash/adapters/inbound"
 	C "github.com/Dreamacro/clash/constant"
@@ -71,21 +70,25 @@ func (t *Tunnel) handleSOCKS(request *adapters.SocketAdapter, proxy C.ProxyAdapt
 	relay(request.Conn(), conn)
 }
 
+func pipe(dst, src net.Conn, die chan struct{}) {
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf[:cap(buf)])
+
+	io.CopyBuffer(dst, src, buf)
+	close(die)
+}
+
 // relay copies between left and right bidirectionally.
 func relay(leftConn, rightConn net.Conn) {
-	ch := make(chan error)
+	p1die := make(chan struct{})
+	go pipe(leftConn, rightConn, p1die)
 
-	go func() {
-		buf := bufPool.Get().([]byte)
-		_, err := io.CopyBuffer(leftConn, rightConn, buf)
-		bufPool.Put(buf[:cap(buf)])
-		leftConn.SetReadDeadline(time.Now())
-		ch <- err
-	}()
+	p2die := make(chan struct{})
+	go pipe(rightConn, leftConn, p2die)
 
-	buf := bufPool.Get().([]byte)
-	io.CopyBuffer(rightConn, leftConn, buf)
-	bufPool.Put(buf[:cap(buf)])
-	rightConn.SetReadDeadline(time.Now())
-	<-ch
+	// wait for tunnel termination
+	select {
+	case <-p1die:
+	case <-p2die:
+	}
 }
