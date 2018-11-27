@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/Dreamacro/clash/adapters/inbound"
 	C "github.com/Dreamacro/clash/constant"
@@ -74,6 +75,9 @@ func pipe(dst, src net.Conn, die chan struct{}) {
 	buf := bufPool.Get().([]byte)
 	defer bufPool.Put(buf[:cap(buf)])
 
+	// setting timeout to kill long and bad proxy
+	// TODO: move timeout to config
+	src.SetReadDeadline(time.Now().Add(30 * time.Second))
 	io.CopyBuffer(dst, src, buf)
 	close(die)
 }
