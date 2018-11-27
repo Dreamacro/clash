@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/textproto"
+	"net/http"
 	"strconv"
 
 	C "github.com/Dreamacro/clash/constant"
@@ -98,27 +98,24 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 		return err
 	}
 
-	tp := textproto.NewReader(bufio.NewReader(rw))
-
-	var requestLine string
-	if requestLine, err = tp.ReadLine(); err != nil {
+	var req http.Request
+	resp, err := http.ReadResponse(bufio.NewReader(rw), &req)
+	if err != nil {
 		return err
 	}
 
-	_, code, _, ok := parseRequestLine(requestLine)
-	if ok && code == "200" {
-		tp.ReadMIMEHeader()
+	if resp.StatusCode == 200 {
 		return nil
 	}
 
-	if code == "407" {
+	if resp.StatusCode == 407 {
 		return errors.New("HTTP need auth")
 	}
 
-	if code == "405" {
+	if resp.StatusCode == 405 {
 		return errors.New("CONNECT method not allowed by proxy")
 	}
-	return errors.New("can not connect remote err code: " + code)
+	return fmt.Errorf("can not connect remote err code: %d", resp.StatusCode)
 }
 
 func (h *Http) MarshalJSON() ([]byte, error) {
