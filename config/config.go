@@ -173,6 +173,13 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 				break
 			}
 			proxy = adapters.NewSocks5(*socksOption)
+		case "http":
+			httpOption := &adapters.HttpOption{}
+			err = decoder.Decode(mapping, httpOption)
+			if err != nil {
+				break
+			}
+			proxy = adapters.NewHttp(*httpOption)
 		case "vmess":
 			vmessOption := &adapters.VmessOption{}
 			err = decoder.Decode(mapping, vmessOption)

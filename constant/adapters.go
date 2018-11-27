@@ -12,6 +12,7 @@ const (
 	Selector
 	Shadowsocks
 	Socks5
+	Http
 	URLTest
 	Vmess
 )
