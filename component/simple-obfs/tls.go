@@ -14,6 +14,10 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
+const (
+	chunkSize = 1 << 14 // 2 ** 14 == 16 * 1024
+)
+
 var bufPool = sync.Pool{New: func() interface{} { return make([]byte, 2048) }}
 
 // TLSObfs is shadowsocks tls simple-obfs implementation
@@ -75,8 +79,22 @@ func (to *TLSObfs) Read(b []byte) (int, error) {
 	// type + ver = 3
 	return to.read(b, 3)
 }
-
 func (to *TLSObfs) Write(b []byte) (int, error) {
+	for i := 0; i < len(b); i += chunkSize {
+		end := i + chunkSize
+		if end > len(b) {
+			end = len(b)
+		}
+
+		n, err := to.write(b[i:end])
+		if err != nil {
+			return n, err
+		}
+	}
+	return len(b), nil
+}
+
+func (to *TLSObfs) write(b []byte) (int, error) {
 	if to.firstRequest {
 		helloMsg := makeClientHelloMsg(b, to.server)
 		_, err := to.Conn.Write(helloMsg)
