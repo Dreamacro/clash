@@ -80,10 +80,11 @@ func (to *TLSObfs) Read(b []byte) (int, error) {
 	return to.read(b, 3)
 }
 func (to *TLSObfs) Write(b []byte) (int, error) {
-	for i := 0; i < len(b); i += chunkSize {
+	length := len(b)
+	for i := 0; i < length; i += chunkSize {
 		end := i + chunkSize
-		if end > len(b) {
-			end = len(b)
+		if end > length {
+			end = length
 		}
 
 		n, err := to.write(b[i:end])
@@ -91,7 +92,7 @@ func (to *TLSObfs) Write(b []byte) (int, error) {
 			return n, err
 		}
 	}
-	return len(b), nil
+	return length, nil
 }
 
 func (to *TLSObfs) write(b []byte) (int, error) {
