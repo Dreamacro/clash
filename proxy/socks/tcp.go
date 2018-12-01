@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/Dreamacro/clash/adapters/inbound"
+	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/tunnel"
 
 	"github.com/Dreamacro/go-shadowsocks2/socks"
@@ -60,5 +61,5 @@ func handleSocks(conn net.Conn) {
 		return
 	}
 	conn.(*net.TCPConn).SetKeepAlive(true)
-	tun.Add(adapters.NewSocket(target, conn))
+	tun.Add(adapters.NewSocket(target, conn, C.SOCKS))
 }

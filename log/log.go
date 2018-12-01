@@ -14,6 +14,10 @@ var (
 	level  = INFO
 )
 
+func init() {
+	log.SetLevel(log.DebugLevel)
+}
+
 type Event struct {
 	LogLevel LogLevel
 	Payload  string
@@ -45,6 +49,10 @@ func Debugln(format string, v ...interface{}) {
 	event := newLog(DEBUG, format, v...)
 	logCh <- event
 	print(event)
+}
+
+func Fatalln(format string, v ...interface{}) {
+	log.Fatalf(format, v...)
 }
 
 func Subscribe() observable.Subscription {

@@ -29,9 +29,12 @@ func (s *SocketAdapter) Conn() net.Conn {
 }
 
 // NewSocket is SocketAdapter generator
-func NewSocket(target socks.Addr, conn net.Conn) *SocketAdapter {
+func NewSocket(target socks.Addr, conn net.Conn, source C.SourceType) *SocketAdapter {
+	metadata := parseSocksAddr(target)
+	metadata.Source = source
+
 	return &SocketAdapter{
 		conn:     conn,
-		metadata: parseSocksAddr(target),
+		metadata: metadata,
 	}
 }

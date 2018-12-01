@@ -71,6 +71,6 @@ func (l LogLevel) String() string {
 	case DEBUG:
 		return "debug"
 	default:
-		return "unknow"
+		return "unknown"
 	}
 }

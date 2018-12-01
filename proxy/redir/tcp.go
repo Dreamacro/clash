@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/Dreamacro/clash/adapters/inbound"
+	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/tunnel"
 
 	log "github.com/sirupsen/logrus"
@@ -59,5 +60,5 @@ func handleRedir(conn net.Conn) {
 		return
 	}
 	conn.(*net.TCPConn).SetKeepAlive(true)
-	tun.Add(adapters.NewSocket(target, conn))
+	tun.Add(adapters.NewSocket(target, conn, C.REDIR))
 }

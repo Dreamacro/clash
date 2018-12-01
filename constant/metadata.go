@@ -15,6 +15,7 @@ const (
 
 	HTTP SourceType = iota
 	SOCKS
+	REDIR
 )
 
 type NetWork int

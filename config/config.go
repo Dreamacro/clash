@@ -3,12 +3,15 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 
 	adapters "github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/common/structure"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
 	R "github.com/Dreamacro/clash/rules"
 	T "github.com/Dreamacro/clash/tunnel"
@@ -28,6 +31,33 @@ type General struct {
 	Secret             string       `json:"secret,omitempty"`
 }
 
+// DNS config
+type DNS struct {
+	Enable     bool             `yaml:"enable"`
+	IPv6       bool             `yaml:"ipv6"`
+	NameServer []dns.NameServer `yaml:"nameserver"`
+	Fallback   []dns.NameServer `yaml:"fallback"`
+	Server     string           `yaml:"server"`
+	Mapping    bool             `yaml:"mapping"`
+}
+
+// Config is clash config manager
+type Config struct {
+	General *General
+	DNS     *DNS
+	Rules   []C.Rule
+	Proxies map[string]C.Proxy
+}
+
+type rawDNS struct {
+	Enable     bool     `yaml:"enable"`
+	IPv6       bool     `yaml:"ipv6"`
+	NameServer []string `yaml:"nameserver"`
+	Fallback   []string `yaml:"fallback"`
+	Server     string   `yaml:"server"`
+	Mapping    bool     `yaml:"mapping"`
+}
+
 type rawConfig struct {
 	Port               int    `yaml:"port"`
 	SocksPort          int    `yaml:"socks-port"`
@@ -38,16 +68,10 @@ type rawConfig struct {
 	ExternalController string `yaml:"external-controller"`
 	Secret             string `yaml:"secret"`
 
+	DNS        *rawDNS                  `yaml:"dns"`
 	Proxy      []map[string]interface{} `yaml:"Proxy"`
 	ProxyGroup []map[string]interface{} `yaml:"Proxy Group"`
 	Rule       []string                 `yaml:"Rule"`
-}
-
-// Config is clash config manager
-type Config struct {
-	General *General
-	Rules   []C.Rule
-	Proxies map[string]C.Proxy
 }
 
 func readConfig(path string) (*rawConfig, error) {
@@ -102,6 +126,12 @@ func Parse(path string) (*Config, error) {
 		return nil, err
 	}
 	config.Rules = rules
+
+	dnsCfg, err := parseDNS(rawCfg.DNS)
+	if err != nil {
+		return nil, err
+	}
+	config.DNS = dnsCfg
 
 	return config, nil
 }
@@ -312,4 +342,80 @@ func parseRules(cfg *rawConfig) ([]C.Rule, error) {
 	}
 
 	return rules, nil
+}
+
+func hostWithDefaultPort(host string, defPort string) (string, error) {
+	if !strings.Contains(host, ":") {
+		host += ":"
+	}
+
+	hostname, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return "", err
+	}
+
+	if port == "" {
+		port = defPort
+	}
+
+	return net.JoinHostPort(hostname, port), nil
+}
+
+func parseNameServer(servers []string) ([]dns.NameServer, error) {
+	nameservers := []dns.NameServer{}
+	log.Debugln("%#v", servers)
+
+	for idx, server := range servers {
+		// parse without scheme .e.g 8.8.8.8:53
+		if host, err := hostWithDefaultPort(server, "53"); err == nil {
+			nameservers = append(
+				nameservers,
+				dns.NameServer{Addr: host},
+			)
+			continue
+		}
+
+		u, err := url.Parse(server)
+		if err != nil {
+			return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
+		}
+
+		if u.Scheme != "tls" {
+			return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
+		}
+
+		host, err := hostWithDefaultPort(u.Path, "853")
+
+		nameservers = append(
+			nameservers,
+			dns.NameServer{
+				Net:  "tcp-tls",
+				Addr: host,
+			},
+		)
+	}
+
+	return nameservers, nil
+}
+
+func parseDNS(cfg *rawDNS) (*DNS, error) {
+	if cfg.Enable && len(cfg.NameServer) == 0 {
+		return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
+	}
+
+	dnsCfg := &DNS{
+		Enable:  cfg.Enable,
+		Server:  cfg.Server,
+		Mapping: cfg.Mapping,
+	}
+
+	if nameserver, err := parseNameServer(cfg.NameServer); err == nil {
+		dnsCfg.NameServer = nameserver
+	}
+
+	if fallback, err := parseNameServer(cfg.Fallback); err == nil {
+		dnsCfg.Fallback = fallback
+	}
+
+	return dnsCfg, nil
 }
