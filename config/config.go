@@ -384,8 +384,7 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 			return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
 		}
 
-		host, err := hostWithDefaultPort(u.Path, "853")
-
+		host, err := hostWithDefaultPort(u.Host, "853")
 		nameservers = append(
 			nameservers,
 			dns.NameServer{
