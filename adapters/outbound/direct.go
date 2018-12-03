@@ -33,7 +33,12 @@ func (d *Direct) Type() C.AdapterType {
 }
 
 func (d *Direct) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err error) {
-	c, err := net.DialTimeout("tcp", net.JoinHostPort(metadata.String(), metadata.Port), tcpTimeout)
+	address := net.JoinHostPort(metadata.Host, metadata.Port)
+	if metadata.IP != nil {
+		address = net.JoinHostPort(metadata.IP.String(), metadata.Port)
+	}
+
+	c, err := net.DialTimeout("tcp", address, tcpTimeout)
 	if err != nil {
 		return
 	}
