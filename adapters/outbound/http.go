@@ -17,16 +17,16 @@ import (
 )
 
 // HTTPAdapter is a proxy adapter
-type httpAdapter struct {
+type HTTPAdapter struct {
 	conn net.Conn
 }
 
 // Close is used to close connection
-func (ha *httpAdapter) Close() {
+func (ha *HTTPAdapter) Close() {
 	ha.conn.Close()
 }
 
-func (ha *httpAdapter) Conn() net.Conn {
+func (ha *HTTPAdapter) Conn() net.Conn {
 	return ha.conn
 }
 
@@ -74,7 +74,7 @@ func (h *Http) Generator(metadata *C.Metadata) (adapter C.ProxyAdapter, err erro
 		return nil, err
 	}
 
-	return &httpAdapter{conn: c}, nil
+	return &HTTPAdapter{conn: c}, nil
 }
 
 func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
@@ -90,7 +90,7 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 		auth := h.user + ":" + h.pass
 		buf.WriteString("Proxy-Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte(auth)) + "\r\n")
 	}
-	//header ended
+	// header ended
 	buf.WriteString("\r\n")
 
 	_, err = rw.Write(buf.Bytes())
