@@ -12,6 +12,7 @@ const (
 	Selector
 	Shadowsocks
 	Socks5
+	Http
 	URLTest
 	Vmess
 )
@@ -50,6 +51,8 @@ func (at AdapterType) String() string {
 		return "Shadowsocks"
 	case Socks5:
 		return "Socks5"
+	case Http:
+		return "Http"
 	case URLTest:
 		return "URLTest"
 	case Vmess:

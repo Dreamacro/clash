@@ -5,9 +5,8 @@ import (
 
 	"github.com/Dreamacro/clash/adapters/inbound"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/log"
 	"github.com/Dreamacro/clash/tunnel"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -28,7 +27,7 @@ func NewRedirProxy(addr string) (*redirListener, error) {
 	rl := &redirListener{l, addr, false}
 
 	go func() {
-		log.Infof("Redir proxy listening at: %s", addr)
+		log.Infoln("Redir proxy listening at: %s", addr)
 		for {
 			c, err := l.Accept()
 			if err != nil {

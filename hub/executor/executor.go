@@ -67,6 +67,9 @@ func updateRules(rules []C.Rule) {
 }
 
 func updateGeneral(general *config.General) {
+	log.SetLevel(general.LogLevel)
+	T.Instance().SetMode(general.Mode)
+
 	allowLan := general.AllowLan
 
 	P.SetAllowLan(allowLan)
@@ -81,7 +84,4 @@ func updateGeneral(general *config.General) {
 	if err := P.ReCreateRedir(general.RedirPort); err != nil {
 		log.Errorln("Start Redir server error: %s", err.Error())
 	}
-
-	log.SetLevel(general.LogLevel)
-	T.Instance().SetMode(general.Mode)
 }

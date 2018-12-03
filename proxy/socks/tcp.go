@@ -5,10 +5,10 @@ import (
 
 	"github.com/Dreamacro/clash/adapters/inbound"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/log"
 	"github.com/Dreamacro/clash/tunnel"
 
 	"github.com/Dreamacro/go-shadowsocks2/socks"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -29,7 +29,7 @@ func NewSocksProxy(addr string) (*sockListener, error) {
 
 	sl := &sockListener{l, addr, false}
 	go func() {
-		log.Infof("SOCKS proxy listening at: %s", addr)
+		log.Infoln("SOCKS proxy listening at: %s", addr)
 		for {
 			c, err := l.Accept()
 			if err != nil {

@@ -14,6 +14,7 @@ var (
 		"warning": WARNING,
 		"info":    INFO,
 		"debug":   DEBUG,
+		"silent":  SILENT,
 	}
 )
 
@@ -22,6 +23,7 @@ const (
 	INFO
 	WARNING
 	ERROR
+	SILENT
 )
 
 type LogLevel int
@@ -70,6 +72,8 @@ func (l LogLevel) String() string {
 		return "error"
 	case DEBUG:
 		return "debug"
+	case SILENT:
+		return "silent"
 	default:
 		return "unknown"
 	}
