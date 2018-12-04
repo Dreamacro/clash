@@ -51,6 +51,7 @@ func ReCreateServer(addr string, resolver *Resolver) error {
 		return err
 	}
 
+	address = addr
 	server = &Server{r: resolver}
 	server.Server = &D.Server{Addr: addr, PacketConn: p, Handler: server}
 
