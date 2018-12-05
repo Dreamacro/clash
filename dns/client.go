@@ -226,7 +226,7 @@ type nameserver struct {
 type Config struct {
 	Main, Fallback []NameServer
 	IPv6           bool
-	Mapping        bool
+	EnhancedMode   EnhancedMode
 }
 
 func transform(servers []NameServer) []*nameserver {
@@ -251,9 +251,10 @@ func New(config Config) *Resolver {
 	})
 
 	r := &Resolver{
-		main:  transform(config.Main),
-		ipv6:  config.IPv6,
-		cache: cache.New(time.Second * 60),
+		main:    transform(config.Main),
+		ipv6:    config.IPv6,
+		cache:   cache.New(time.Second * 60),
+		mapping: config.EnhancedMode == MAPPING,
 	}
 	if config.Fallback != nil {
 		r.fallback = transform(config.Fallback)

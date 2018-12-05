@@ -14,18 +14,18 @@ var (
 	tun = tunnel.Instance()
 )
 
-type httpListener struct {
+type HttpListener struct {
 	net.Listener
 	address string
 	closed  bool
 }
 
-func NewHttpProxy(addr string) (*httpListener, error) {
+func NewHttpProxy(addr string) (*HttpListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	hl := &httpListener{l, addr, false}
+	hl := &HttpListener{l, addr, false}
 
 	go func() {
 		log.Infoln("HTTP proxy listening at: %s", addr)
@@ -44,12 +44,12 @@ func NewHttpProxy(addr string) (*httpListener, error) {
 	return hl, nil
 }
 
-func (l *httpListener) Close() {
+func (l *HttpListener) Close() {
 	l.closed = true
 	l.Listener.Close()
 }
 
-func (l *httpListener) Address() string {
+func (l *HttpListener) Address() string {
 	return l.address
 }
 

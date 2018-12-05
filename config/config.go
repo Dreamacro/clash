@@ -33,12 +33,12 @@ type General struct {
 
 // DNS config
 type DNS struct {
-	Enable     bool             `yaml:"enable"`
-	IPv6       bool             `yaml:"ipv6"`
-	NameServer []dns.NameServer `yaml:"nameserver"`
-	Fallback   []dns.NameServer `yaml:"fallback"`
-	Server     string           `yaml:"server"`
-	Mapping    bool             `yaml:"mapping"`
+	Enable       bool             `yaml:"enable"`
+	IPv6         bool             `yaml:"ipv6"`
+	NameServer   []dns.NameServer `yaml:"nameserver"`
+	Fallback     []dns.NameServer `yaml:"fallback"`
+	Listen       string           `yaml:"listen"`
+	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
 }
 
 // Config is clash config manager
@@ -50,23 +50,23 @@ type Config struct {
 }
 
 type rawDNS struct {
-	Enable     bool     `yaml:"enable"`
-	IPv6       bool     `yaml:"ipv6"`
-	NameServer []string `yaml:"nameserver"`
-	Fallback   []string `yaml:"fallback"`
-	Server     string   `yaml:"server"`
-	Mapping    bool     `yaml:"mapping"`
+	Enable       bool             `yaml:"enable"`
+	IPv6         bool             `yaml:"ipv6"`
+	NameServer   []string         `yaml:"nameserver"`
+	Fallback     []string         `yaml:"fallback"`
+	Listen       string           `yaml:"listen"`
+	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
 }
 
 type rawConfig struct {
-	Port               int    `yaml:"port"`
-	SocksPort          int    `yaml:"socks-port"`
-	RedirPort          int    `yaml:"redir-port"`
-	AllowLan           bool   `yaml:"allow-lan"`
-	Mode               string `yaml:"mode"`
-	LogLevel           string `yaml:"log-level"`
-	ExternalController string `yaml:"external-controller"`
-	Secret             string `yaml:"secret"`
+	Port               int          `yaml:"port"`
+	SocksPort          int          `yaml:"socks-port"`
+	RedirPort          int          `yaml:"redir-port"`
+	AllowLan           bool         `yaml:"allow-lan"`
+	Mode               T.Mode       `yaml:"mode"`
+	LogLevel           log.LogLevel `yaml:"log-level"`
+	ExternalController string       `yaml:"external-controller"`
+	Secret             string       `yaml:"secret"`
 
 	DNS        *rawDNS                  `yaml:"dns"`
 	Proxy      []map[string]interface{} `yaml:"Proxy"`
@@ -90,8 +90,8 @@ func readConfig(path string) (*rawConfig, error) {
 	// config with some default value
 	rawConfig := &rawConfig{
 		AllowLan:   false,
-		Mode:       T.Rule.String(),
-		LogLevel:   log.INFO.String(),
+		Mode:       T.Rule,
+		LogLevel:   log.INFO,
 		Rule:       []string{},
 		Proxy:      []map[string]interface{}{},
 		ProxyGroup: []map[string]interface{}{},
@@ -141,20 +141,10 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
 	allowLan := cfg.AllowLan
-	logLevelString := cfg.LogLevel
-	modeString := cfg.Mode
 	externalController := cfg.ExternalController
 	secret := cfg.Secret
-
-	mode, exist := T.ModeMapping[modeString]
-	if !exist {
-		return nil, fmt.Errorf("General.mode value invalid")
-	}
-
-	logLevel, exist := log.LogLevelMapping[logLevelString]
-	if !exist {
-		return nil, fmt.Errorf("General.log-level value invalid")
-	}
+	mode := cfg.Mode
+	logLevel := cfg.LogLevel
 
 	general := &General{
 		Port:               port,
@@ -410,9 +400,9 @@ func parseDNS(cfg *rawDNS) (*DNS, error) {
 	}
 
 	dnsCfg := &DNS{
-		Enable:  cfg.Enable,
-		Server:  cfg.Server,
-		Mapping: cfg.Mapping,
+		Enable:       cfg.Enable,
+		Listen:       cfg.Listen,
+		EnhancedMode: cfg.EnhancedMode,
 	}
 
 	if nameserver, err := parseNameServer(cfg.NameServer); err == nil {

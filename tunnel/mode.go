@@ -10,9 +10,9 @@ type Mode int
 var (
 	// ModeMapping is a mapping for Mode enum
 	ModeMapping = map[string]Mode{
-		"Global": Global,
-		"Rule":   Rule,
-		"Direct": Direct,
+		Global.String(): Global,
+		Rule.String():   Rule,
+		Direct.String(): Direct,
 	}
 )
 
@@ -26,6 +26,18 @@ const (
 func (m *Mode) UnmarshalJSON(data []byte) error {
 	var tp string
 	json.Unmarshal(data, &tp)
+	mode, exist := ModeMapping[tp]
+	if !exist {
+		return errors.New("invalid mode")
+	}
+	*m = mode
+	return nil
+}
+
+// UnmarshalYAML unserialize Mode with yaml
+func (m *Mode) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var tp string
+	unmarshal(&tp)
 	mode, exist := ModeMapping[tp]
 	if !exist {
 		return errors.New("invalid mode")

@@ -15,19 +15,19 @@ var (
 	tun = tunnel.Instance()
 )
 
-type sockListener struct {
+type SockListener struct {
 	net.Listener
 	address string
 	closed  bool
 }
 
-func NewSocksProxy(addr string) (*sockListener, error) {
+func NewSocksProxy(addr string) (*SockListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	sl := &sockListener{l, addr, false}
+	sl := &SockListener{l, addr, false}
 	go func() {
 		log.Infoln("SOCKS proxy listening at: %s", addr)
 		for {
@@ -45,12 +45,12 @@ func NewSocksProxy(addr string) (*sockListener, error) {
 	return sl, nil
 }
 
-func (l *sockListener) Close() {
+func (l *SockListener) Close() {
 	l.closed = true
 	l.Listener.Close()
 }
 
-func (l *sockListener) Address() string {
+func (l *SockListener) Address() string {
 	return l.address
 }
 

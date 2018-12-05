@@ -49,13 +49,13 @@ func updateDNS(c *config.DNS) {
 		return
 	}
 	r := dns.New(dns.Config{
-		Main:     c.NameServer,
-		Fallback: c.Fallback,
-		IPv6:     c.IPv6,
-		Mapping:  c.Mapping,
+		Main:         c.NameServer,
+		Fallback:     c.Fallback,
+		IPv6:         c.IPv6,
+		EnhancedMode: c.EnhancedMode,
 	})
 	T.Instance().SetResolver(r)
-	dns.ReCreateServer(c.Server, r)
+	dns.ReCreateServer(c.Listen, r)
 }
 
 func updateProxies(proxies map[string]C.Proxy) {

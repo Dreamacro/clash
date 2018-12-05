@@ -13,9 +13,9 @@ import (
 var (
 	allowLan = false
 
-	socksListener listener
-	httpListener  listener
-	redirListener listener
+	socksListener *socks.SockListener
+	httpListener  *http.HttpListener
+	redirListener *redir.RedirListener
 )
 
 type listener interface {
