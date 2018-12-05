@@ -178,6 +178,7 @@ func (r *Resolver) msgToIP(msg *D.Msg) ([]net.IP, error) {
 				continue
 			}
 			ips = append(ips, ans.AAAA)
+			continue
 		}
 
 		ans, ok := answer.(*D.A)
