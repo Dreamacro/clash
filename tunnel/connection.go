@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, proxy C.ProxyAdapter)
 	req := request.R
 	host := req.Host
 	keepalive := true
-	if req.Header.Get("Connection") == "close" {
+	if strings.ToLower(req.Header.Get("Connection")) == "close" {
 		keepalive = false
 	}
 
