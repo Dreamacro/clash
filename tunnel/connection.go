@@ -25,6 +25,10 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, proxy C.ProxyAdapter)
 	conn := newTrafficTrack(proxy.Conn(), t.traffic)
 	req := request.R
 	host := req.Host
+	keepalive := true
+	if req.Header.Get("Connection") == "close" {
+		keepalive = false
+	}
 
 	for {
 		req.Header.Set("Connection", "close")
@@ -50,6 +54,10 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, proxy C.ProxyAdapter)
 		}
 		err = resp.Write(request.Conn())
 		if err != nil || resp.Close {
+			break
+		}
+
+		if !keepalive {
 			break
 		}
 
