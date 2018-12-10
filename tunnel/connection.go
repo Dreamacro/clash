@@ -27,11 +27,12 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, proxy C.ProxyAdapter)
 	req := request.R
 	host := req.Host
 	keepalive := true
-	if strings.ToLower(req.Header.Get("Connection")) == "close" {
-		keepalive = false
-	}
 
 	for {
+		if strings.ToLower(req.Header.Get("Connection")) == "close" {
+			keepalive = false
+		}
+
 		req.Header.Set("Connection", "close")
 		req.RequestURI = ""
 		adapters.RemoveHopByHopHeaders(req.Header)
