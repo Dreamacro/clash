@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	RuleCacheLifeSeconds   = 600
-	RuleCacheExpireSeconds = 120
+	CacheExpireSeconds = 1200
+	CacheCheckSeconds  = 120
 )
 
 var (
@@ -58,7 +58,7 @@ func (t *Tunnel) UpdateRules(rules []C.Rule) {
 	t.configLock.Lock()
 	t.rules = rules
 	// flush rule cache
-	t.cache = cache.New(RuleCacheExpireSeconds * time.Second)
+	t.cache = cache.New(CacheCheckSeconds * time.Second)
 	t.configLock.Unlock()
 }
 
@@ -173,12 +173,12 @@ func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
 				continue
 			}
 			log.Infoln("%v match %s using %s", key, rule.RuleType().String(), rule.Adapter())
-			t.cache.Put(key, a, RuleCacheLifeSeconds*time.Second)
+			t.cache.Put(key, a, CacheExpireSeconds*time.Second)
 			return a
 		}
 	}
 	log.Infoln("%v doesn't match any rule using DIRECT", key)
-	t.cache.Put(key, t.proxies["DIRECT"], RuleCacheLifeSeconds*time.Second)
+	t.cache.Put(key, t.proxies["DIRECT"], CacheExpireSeconds*time.Second)
 	return t.proxies["DIRECT"]
 }
 
@@ -189,7 +189,7 @@ func newTunnel() *Tunnel {
 		configLock: &sync.RWMutex{},
 		traffic:    C.NewTraffic(time.Second),
 		mode:       Rule,
-		cache:      cache.New(RuleCacheExpireSeconds * time.Second),
+		cache:      cache.New(CacheCheckSeconds * time.Second),
 	}
 }
 
