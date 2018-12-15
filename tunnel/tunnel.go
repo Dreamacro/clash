@@ -6,11 +6,17 @@ import (
 	"time"
 
 	InboundAdapter "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/common/cache"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
 
 	"gopkg.in/eapache/channels.v1"
+)
+
+const (
+	RuleCacheLifeSeconds   = 600
+	RuleCacheExpireSeconds = 120
 )
 
 var (
@@ -26,6 +32,7 @@ type Tunnel struct {
 	configLock *sync.RWMutex
 	traffic    *C.Traffic
 	resolver   *dns.Resolver
+	cache      *cache.Cache
 
 	// Outbound Rule
 	mode Mode
@@ -50,6 +57,8 @@ func (t *Tunnel) Rules() []C.Rule {
 func (t *Tunnel) UpdateRules(rules []C.Rule) {
 	t.configLock.Lock()
 	t.rules = rules
+	// flush rule cache
+	t.cache = cache.New(RuleCacheExpireSeconds * time.Second)
 	t.configLock.Unlock()
 }
 
@@ -151,17 +160,25 @@ func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
 	t.configLock.RLock()
 	defer t.configLock.RUnlock()
 
+	key := metadata.String()
+	cache := t.cache.Get(key)
+	if cache != nil {
+		return cache.(C.Proxy)
+	}
+
 	for _, rule := range t.rules {
 		if rule.IsMatch(metadata) {
 			a, ok := t.proxies[rule.Adapter()]
 			if !ok {
 				continue
 			}
-			log.Infoln("%v match %s using %s", metadata.String(), rule.RuleType().String(), rule.Adapter())
+			log.Infoln("%v match %s using %s", key, rule.RuleType().String(), rule.Adapter())
+			t.cache.Put(key, a, RuleCacheLifeSeconds*time.Second)
 			return a
 		}
 	}
-	log.Infoln("%v doesn't match any rule using DIRECT", metadata.String())
+	log.Infoln("%v doesn't match any rule using DIRECT", key)
+	t.cache.Put(key, t.proxies["DIRECT"], RuleCacheLifeSeconds*time.Second)
 	return t.proxies["DIRECT"]
 }
 
@@ -172,6 +189,7 @@ func newTunnel() *Tunnel {
 		configLock: &sync.RWMutex{},
 		traffic:    C.NewTraffic(time.Second),
 		mode:       Rule,
+		cache:      cache.New(RuleCacheExpireSeconds * time.Second),
 	}
 }
 
