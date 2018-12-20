@@ -81,8 +81,8 @@ func (ho *HTTPObfs) Write(b []byte) (int, error) {
 		buf.Write(b)
 		ho.firstRequest = false
 		return ho.Conn.Write(buf.Bytes())
-
 	}
+
 	return ho.Conn.Write(b)
 }
 
