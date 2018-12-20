@@ -7,8 +7,16 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"net/http"
 )
+
+var HTTP = "GET / HTTP/1.1\r\n" +
+	"Host: %s\r\n" +
+	"User-Agent: curl/7.%d.%d\r\n" +
+	"Upgrade: websocket\r\n" +
+	"Connection: Upgrade\r\n" +
+	"Sec-WebSocket-Key: %s\r\n" +
+	"Content-Length: %d\r\n" +
+	"\r\n"
 
 // HTTPObfs is shadowsocks http simple-obfs implementation
 type HTTPObfs struct {
@@ -61,18 +69,20 @@ func (ho *HTTPObfs) Write(b []byte) (int, error) {
 	if ho.firstRequest {
 		randBytes := make([]byte, 16)
 		rand.Read(randBytes)
-		req, _ := http.NewRequest("GET", fmt.Sprintf("http://%s/", ho.host), bytes.NewBuffer(b[:]))
-		req.Header.Set("User-Agent", fmt.Sprintf("curl/7.%d.%d", rand.Int()%54, rand.Int()%2))
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Connection", "Upgrade")
-		req.Host = fmt.Sprintf("%s:%s", ho.host, ho.port)
-		req.Header.Set("Sec-WebSocket-Key", base64.URLEncoding.EncodeToString(randBytes))
-		req.ContentLength = int64(len(b))
-		err := req.Write(ho.Conn)
-		ho.firstRequest = false
-		return len(b), err
-	}
+		buf := new(bytes.Buffer)
+		buf.WriteString(
+			fmt.Sprintf(HTTP,
+				ho.host,
+				rand.Int()%54,
+				rand.Int()%2,
+				base64.URLEncoding.EncodeToString(randBytes),
+				len(b)))
 
+		buf.Write(b)
+		ho.firstRequest = false
+		return ho.Conn.Write(buf.Bytes())
+
+	}
 	return ho.Conn.Write(b)
 }
 
