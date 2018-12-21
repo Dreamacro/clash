@@ -47,19 +47,23 @@ func Start(addr string, secret string) {
 		MaxAge:         300,
 	})
 
-	r.Use(cors.Handler, authentication)
+	r.Group(func(r chi.Router) {
+		r.Use(cors.Handler, authentication)
 
-	r.With(jsonContentType).Get("/traffic", traffic)
-	r.With(jsonContentType).Get("/logs", getLogs)
-	r.Mount("/configs", configRouter())
-	r.Mount("/proxies", proxyRouter())
-	r.Mount("/rules", ruleRouter())
+		r.With(jsonContentType).Get("/traffic", traffic)
+		r.With(jsonContentType).Get("/logs", getLogs)
+		r.Mount("/configs", configRouter())
+		r.Mount("/proxies", proxyRouter())
+		r.Mount("/rules", ruleRouter())
+	})
 
 	if uiPath != "" {
-		fs := http.StripPrefix("/ui", http.FileServer(http.Dir(uiPath)))
-		r.Get("/ui", http.RedirectHandler("/ui/", 301).ServeHTTP)
-		r.Get("/ui/*", func(w http.ResponseWriter, r *http.Request) {
-			fs.ServeHTTP(w, r)
+		r.Group(func(r chi.Router) {
+			fs := http.StripPrefix("/ui", http.FileServer(http.Dir(uiPath)))
+			r.Get("/ui", http.RedirectHandler("/ui/", 301).ServeHTTP)
+			r.Get("/ui/*", func(w http.ResponseWriter, r *http.Request) {
+				fs.ServeHTTP(w, r)
+			})
 		})
 	}
 
