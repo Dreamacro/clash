@@ -45,7 +45,9 @@ func GetGeneral() *config.General {
 func updateDNS(c *config.DNS) {
 	if c.Enable == false {
 		T.Instance().SetResolver(nil)
-		dns.ReCreateServer("", nil)
+		if err := dns.ReCreateServer("", nil); err != nil {
+			log.Errorln("Start DNS server error: %s", err.Error())
+		}
 		return
 	}
 	r := dns.New(dns.Config{
@@ -55,7 +57,9 @@ func updateDNS(c *config.DNS) {
 		EnhancedMode: c.EnhancedMode,
 	})
 	T.Instance().SetResolver(r)
-	dns.ReCreateServer(c.Listen, r)
+	if err := dns.ReCreateServer(c.Listen, r); err != nil {
+		log.Errorln("Start DNS server error: %s", err.Error())
+	}
 }
 
 func updateProxies(proxies map[string]C.Proxy) {
