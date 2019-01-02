@@ -45,9 +45,7 @@ func GetGeneral() *config.General {
 func updateDNS(c *config.DNS) {
 	if c.Enable == false {
 		T.Instance().SetResolver(nil)
-		if err := dns.ReCreateServer("", nil); err != nil {
-			log.Errorln("Start DNS server error: %s", err.Error())
-		}
+		dns.ReCreateServer("", nil)
 		return
 	}
 	r := dns.New(dns.Config{
