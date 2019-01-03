@@ -293,10 +293,13 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	}
 
 	// parse proxy group
+	if err := ProxyGroupsDagSort(groupsConfig); err != nil {
+		return nil, err
+	}
 	for idx, mapping := range groupsConfig {
 		groupType, existType := mapping["type"].(string)
 		groupName, existName := mapping["name"].(string)
-		if !existType && existName {
+		if !(existType && existName) {
 			return nil, fmt.Errorf("ProxyGroup %d: missing type or name", idx)
 		}
 
