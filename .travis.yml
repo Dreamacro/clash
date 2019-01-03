@@ -21,6 +21,6 @@ deploy:
   file: bin/*
   file_glob: true
   on:
-    repo: Dreamacro/clash
+    repo: silvernoo/clash
     branch: master
     tags: true
