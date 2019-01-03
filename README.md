@@ -8,8 +8,8 @@
 <h4 align="center">A rule-based tunnel in Go.</h4>
 
 <p align="center">
-  <a href="https://travis-ci.org/Dreamacro/clash">
-    <img src="https://img.shields.io/travis/Dreamacro/clash.svg?style=flat-square"
+  <a href="https://travis-ci.org/silvernoo/clash">
+    <img src="https://img.shields.io/travis/silvernoo/clash.svg?style=flat-square"
          alt="Travis-CI">
   </a>
   <a href="https://goreportcard.com/report/github.com/Dreamacro/clash">
