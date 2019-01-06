@@ -60,7 +60,7 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 
 	addr := net.JoinHostPort(metadata.Host, metadata.Port)
 	buf.WriteString("CONNECT " + addr + " HTTP/1.1\r\n")
-	buf.WriteString("Host: " + addr + "\r\n")
+	buf.WriteString("Host: " + metadata.Host + "\r\n")
 	buf.WriteString("Proxy-Connection: Keep-Alive\r\n")
 
 	if h.user != "" && h.pass != "" {
