@@ -6,6 +6,7 @@ const (
 	DomainSuffix
 	DomainKeyword
 	GEOIP
+	IPIP
 	IPCIDR
 	FINAL
 )
@@ -22,6 +23,8 @@ func (rt RuleType) String() string {
 		return "DomainKeyword"
 	case GEOIP:
 		return "GEOIP"
+	case IPIP:
+		return "IPIP"
 	case IPCIDR:
 		return "IPCIDR"
 	case FINAL:

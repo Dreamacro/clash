@@ -47,3 +47,7 @@ func (p *path) Config() string {
 func (p *path) MMDB() string {
 	return P.Join(p.homedir, "Country.mmdb")
 }
+
+func (p *path) IPIP() string {
+	return P.Join(p.homedir, "ipiptest.ipdb")
+}

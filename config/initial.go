@@ -77,5 +77,23 @@ func Init(dir string) error {
 			return fmt.Errorf("Can't download MMDB: %s", err.Error())
 		}
 	}
+
+	// initial ipip db
+	if _, err := os.Stat(C.Path.IPIP()); os.IsNotExist(err) {
+		log.Info("Can't find IPIP, start download")
+		res, err := http.Get("https://raw.githubusercontent.com/antonchen/clash/storage/ipiptest.ipdb")
+		if err != nil {
+			return fmt.Errorf("Can't download IPIP: %s", err.Error())
+		}
+		f, err := os.OpenFile(C.Path.IPIP(), os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("Can't create IPIP: %s", err.Error())
+		}
+		defer f.Close()
+		_, err = io.Copy(f, res.Body)
+		if err != nil {
+			return fmt.Errorf("Can't write IPIP: %s", err.Error())
+		}
+	}
 	return nil
 }
