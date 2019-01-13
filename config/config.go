@@ -324,7 +324,7 @@ func parseRules(cfg *rawConfig) ([]C.Rule, error) {
 			payload = rule[1]
 			target = rule[2]
 		default:
-			return nil, fmt.Errorf("Rules[%d] error: format invalid", idx)
+			return nil, fmt.Errorf("Rules[%d] [- %s] error: format invalid", idx, line)
 		}
 
 		rule = trimArr(rule)
