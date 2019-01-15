@@ -40,7 +40,7 @@ type Metadata struct {
 }
 
 func (addr *Metadata) String() string {
-	if addr.Host == "" {
+	if addr.Host == "" && addr.IP != nil {
 		return addr.IP.String()
 	}
 	return addr.Host
