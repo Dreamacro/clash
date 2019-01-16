@@ -33,6 +33,7 @@ type SourceType int
 type Metadata struct {
 	NetWork  NetWork
 	Source   SourceType
+	SourceIP *net.IP
 	AddrType int
 	Host     string
 	IP       *net.IP

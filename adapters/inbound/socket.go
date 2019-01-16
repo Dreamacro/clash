@@ -32,6 +32,7 @@ func (s *SocketAdapter) Conn() net.Conn {
 func NewSocket(target socks.Addr, conn net.Conn, source C.SourceType) *SocketAdapter {
 	metadata := parseSocksAddr(target)
 	metadata.Source = source
+	metadata.SourceIP = parseSourceIP(conn)
 
 	return &SocketAdapter{
 		conn:     conn,

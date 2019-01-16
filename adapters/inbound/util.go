@@ -61,3 +61,10 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 
 	return metadata
 }
+
+func parseSourceIP(conn net.Conn) *net.IP {
+	if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		return &addr.IP
+	}
+	return nil
+}

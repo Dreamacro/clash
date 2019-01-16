@@ -32,8 +32,10 @@ func (h *HTTPAdapter) Conn() net.Conn {
 
 // NewHTTP is HTTPAdapter generator
 func NewHTTP(request *http.Request, conn net.Conn) *HTTPAdapter {
+	metadata := parseHTTPAddr(request)
+	metadata.SourceIP = parseSourceIP(conn)
 	return &HTTPAdapter{
-		metadata: parseHTTPAddr(request),
+		metadata: metadata,
 		R:        request,
 		conn:     conn,
 	}

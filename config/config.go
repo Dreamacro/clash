@@ -338,7 +338,9 @@ func parseRules(cfg *rawConfig) ([]C.Rule, error) {
 		case "GEOIP":
 			rules = append(rules, R.NewGEOIP(payload, target))
 		case "IP-CIDR", "IP-CIDR6":
-			rules = append(rules, R.NewIPCIDR(payload, target))
+			rules = append(rules, R.NewIPCIDR(payload, target, false))
+		case "SOURCE-IP-CIDR":
+			rules = append(rules, R.NewIPCIDR(payload, target, true))
 		case "MATCH":
 			fallthrough
 		case "FINAL":
