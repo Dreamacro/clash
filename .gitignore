@@ -14,3 +14,7 @@ bin/*
 
 # dep
 vendor
+
+# Output directory
+/bin
+
