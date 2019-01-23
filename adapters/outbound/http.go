@@ -47,8 +47,15 @@ func (h *Http) Generator(metadata *C.Metadata) (net.Conn, error) {
 		return nil, fmt.Errorf("%s connect error", h.addr)
 	}
 	tcpKeepAlive(c)
-	if err := h.shakeHand(metadata, c); err != nil {
-		return nil, err
+	if metadata.IsHttps {
+		if err := h.shakeHand(metadata, c); err != nil {
+			return nil, err
+		}
+	} else {
+		if h.user != "" && h.pass != "" {
+			auth := h.user + ":" + h.pass
+			metadata.Auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+		}
 	}
 
 	return c, nil

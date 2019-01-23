@@ -37,6 +37,8 @@ type Metadata struct {
 	Host     string
 	IP       *net.IP
 	Port     string
+	IsHttps  bool
+	Auth     string
 }
 
 func (addr *Metadata) String() string {

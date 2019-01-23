@@ -39,6 +39,11 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 		port = "80"
 	}
 
+	isHttps := false
+	if request.Method == http.MethodConnect {
+		isHttps = true
+	}
+
 	metadata := &C.Metadata{
 		NetWork:  C.TCP,
 		Source:   C.HTTP,
@@ -46,6 +51,7 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 		Host:     host,
 		IP:       nil,
 		Port:     port,
+		IsHttps:  isHttps,
 	}
 
 	ip := net.ParseIP(host)

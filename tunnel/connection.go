@@ -33,9 +33,12 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		}
 
 		req.Header.Set("Connection", "close")
-		req.RequestURI = ""
+		// req.RequestURI = ""
 		adapters.RemoveHopByHopHeaders(req.Header)
-		err := req.Write(conn)
+		if len(request.Metadata().Auth) > 0 {
+			req.Header.Set("Proxy-Authorization", request.Metadata().Auth)
+		}
+		err := req.WriteProxy(conn)
 		if err != nil {
 			break
 		}
