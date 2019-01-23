@@ -106,7 +106,7 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	defer localConn.Close()
 	metadata := localConn.Metadata()
 
-	if metadata.Source == C.REDIR && t.resolver != nil {
+	if len(metadata.Host) <= 0 && t.resolver != nil {
 		host, exist := t.resolver.IPToHost(*metadata.IP)
 		if exist {
 			metadata.Host = host
