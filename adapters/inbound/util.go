@@ -29,10 +29,6 @@ func parseSocksAddr(target socks.Addr) *C.Metadata {
 		metadata.Port = strconv.Itoa((int(target[1+net.IPv6len]) << 8) | int(target[1+net.IPv6len+1]))
 	}
 
-	if len(metadata.Host) > 0 {
-		parseIP(metadata)
-	}
-
 	return metadata
 }
 
@@ -52,19 +48,16 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 		Port:     port,
 	}
 
-	parseIP(metadata)
-	return metadata
-}
-
-func parseIP(m *C.Metadata) {
-	ip := net.ParseIP(m.Host)
+	ip := net.ParseIP(host)
 	if ip != nil {
 		switch {
 		case ip.To4() == nil:
-			m.AddrType = C.AtypIPv6
+			metadata.AddrType = C.AtypIPv6
 		default:
-			m.AddrType = C.AtypIPv4
+			metadata.AddrType = C.AtypIPv4
 		}
-		m.IP = &ip
+		metadata.IP = &ip
 	}
+
+	return metadata
 }

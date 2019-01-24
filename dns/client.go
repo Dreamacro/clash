@@ -148,6 +148,11 @@ func (r *Resolver) resolveIP(m *D.Msg) (msg *D.Msg, err error) {
 }
 
 func (r *Resolver) ResolveIP(host string) (ip net.IP, err error) {
+	ip = net.ParseIP(host)
+	if ip != nil {
+		return ip, nil
+	}
+
 	query := &D.Msg{}
 	dnsType := D.TypeA
 	if r.ipv6 {
