@@ -47,15 +47,17 @@ func (h *Http) Generator(metadata *C.Metadata) (net.Conn, error) {
 		return nil, fmt.Errorf("%s connect error", h.addr)
 	}
 	tcpKeepAlive(c)
-	if metadata.IsHttps {
-		if err := h.shakeHand(metadata, c); err != nil {
-			return nil, err
-		}
-	} else {
-		if h.user != "" && h.pass != "" {
-			auth := h.user + ":" + h.pass
-			metadata.Auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-		}
+	if h.user != "" && h.pass != "" {
+		auth := h.user + ":" + h.pass
+		metadata.Auth = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+	}
+
+	if metadata.Source == C.HTTP && metadata.IsHttps == false {
+		return c, nil
+	}
+
+	if err := h.shakeHand(metadata, c); err != nil {
+		return nil, err
 	}
 
 	return c, nil
@@ -65,14 +67,13 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	var buf bytes.Buffer
 	var err error
 
-	addr := net.JoinHostPort(metadata.Host, metadata.Port)
+	addr := net.JoinHostPort(metadata.String(), metadata.Port)
 	buf.WriteString("CONNECT " + addr + " HTTP/1.1\r\n")
 	buf.WriteString("Host: " + metadata.Host + "\r\n")
 	buf.WriteString("Proxy-Connection: Keep-Alive\r\n")
 
-	if h.user != "" && h.pass != "" {
-		auth := h.user + ":" + h.pass
-		buf.WriteString("Proxy-Authorization: Basic " + base64.StdEncoding.EncodeToString([]byte(auth)) + "\r\n")
+	if metadata.Auth != "" {
+		buf.WriteString(metadata.Auth)
 	}
 	// header ended
 	buf.WriteString("\r\n")
