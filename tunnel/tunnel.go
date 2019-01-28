@@ -22,6 +22,7 @@ var (
 type Tunnel struct {
 	queue      *channels.InfiniteChannel
 	rules      []C.Rule
+	ipRules    []C.Rule
 	proxies    map[string]C.Proxy
 	configLock *sync.RWMutex
 	traffic    *C.Traffic
@@ -50,6 +51,12 @@ func (t *Tunnel) Rules() []C.Rule {
 func (t *Tunnel) UpdateRules(rules []C.Rule) {
 	t.configLock.Lock()
 	t.rules = rules
+	for _, rule := range rules {
+		switch rule.RuleType() {
+		case C.GEOIP, C.IPCIDR, C.FINAL:
+			t.ipRules = append(t.ipRules, rule)
+		}
+	}
 	t.configLock.Unlock()
 }
 
@@ -112,14 +119,6 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 			metadata.Host = host
 			metadata.AddrType = C.AtypDomainName
 		}
-	} else if metadata.IP == nil && metadata.AddrType == C.AtypDomainName {
-		ip, err := t.resolveIP(metadata.Host)
-		if err != nil {
-			log.Debugln("[DNS] resolve %s error: %s", metadata.Host, err.Error())
-		} else {
-			log.Debugln("[DNS] %s --> %s", metadata.Host, ip.String())
-			metadata.IP = &ip
-		}
 	}
 
 	var proxy C.Proxy
@@ -151,7 +150,18 @@ func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
 	t.configLock.RLock()
 	defer t.configLock.RUnlock()
 
+	var isDomain bool
+	if metadata.IP == nil && metadata.AddrType == C.AtypDomainName {
+		isDomain = true
+	}
+
 	for _, rule := range t.rules {
+		if isDomain {
+			switch rule.RuleType() {
+			case C.GEOIP, C.IPCIDR, C.FINAL:
+				continue
+			}
+		}
 		if rule.IsMatch(metadata) {
 			if a, ok := t.proxies[rule.Adapter()]; ok {
 				log.Infoln("%v match %s using %s", metadata.String(), rule.RuleType().String(), rule.Adapter())
@@ -159,8 +169,35 @@ func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
 			}
 		}
 	}
+
+	if isDomain {
+		if p := t.resolveMatch(metadata); p != nil {
+			return p
+		}
+	}
+
 	log.Infoln("%v doesn't match any rule using DIRECT", metadata.String())
 	return t.proxies["DIRECT"]
+}
+
+func (t *Tunnel) resolveMatch(metadata *C.Metadata) C.Proxy {
+	ip, err := t.resolveIP(metadata.Host)
+	if err != nil {
+		log.Debugln("[DNS] resolve %s error: %s", metadata.Host, err.Error())
+		return nil
+	}
+
+	log.Debugln("[DNS] %s --> %s", metadata.Host, ip.String())
+	metadata.IP = &ip
+	for _, rule := range t.ipRules {
+		if rule.IsMatch(metadata) {
+			if a, ok := t.proxies[rule.Adapter()]; ok {
+				log.Infoln("%v match %s using %s", metadata.String(), rule.RuleType().String(), rule.Adapter())
+				return a
+			}
+		}
+	}
+	return nil
 }
 
 func newTunnel() *Tunnel {
