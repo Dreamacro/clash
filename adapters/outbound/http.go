@@ -73,7 +73,7 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	buf.WriteString("Proxy-Connection: Keep-Alive\r\n")
 
 	if metadata.Auth != "" {
-		buf.WriteString(metadata.Auth)
+		buf.WriteString("Proxy-Authorization: " + metadata.Auth + "\r\n")
 	}
 	// header ended
 	buf.WriteString("\r\n")
