@@ -153,12 +153,10 @@ func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
 
 	for _, rule := range t.rules {
 		if rule.IsMatch(metadata) {
-			a, ok := t.proxies[rule.Adapter()]
-			if !ok {
-				continue
+			if a, ok := t.proxies[rule.Adapter()]; ok {
+				log.Infoln("%v match %s using %s", metadata.String(), rule.RuleType().String(), rule.Adapter())
+				return a
 			}
-			log.Infoln("%v match %s using %s", metadata.String(), rule.RuleType().String(), rule.Adapter())
-			return a
 		}
 	}
 	log.Infoln("%v doesn't match any rule using DIRECT", metadata.String())
