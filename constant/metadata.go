@@ -40,9 +40,17 @@ type Metadata struct {
 	Port     string
 }
 
-func (addr *Metadata) String() string {
-	if addr.Host == "" {
-		return addr.IP.String()
+func (m *Metadata) String() string {
+	if m.Host == "" {
+		return m.IP.String()
 	}
-	return addr.Host
+	return m.Host
+}
+
+func (m *Metadata) Valid() bool {
+	return m.Host != "" || m.IP != nil
+}
+
+func (m *Metadata) NeedLoopUpHost() bool {
+	return m.Source == REDIR
 }

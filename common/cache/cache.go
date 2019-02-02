@@ -44,6 +44,21 @@ func (c *cache) Get(key interface{}) interface{} {
 	return elm.Payload
 }
 
+// GetWithExpire element in Cache with Expire Time
+func (c *cache) GetWithExpire(key interface{}) (payload interface{}, expired time.Time) {
+	item, exist := c.mapping.Load(key)
+	if !exist {
+		return
+	}
+	elm := item.(*element)
+	// expired
+	if time.Since(elm.Expired) > 0 {
+		c.mapping.Delete(key)
+		return
+	}
+	return elm.Payload, elm.Expired
+}
+
 func (c *cache) cleanup() {
 	c.mapping.Range(func(k, v interface{}) bool {
 		key := k.(string)

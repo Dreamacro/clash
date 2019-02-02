@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
 
-	"gopkg.in/eapache/channels.v1"
+	channels "gopkg.in/eapache/channels.v1"
 )
 
 var (
@@ -80,6 +81,10 @@ func (t *Tunnel) SetResolver(resolver *dns.Resolver) {
 	t.resolver = resolver
 }
 
+func (t *Tunnel) hasResolver() bool {
+	return t.resolver != nil
+}
+
 func (t *Tunnel) process() {
 	queue := t.queue.Out()
 	for {
@@ -106,19 +111,11 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	defer localConn.Close()
 	metadata := localConn.Metadata()
 
-	if metadata.Source == C.REDIR && t.resolver != nil {
+	if metadata.NeedLoopUpHost() && t.hasResolver() {
 		host, exist := t.resolver.IPToHost(*metadata.IP)
 		if exist {
 			metadata.Host = host
 			metadata.AddrType = C.AtypDomainName
-		}
-	} else if metadata.IP == nil && metadata.AddrType == C.AtypDomainName {
-		ip, err := t.resolveIP(metadata.Host)
-		if err != nil {
-			log.Debugln("[DNS] resolve %s error: %s", metadata.Host, err.Error())
-		} else {
-			log.Debugln("[DNS] %s --> %s", metadata.Host, ip.String())
-			metadata.IP = &ip
 		}
 	}
 
@@ -130,8 +127,18 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		proxy = t.proxies["GLOBAL"]
 	// Rule
 	default:
-		proxy = t.match(metadata)
+		var err error
+		proxy, err = t.match(metadata)
+		if err != nil {
+			return
+		}
 	}
+
+	if !metadata.Valid() {
+		log.Warnln("[Metadata] not valid: %#v", metadata)
+		return
+	}
+
 	remoConn, err := proxy.Generator(metadata)
 	if err != nil {
 		log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SourceIP.String(), metadata.String(), err.Error())
@@ -147,22 +154,33 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	}
 }
 
-func (t *Tunnel) match(metadata *C.Metadata) C.Proxy {
+func (t *Tunnel) shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
+	return (rule.RuleType() == C.GEOIP || rule.RuleType() == C.IPCIDR) && metadata.Host != "" && metadata.IP == nil
+}
+
+func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
 	t.configLock.RLock()
 	defer t.configLock.RUnlock()
 
 	for _, rule := range t.rules {
-		if rule.IsMatch(metadata) {
-			a, ok := t.proxies[rule.Adapter()]
-			if !ok {
-				continue
+		if t.shouldResolveIP(rule, metadata) {
+			ip, err := t.resolveIP(metadata.Host)
+			if err != nil {
+				return nil, fmt.Errorf("[DNS] resolve %s error: %s", metadata.Host, err.Error())
 			}
-			log.Infoln("%s --> %v match %s using %s", metadata.SourceIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter())
-			return a
+			log.Debugln("[DNS] %s --> %s", metadata.Host, ip.String())
+			metadata.IP = &ip
+		}
+
+		if rule.IsMatch(metadata) {
+			if a, ok := t.proxies[rule.Adapter()]; ok {
+				log.Infoln("%s --> %v match %s using %s", metadata.SourceIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter())
+				return a, nil
+			}
 		}
 	}
 	log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SourceIP.String(), metadata.String())
-	return t.proxies["DIRECT"]
+	return t.proxies["DIRECT"], nil
 }
 
 func newTunnel() *Tunnel {
