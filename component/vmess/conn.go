@@ -35,20 +35,10 @@ type Conn struct {
 	respV       byte
 	security    byte
 
-	sent     bool
 	received bool
 }
 
 func (vc *Conn) Write(b []byte) (int, error) {
-	if vc.sent {
-		return vc.writer.Write(b)
-	}
-
-	if err := vc.sendRequest(); err != nil {
-		return 0, err
-	}
-
-	vc.sent = true
 	return vc.writer.Write(b)
 }
 
@@ -153,7 +143,7 @@ func hashTimestamp(t time.Time) []byte {
 }
 
 // newConn return a Conn instance
-func newConn(conn net.Conn, id *ID, dst *DstAddr, security Security) *Conn {
+func newConn(conn net.Conn, id *ID, dst *DstAddr, security Security) (*Conn, error) {
 	randBytes := make([]byte, 33)
 	rand.Read(randBytes)
 	reqBodyIV := make([]byte, 16)
@@ -196,7 +186,7 @@ func newConn(conn net.Conn, id *ID, dst *DstAddr, security Security) *Conn {
 		reader = newAEADReader(conn, aead, respBodyIV[:])
 	}
 
-	return &Conn{
+	c := &Conn{
 		Conn:        conn,
 		id:          id,
 		dst:         dst,
@@ -209,4 +199,8 @@ func newConn(conn net.Conn, id *ID, dst *DstAddr, security Security) *Conn {
 		writer:      writer,
 		security:    security,
 	}
+	if err := c.sendRequest(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

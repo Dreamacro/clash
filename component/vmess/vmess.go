@@ -100,7 +100,7 @@ func (c *Client) New(conn net.Conn, dst *DstAddr) (net.Conn, error) {
 	} else if c.tls {
 		conn = tls.Client(conn, c.tlsConfig)
 	}
-	return newConn(conn, c.user[r], dst, c.security), nil
+	return newConn(conn, c.user[r], dst, c.security)
 }
 
 // NewClient return Client instance
