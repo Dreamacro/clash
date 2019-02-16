@@ -114,6 +114,10 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	defer localConn.Close()
 	metadata := localConn.Metadata()
+	if !metadata.Valid() {
+		log.Warnln("[Metadata] not valid: %#v", metadata)
+		return
+	}
 
 	if t.needLookupIP(metadata) {
 		host, exist := t.resolver.IPToHost(*metadata.IP)
@@ -136,11 +140,6 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		if err != nil {
 			return
 		}
-	}
-
-	if !metadata.Valid() {
-		log.Warnln("[Metadata] not valid: %#v", metadata)
-		return
 	}
 
 	remoConn, err := proxy.Generator(metadata)
