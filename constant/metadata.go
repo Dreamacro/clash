@@ -50,3 +50,7 @@ func (m *Metadata) String() string {
 	}
 	return m.Host
 }
+
+func (m *Metadata) Valid() bool {
+	return m.Host != "" || m.IP != nil
+}
