@@ -108,7 +108,7 @@ external-controller: 127.0.0.1:9090
   #   - 114.114.114.114
   #   - tls://dns.rubyfish.cn:853 # dns over tls
   # fallback: # concurrent request with nameserver, fallback used when GEOIP country isn't CN
-  #   - 8.8.8.8
+  #   - tcp://1.1.1.1
 
 Proxy:
 

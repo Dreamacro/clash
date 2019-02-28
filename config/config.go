@@ -386,34 +386,43 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	nameservers := []dns.NameServer{}
 
 	for idx, server := range servers {
-		// parse without scheme .e.g 8.8.8.8:53
-		if host, err := hostWithDefaultPort(server, "53"); err == nil {
-			nameservers = append(
-				nameservers,
-				dns.NameServer{Addr: host},
-			)
-			continue
-		}
-
 		u, err := url.Parse(server)
 		if err != nil {
 			return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
 		}
 
-		if u.Scheme != "tls" {
-			return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
+		// parse without scheme .e.g 8.8.8.8:53, u will have empty `Host`
+		if u.Host == "" {
+			u.Host = u.Path
+			u.Path = ""
 		}
 
-		host, err := hostWithDefaultPort(u.Host, "853")
+		var host, dnsNet string
+		switch u.Scheme {
+		case "":
+			host, err = hostWithDefaultPort(u.Host, "53")
+			dnsNet = "" // UDP
+		case "tcp":
+			host, err = hostWithDefaultPort(u.Host, "53")
+			dnsNet = "tcp" // TCP
+		case "tls":
+			host, err = hostWithDefaultPort(u.Host, "853")
+			dnsNet = "tcp-tls" // DNS over TLS
+		default:
+			return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
+		}
+
 		nameservers = append(
 			nameservers,
 			dns.NameServer{
-				Net:  "tcp-tls",
+				Net:  dnsNet,
 				Addr: host,
 			},
 		)
 	}
-
 	return nameservers, nil
 }
 
@@ -430,10 +439,14 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 
 	if nameserver, err := parseNameServer(cfg.NameServer); err == nil {
 		dnsCfg.NameServer = nameserver
+	} else {
+		return nil, err
 	}
 
 	if fallback, err := parseNameServer(cfg.Fallback); err == nil {
 		dnsCfg.Fallback = fallback
+	} else {
+		return nil, err
 	}
 
 	return dnsCfg, nil
