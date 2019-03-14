@@ -11,6 +11,7 @@ import (
 type WebsocketOption struct {
 	Host      string
 	Path      string
+	Headers   map[string]string
 	TLSConfig *tls.Config
 }
 
@@ -20,6 +21,7 @@ func NewWebsocketObfs(conn net.Conn, option *WebsocketOption) (net.Conn, error) 
 		Host:      option.Host,
 		Path:      option.Path,
 		TLS:       option.TLSConfig != nil,
+		Headers:   option.Headers,
 		TLSConfig: option.TLSConfig,
 	}
 

@@ -48,11 +48,12 @@ type simpleObfsOption struct {
 }
 
 type v2rayObfsOption struct {
-	Mode           string `obfs:"mode"`
-	Host           string `obfs:"host,omitempty"`
-	Path           string `obfs:"path,omitempty"`
-	TLS            bool   `obfs:"tls,omitempty"`
-	SkipCertVerify bool   `obfs:"skip-cert-verify,omitempty"`
+	Mode           string            `obfs:"mode"`
+	Host           string            `obfs:"host,omitempty"`
+	Path           string            `obfs:"path,omitempty"`
+	TLS            bool              `obfs:"tls,omitempty"`
+	Headers        map[string]string `obfs:"headers,omitempty"`
+	SkipCertVerify bool              `obfs:"skip-cert-verify,omitempty"`
 }
 
 func (ss *ShadowSocks) Generator(metadata *C.Metadata) (net.Conn, error) {
@@ -131,10 +132,10 @@ func NewShadowSocks(option ShadowSocksOption) (*ShadowSocks, error) {
 				ClientSessionCache: getClientSessionCache(),
 			}
 		}
-
 		wsOption = &v2rayObfs.WebsocketOption{
 			Host:      opts.Host,
 			Path:      opts.Path,
+			Headers:   opts.Headers,
 			TLSConfig: tlsConfig,
 		}
 	}
