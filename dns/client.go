@@ -234,6 +234,7 @@ func transform(servers []NameServer) []*nameserver {
 				TLSConfig: &tls.Config{
 					ClientSessionCache: globalSessionCache,
 				},
+				UDPSize: 4096,
 			},
 			Address: s.Addr,
 		})

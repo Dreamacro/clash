@@ -1,8 +1,10 @@
 package dns
 
 import (
+	"fmt"
 	"net"
 
+	"github.com/Dreamacro/clash/log"
 	D "github.com/miekg/dns"
 )
 
@@ -20,6 +22,9 @@ func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
 	msg, err := s.r.Exchange(r)
 
 	if err != nil {
+		q := r.Question[0]
+		qString := fmt.Sprintf("%s %s %s", q.Name, D.Class(q.Qclass).String(), D.Type(q.Qtype).String())
+		log.Debugln("[DNS Server] Exchange %s failed: %v", qString, err)
 		D.HandleFailed(w, r)
 		return
 	}
