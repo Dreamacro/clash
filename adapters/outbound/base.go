@@ -43,7 +43,7 @@ func (p *Proxy) Alive() bool {
 
 func (p *Proxy) Dial(metadata *C.Metadata) (net.Conn, error) {
 	conn, err := p.ProxyAdapter.Dial(metadata)
-	p.alive = err == nil
+	p.alive = p.alive && (err == nil)
 	return conn, err
 }
 
@@ -89,6 +89,7 @@ func (p *Proxy) URLTest(url string) (t uint16, err error) {
 		if err == nil {
 			record.Delay = t
 		}
+		p.alive = err == nil
 		p.history.Put(record)
 		if p.history.Len() > 10 {
 			p.history.Pop()
