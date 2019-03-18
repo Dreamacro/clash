@@ -131,7 +131,7 @@ func (r *Resolver) resolveIP(m *D.Msg) (msg *D.Msg, err error) {
 		}
 
 		if ips := r.msgToIP(res.Msg); len(ips) != 0 {
-			if record, _ := mmdb.Country(ips[0]); record.Country.IsoCode == "CN" || record.Country.IsoCode == "" {
+			if record, _ := mmdb.Country(ips[0]); record.Country.IsoCode == "CN" {
 				// release channel
 				go func() { <-fallbackMsg }()
 				msg = res.Msg
