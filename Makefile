@@ -1,9 +1,9 @@
 NAME=clash
 BINDIR=bin
 VERSION=$(shell git describe --tags)
-BUILDTIME=$(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
-GOBUILD=CGO_ENABLED=0 go build -ldflags '-X github.com/Dreamacro/clash/constant.Version=$(VERSION) \
-		-X github.com/Dreamacro/clash/constant.BuildTime=$(BUILDTIME) \
+BUILDTIME=$(shell date -u '+%Y-%m-%d %I:%M:%S')
+GOBUILD=CGO_ENABLED=0 go build -ldflags '-X "github.com/Dreamacro/clash/constant.Version=$(VERSION)" \
+		-X "github.com/Dreamacro/clash/constant.BuildTime=$(BUILDTIME)" \
 		-w -s'
 
 PLATFORM_LIST = \
