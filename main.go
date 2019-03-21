@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/Dreamacro/clash/config"
@@ -28,8 +29,7 @@ func init() {
 
 func main() {
 	if version {
-		fmt.Printf("Clash Version: %s\n", C.Version)
-		fmt.Printf("UTC Build Time: %s\n", C.BuildTime)
+		fmt.Printf("Clash %s %s %s %s\n", C.Version, runtime.GOOS, runtime.GOARCH, C.BuildTime)
 		return
 	}
 
