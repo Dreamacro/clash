@@ -23,7 +23,7 @@ var (
 
 func init() {
 	flag.StringVar(&homedir, "d", "", "set configuration directory")
-	flag.BoolVar(&version, "v", false, "Show current version of v2ray-plugin")
+	flag.BoolVar(&version, "v", false, "show current version of clash")
 	flag.Parse()
 }
 
