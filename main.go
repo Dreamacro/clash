@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	VERSION = "custom"
 	version bool
 	homedir string
 )
@@ -29,7 +28,8 @@ func init() {
 
 func main() {
 	if version {
-		fmt.Println(VERSION)
+		fmt.Printf("Clash Version: %s\n", C.Version)
+		fmt.Printf("UTC Build Time: %s\n", C.BuildTime)
 		return
 	}
 
