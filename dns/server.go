@@ -39,10 +39,6 @@ func ReCreateServer(addr string, resolver *Resolver) error {
 		server.Shutdown()
 	}
 
-	if addr == address {
-		return nil
-	}
-
 	_, port, err := net.SplitHostPort(addr)
 	if port == "0" || port == "" || err != nil {
 		return nil
