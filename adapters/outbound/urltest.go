@@ -92,7 +92,7 @@ func (u *URLTest) fallback() {
 }
 
 func (u *URLTest) speedTest() {
-	if atomic.CompareAndSwapInt32(&u.once, 0, 1) {
+	if !atomic.CompareAndSwapInt32(&u.once, 0, 1) {
 		return
 	}
 	defer atomic.StoreInt32(&u.once, 0)
