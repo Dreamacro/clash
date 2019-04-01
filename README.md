@@ -209,6 +209,9 @@ Rule:
 - MATCH,auto
 ```
 
+## Documentations
+https://clash.gitbook.io/
+
 ## Thanks
 
 [riobard/go-shadowsocks2](https://github.com/riobard/go-shadowsocks2)
