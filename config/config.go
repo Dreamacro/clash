@@ -31,7 +31,7 @@ type General struct {
 	ExternalController string       `json:"-"`
 	ExternalUI         string       `json:"-"`
 	Secret             string       `json:"-"`
-	SocketMark         int          `json:"socket-mark"`
+	SocketMark         int          `json:"-"`
 }
 
 // DNS config
