@@ -30,6 +30,8 @@ type Tunnel struct {
 
 	// Outbound Rule
 	mode Mode
+	// SO_MARK for socket options
+	socketMark int
 }
 
 // Add request to queue
@@ -74,6 +76,16 @@ func (t *Tunnel) Mode() Mode {
 // SetMode change the mode of tunnel
 func (t *Tunnel) SetMode(mode Mode) {
 	t.mode = mode
+}
+
+// SocketMark returns socket option SO_MARK
+func (t *Tunnel) SocketMark() int {
+	return t.socketMark
+}
+
+// SetSocketMark changes socket option SO_MARK
+func (t *Tunnel) SetSocketMark(socketMark int) {
+	t.socketMark = socketMark
 }
 
 // SetResolver change the resolver of tunnel

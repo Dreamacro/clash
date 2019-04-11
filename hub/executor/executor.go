@@ -80,6 +80,7 @@ func updateRules(rules []C.Rule) {
 func updateGeneral(general *config.General) {
 	log.SetLevel(general.LogLevel)
 	T.Instance().SetMode(general.Mode)
+	T.Instance().SetSocketMark(general.SocketMark)
 
 	allowLan := general.AllowLan
 

@@ -31,6 +31,7 @@ type General struct {
 	ExternalController string       `json:"-"`
 	ExternalUI         string       `json:"-"`
 	Secret             string       `json:"-"`
+	SocketMark         int          `json:"socket-mark"`
 }
 
 // DNS config
@@ -70,6 +71,7 @@ type rawConfig struct {
 	ExternalController string       `yaml:"external-controller"`
 	ExternalUI         string       `yaml:"external-ui"`
 	Secret             string       `yaml:"secret"`
+	SocketMark         int          `yaml:"socket-mark"`
 
 	DNS        rawDNS                   `yaml:"dns"`
 	Proxy      []map[string]interface{} `yaml:"Proxy"`
@@ -150,6 +152,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
 	secret := cfg.Secret
+	socketMark := cfg.SocketMark
 	mode := cfg.Mode
 	logLevel := cfg.LogLevel
 
@@ -173,6 +176,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		ExternalController: externalController,
 		ExternalUI:         externalUI,
 		Secret:             secret,
+		SocketMark:         socketMark,
 	}
 	return general, nil
 }

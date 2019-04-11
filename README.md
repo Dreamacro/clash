@@ -105,6 +105,10 @@ external-controller: 127.0.0.1:9090
 # Secret for RESTful API (Optional)
 # secret: ""
 
+# SO_MARK for Linux socket options which may help filter and bypass outbound packet processed by clash
+# in order to build a transparent proxy together with Netfilter redirect
+# socket-mark: 0xffff
+
 # dns:
   # enable: true # set true to enable dns (default is false)
   # ipv6: false # default is false

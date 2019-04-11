@@ -31,7 +31,7 @@ type VmessOption struct {
 }
 
 func (v *Vmess) Dial(metadata *C.Metadata) (net.Conn, error) {
-	c, err := net.DialTimeout("tcp", v.server, tcpTimeout)
+	c, err := dialTimeout("tcp", v.server, tcpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error", v.server)
 	}

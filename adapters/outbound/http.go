@@ -36,7 +36,7 @@ type HttpOption struct {
 }
 
 func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
-	c, err := net.DialTimeout("tcp", h.addr, tcpTimeout)
+	c, err := dialTimeout("tcp", h.addr, tcpTimeout)
 	if err == nil && h.tls {
 		cc := tls.Client(c, h.tlsConfig)
 		err = cc.Handshake()
