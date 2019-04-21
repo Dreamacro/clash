@@ -65,7 +65,7 @@ func Init(dir string) error {
 
 	// initial config.yml
 	if _, err := os.Stat(C.Path.Config()); os.IsNotExist(err) {
-		log.Info("Can't find config, create a empty file")
+		log.Info("Can't find config, create an empty file")
 		os.OpenFile(C.Path.Config(), os.O_CREATE|os.O_WRONLY, 0644)
 	}
 
