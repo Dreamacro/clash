@@ -114,6 +114,7 @@ experimental:
   # ipv6: false # default is false
   # listen: 0.0.0.0:53
   # enhanced-mode: redir-host # or fake-ip
+  # fake-ip-range: 192.18.0.1/31
   # nameserver:
   #   - 114.114.114.114
   #   - tls://dns.rubyfish.cn:853 # dns over tls
