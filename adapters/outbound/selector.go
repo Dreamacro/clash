@@ -13,6 +13,7 @@ type Selector struct {
 	*Base
 	selected C.Proxy
 	proxies  map[string]C.Proxy
+	proxyList []string
 }
 
 type SelectorOption struct {
@@ -41,7 +42,7 @@ func (s *Selector) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"type": s.Type().String(),
 		"now":  s.Now(),
-		"all":  all,
+		"all":  s.proxyList,
 	})
 }
 
@@ -64,8 +65,10 @@ func NewSelector(name string, proxies []C.Proxy) (*Selector, error) {
 	}
 
 	mapping := make(map[string]C.Proxy)
-	for _, proxy := range proxies {
+	proxyList := make([]string, len(proxies))
+	for id, proxy := range proxies {
 		mapping[proxy.Name()] = proxy
+		proxyList[id] = proxy.Name()
 	}
 
 	s := &Selector{
@@ -75,6 +78,7 @@ func NewSelector(name string, proxies []C.Proxy) (*Selector, error) {
 		},
 		proxies:  mapping,
 		selected: proxies[0],
+		proxyList: proxyList,
 	}
 	return s, nil
 }

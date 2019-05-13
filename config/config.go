@@ -194,6 +194,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 
 func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	proxies := make(map[string]C.Proxy)
+	proxyList := []string{};
 	proxiesConfig := cfg.Proxy
 	groupsConfig := cfg.ProxyGroup
 
@@ -201,6 +202,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 
 	proxies["DIRECT"] = adapters.NewProxy(adapters.NewDirect())
 	proxies["REJECT"] = adapters.NewProxy(adapters.NewReject())
+	proxyList = append(proxyList, "DIRECT","REJECT")
 
 	// parse proxy
 	for idx, mapping := range proxiesConfig {
@@ -252,6 +254,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("Proxy %s is the duplicate name", proxy.Name())
 		}
 		proxies[proxy.Name()] = adapters.NewProxy(proxy)
+		proxyList = append(proxyList, proxy.Name())
 	}
 
 	// parse proxy group
@@ -323,11 +326,12 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("Proxy %s: %s", groupName, err.Error())
 		}
 		proxies[groupName] = adapters.NewProxy(group)
+		proxyList = append(proxyList, groupName)
 	}
 
 	ps := []C.Proxy{}
-	for _, v := range proxies {
-		ps = append(ps, v)
+	for _, v := range proxyList {
+		ps = append(ps, proxies[v])
 	}
 
 	global, _ := adapters.NewSelector("GLOBAL", ps)
