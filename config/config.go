@@ -194,7 +194,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 
 func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	proxies := make(map[string]C.Proxy)
-	proxyList := []string{};
+	proxyList := []string{}
 	proxiesConfig := cfg.Proxy
 	groupsConfig := cfg.ProxyGroup
 
@@ -202,7 +202,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 
 	proxies["DIRECT"] = adapters.NewProxy(adapters.NewDirect())
 	proxies["REJECT"] = adapters.NewProxy(adapters.NewReject())
-	proxyList = append(proxyList, "DIRECT","REJECT")
+	proxyList = append(proxyList, "DIRECT", "REJECT")
 
 	// parse proxy
 	for idx, mapping := range proxiesConfig {
