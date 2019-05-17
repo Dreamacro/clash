@@ -41,6 +41,23 @@ func (b *Base) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type conn struct {
+	net.Conn
+	chain []string
+}
+
+func (c *conn) GetChain() []string {
+	return c.chain
+}
+
+func (c *conn) Append(a C.ProxyAdapter) {
+	c.chain = append(c.chain, a.Name())
+}
+
+func NewConn(c net.Conn, a C.ProxyAdapter) C.Conn {
+	return &conn{c, []string{a.Name()}}
+}
+
 type Proxy struct {
 	C.ProxyAdapter
 	history *queue.Queue
@@ -51,7 +68,7 @@ func (p *Proxy) Alive() bool {
 	return p.alive
 }
 
-func (p *Proxy) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
 	conn, err := p.ProxyAdapter.Dial(metadata)
 	if err != nil {
 		p.alive = false

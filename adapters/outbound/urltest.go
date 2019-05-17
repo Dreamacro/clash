@@ -35,10 +35,12 @@ func (u *URLTest) Now() string {
 	return u.fast.Name()
 }
 
-func (u *URLTest) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (u *URLTest) Dial(metadata *C.Metadata) (C.Conn, error) {
 	a, err := u.fast.Dial(metadata)
 	if err != nil {
 		u.fallback()
+	} else {
+		a.Append(u)
 	}
 	return a, err
 }

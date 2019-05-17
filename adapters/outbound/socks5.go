@@ -31,7 +31,7 @@ type Socks5Option struct {
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
-func (ss *Socks5) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (ss *Socks5) Dial(metadata *C.Metadata) (C.Conn, error) {
 	c, err := net.DialTimeout("tcp", ss.addr, tcpTimeout)
 
 	if err == nil && ss.tls {
@@ -54,7 +54,7 @@ func (ss *Socks5) Dial(metadata *C.Metadata) (net.Conn, error) {
 	if err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
 		return nil, err
 	}
-	return c, nil
+	return NewConn(c, ss), nil
 }
 
 func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {

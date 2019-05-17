@@ -24,10 +24,16 @@ type ServerAdapter interface {
 	Metadata() *Metadata
 }
 
+type Conn interface {
+	net.Conn
+	GetChain() []string
+	Append(adapter ProxyAdapter)
+}
+
 type ProxyAdapter interface {
 	Name() string
 	Type() AdapterType
-	Dial(metadata *Metadata) (net.Conn, error)
+	Dial(metadata *Metadata) (Conn, error)
 	DialUDP(metadata *Metadata) (net.PacketConn, net.Addr, error)
 	SupportUDP() bool
 	Destroy()

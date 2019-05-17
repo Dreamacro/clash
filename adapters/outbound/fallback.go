@@ -30,9 +30,13 @@ func (f *Fallback) Now() string {
 	return proxy.Name()
 }
 
-func (f *Fallback) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (f *Fallback) Dial(metadata *C.Metadata) (C.Conn, error) {
 	proxy := f.findAliveProxy()
-	return proxy.Dial(metadata)
+	c, err := proxy.Dial(metadata)
+	if err == nil {
+		c.Append(f)
+	}
+	return c, err
 }
 
 func (f *Fallback) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {

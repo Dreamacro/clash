@@ -35,7 +35,7 @@ type HttpOption struct {
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
-func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (h *Http) Dial(metadata *C.Metadata) (C.Conn, error) {
 	c, err := net.DialTimeout("tcp", h.addr, tcpTimeout)
 	if err == nil && h.tls {
 		cc := tls.Client(c, h.tlsConfig)
@@ -51,7 +51,7 @@ func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
 		return nil, err
 	}
 
-	return c, nil
+	return NewConn(c, h), nil
 }
 
 func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {

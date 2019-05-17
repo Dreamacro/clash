@@ -10,7 +10,7 @@ type Direct struct {
 	*Base
 }
 
-func (d *Direct) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (d *Direct) Dial(metadata *C.Metadata) (C.Conn, error) {
 	address := net.JoinHostPort(metadata.Host, metadata.DstPort)
 	if metadata.DstIP != nil {
 		address = net.JoinHostPort(metadata.DstIP.String(), metadata.DstPort)
@@ -21,7 +21,7 @@ func (d *Direct) Dial(metadata *C.Metadata) (net.Conn, error) {
 		return nil, err
 	}
 	tcpKeepAlive(c)
-	return c, nil
+	return NewConn(c, d), nil
 }
 
 func (d *Direct) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {

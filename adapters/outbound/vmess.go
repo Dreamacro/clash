@@ -31,14 +31,14 @@ type VmessOption struct {
 	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
 }
 
-func (v *Vmess) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (v *Vmess) Dial(metadata *C.Metadata) (C.Conn, error) {
 	c, err := net.DialTimeout("tcp", v.server, tcpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error", v.server)
 	}
 	tcpKeepAlive(c)
 	c, err = v.client.New(c, parseVmessAddr(metadata))
-	return c, err
+	return NewConn(c, v), err
 }
 
 func (v *Vmess) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
