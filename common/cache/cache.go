@@ -64,8 +64,6 @@ func (c *cache) GetWithExpire(key interface{}) (payload interface{}, expired tim
 
 func (c *cache) Save(filepath string) error {
 	f, err := os.Create(filepath)
-	defer f.Close()
-
 	if err != nil {
 		return err
 	}
@@ -83,15 +81,15 @@ func (c *cache) Save(filepath string) error {
 
 	err = enc.Encode(res)
 	if err != nil {
+		f.Close()
 		return err
 	}
 
-	return nil
+	return f.Close()
 }
 
 func (c *cache) Reload(filepath string) uint32 {
 	f, err := os.Open(filepath)
-	defer f.Close()
 	if err != nil {
 		return 0
 	}
@@ -99,8 +97,8 @@ func (c *cache) Reload(filepath string) uint32 {
 	dec := gob.NewDecoder(f)
 	items := make(map[string]string)
 	err = dec.Decode(&items)
-
 	if err != nil {
+		f.Close()
 		return 0
 	}
 
@@ -110,6 +108,7 @@ func (c *cache) Reload(filepath string) uint32 {
 		res++
 	}
 
+	f.Close()
 	return res
 }
 
