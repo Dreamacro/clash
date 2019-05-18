@@ -60,6 +60,7 @@ func (s *Server) handleFakeIP(r *D.Msg) (msg *D.Msg, err error) {
 	cache := s.r.cache.Get("fakeip:" + q.String())
 	if cache != nil {
 		msg = cache.(*D.Msg).Copy()
+		setMsgTTL(msg, 1)
 		return
 	}
 
