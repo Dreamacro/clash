@@ -1,7 +1,10 @@
 package cache
 
 import (
+	"encoding/gob"
+	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,6 +60,57 @@ func (c *cache) GetWithExpire(key interface{}) (payload interface{}, expired tim
 		return
 	}
 	return elm.Payload, elm.Expired
+}
+
+func (c *cache) Save(filepath string) error {
+	f, err := os.Create(filepath)
+	defer f.Close()
+
+	if err != nil {
+		return err
+	}
+
+	enc := gob.NewEncoder(f)
+	res := make(map[string]string)
+
+	c.mapping.Range(func(k, v interface{}) bool {
+		key := k.(string)
+		if strings.HasPrefix(key, "fakeip:") {
+			res[key] = v.(*element).Payload.(string)
+		}
+		return true
+	})
+
+	err = enc.Encode(res)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *cache) Reload(filepath string) uint32 {
+	f, err := os.Open(filepath)
+	defer f.Close()
+	if err != nil {
+		return 0
+	}
+
+	dec := gob.NewDecoder(f)
+	items := make(map[string]string)
+	err = dec.Decode(&items)
+
+	if err != nil {
+		return 0
+	}
+
+	var res uint32
+	for k, v := range items {
+		c.Put(k, v, 600*time.Second)
+		res++
+	}
+
+	return res
 }
 
 func (c *cache) cleanup() {

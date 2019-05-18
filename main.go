@@ -12,6 +12,7 @@ import (
 	"github.com/Dreamacro/clash/config"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/hub"
+	T "github.com/Dreamacro/clash/tunnel"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -52,7 +53,18 @@ func main() {
 		log.Fatalf("Parse config error: %s", err.Error())
 	}
 
+	signals()
+}
+
+func signals() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	for {
+		sig := <-sigCh
+		switch sig {
+		case syscall.SIGTERM, syscall.SIGINT:
+			T.Instance().Close()
+			return
+		}
+	}
 }

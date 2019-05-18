@@ -19,6 +19,11 @@ func (p *Pool) Get() net.IP {
 	return ip
 }
 
+// Get return a new fake ip
+func (p *Pool) AddMin(offset uint32) {
+	p.min += offset
+}
+
 func ipToUint(ip net.IP) uint32 {
 	v := uint32(ip[0]) << 24
 	v += uint32(ip[1]) << 16
