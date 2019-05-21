@@ -12,7 +12,8 @@ const Name = "clash"
 var Path *path
 
 type path struct {
-	homedir string
+	homedir  string
+	confname string
 }
 
 func init() {
@@ -34,7 +35,17 @@ func init() {
 
 // SetHomeDir is used to set the configuration path
 func SetHomeDir(root string) {
-	Path = &path{homedir: root}
+	Path = &path{
+		homedir:  root,
+		confname: "config.yml",
+	}
+}
+
+func SetHomeDirAndConfName(root string, name string) {
+	Path = &path{
+		homedir:  root,
+		confname: name,
+	}
 }
 
 func (p *path) HomeDir() string {
@@ -42,7 +53,7 @@ func (p *path) HomeDir() string {
 }
 
 func (p *path) Config() string {
-	return P.Join(p.homedir, "config.yml")
+	return P.Join(p.homedir, p.confname)
 }
 
 func (p *path) MMDB() string {
