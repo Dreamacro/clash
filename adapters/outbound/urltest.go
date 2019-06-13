@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,7 +55,6 @@ func (u *URLTest) MarshalJSON() ([]byte, error) {
 	for _, proxy := range u.proxies {
 		all = append(all, proxy.Name())
 	}
-	sort.Strings(all)
 	return json.Marshal(map[string]interface{}{
 		"type": u.Type().String(),
 		"now":  u.Now(),
