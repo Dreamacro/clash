@@ -5,6 +5,9 @@ BUILDTIME=$(shell date -u)
 GOBUILD=CGO_ENABLED=0 go build -ldflags '-X "github.com/Dreamacro/clash/constant.Version=$(VERSION)" \
 		-X "github.com/Dreamacro/clash/constant.BuildTime=$(BUILDTIME)" \
 		-w -s'
+MOBILE_GOBUILD=CGO_ENABLED=1 go build -ldflags '-X "github.com/Dreamacro/clash/constant.Version=$(VERSION)" \
+		-X "github.com/Dreamacro/clash/constant.BuildTime=$(BUILDTIME)" \
+		-w -s'
 
 PLATFORM_LIST = \
 	darwin-amd64 \
@@ -75,6 +78,40 @@ windows-386:
 
 windows-amd64:
 	GOARCH=amd64 GOOS=windows $(GOBUILD) -o $(BINDIR)/$(NAME)-$@.exe
+
+android-armeabi-v7a:
+ifndef ANDROID_NDK_HOST
+	@echo "ANDROID_NDK_HOST is undefined, use default linux-x86_64"
+	$(eval ANDROID_NDK_HOST := linux-x86_64)
+endif
+ifndef ANDROID_NDK
+	$(error ANDROID_NDK is undefined)
+endif
+ifndef ANDROID_API
+	@echo "ANDROID_API is undefined, use default 21"
+	$(eval ANDROID_API := 21)
+endif
+	$(eval ANDROID_CC := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/armv7a-linux-androideabi$(ANDROID_API)-clang)
+	$(eval ABDROID_CXX := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/armv7a-linux-androideabi$(ANDROID_API)-clang++)
+	$(eval ANDROID_LD := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/arm-linux-androideabi-ld)
+	GOARCH=arm GOARM=7 GOOS=android CXX=$(ABDROID_CXX) CC=$(ANDROID_CC) LD=$(ANDROID_LD)  $(MOBILE_GOBUILD) -o $(BINDIR)/$(NAME)-$@
+
+android-arm64-v8a:
+ifndef ANDROID_NDK_HOST
+	@echo "ANDROID_NDK_HOST is undefined, use default linux-x86_64"
+	$(eval ANDROID_NDK_HOST := linux-x86_64)
+endif
+ifndef ANDROID_NDK
+	$(error ANDROID_NDK is undefined)
+endif
+ifndef ANDROID_API
+	@echo "ANDROID_API is undefined, use default 21"
+	$(eval ANDROID_API := 21)
+endif
+	$(eval ANDROID_CC := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/aarch64-linux-android$(ANDROID_API)-clang)
+	$(eval ABDROID_CXX := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/aarch64-linux-android$(ANDROID_API)-clang++)
+	$(eval ANDROID_LD := $(ANDROID_NDK)/toolchains/llvm/prebuilt/$(ANDROID_NDK_HOST)/bin/aarch64-linux-android-ld)
+	GOARCH=arm64 GOOS=android CXX=$(ABDROID_CXX) CC=$(ANDROID_CC) LD=$(ANDROID_LD)  $(MOBILE_GOBUILD) -o $(BINDIR)/$(NAME)-$@
 
 gz_releases=$(addsuffix .gz, $(PLATFORM_LIST))
 zip_releases=$(addsuffix .zip, $(WINDOWS_ARCH_LIST))
