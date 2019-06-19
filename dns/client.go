@@ -240,6 +240,7 @@ func transform(servers []NameServer) []*nameserver {
 				Net: s.Net,
 				TLSConfig: &tls.Config{
 					ClientSessionCache: globalSessionCache,
+					NextProtos:         []string{"dns"},
 				},
 				UDPSize: 4096,
 			},
