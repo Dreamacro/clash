@@ -377,7 +377,7 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		}
 
 		if _, ok := proxies[target]; !ok {
-			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy target invalid", idx, line)
+			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
 		}
 
 		rule = trimArr(rule)
