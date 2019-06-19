@@ -157,7 +157,7 @@ func Parse(path string) (*Config, error) {
 	}
 	config.Proxies = proxies
 
-	rules, err := parseRules(rawCfg)
+	rules, err := parseRules(rawCfg, proxies)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	return proxies, nil
 }
 
-func parseRules(cfg *rawConfig) ([]C.Rule, error) {
+func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 	rules := []C.Rule{}
 
 	rulesConfig := cfg.Rule
@@ -374,6 +374,10 @@ func parseRules(cfg *rawConfig) ([]C.Rule, error) {
 			target = rule[2]
 		default:
 			return nil, fmt.Errorf("Rules[%d] [%s] error: format invalid", idx, line)
+		}
+
+		if _, ok := proxies[target]; !ok {
+			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy target invalid", idx, line)
 		}
 
 		rule = trimArr(rule)
