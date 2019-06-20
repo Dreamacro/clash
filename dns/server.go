@@ -23,7 +23,7 @@ type Server struct {
 }
 
 func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
-	if s.r.IsFakeIP() {
+	if s.r.IsFakeIP() && !s.r.IsWhiteHost(r) {
 		msg, err := s.handleFakeIP(r)
 		if err != nil {
 			D.HandleFailed(w, r)

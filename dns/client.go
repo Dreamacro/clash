@@ -34,6 +34,7 @@ type Resolver struct {
 	fallback []*nameserver
 	main     []*nameserver
 	cache    *cache.Cache
+	White    map[string]struct{}
 }
 
 type result struct {
@@ -215,6 +216,16 @@ func (r *Resolver) IsFakeIP() bool {
 	return r.fakeip
 }
 
+func (r *Resolver) IsWhiteHost(m *D.Msg) bool {
+	host := strings.ToLower(m.Question[0].Name)
+	if strings.HasSuffix(host, ".") {
+		host = host[:len(host)-1]
+	}
+
+	_, exist := r.White[host]
+	return exist
+}
+
 type NameServer struct {
 	Net  string
 	Addr string
@@ -230,6 +241,7 @@ type Config struct {
 	IPv6           bool
 	EnhancedMode   EnhancedMode
 	Pool           *fakeip.Pool
+	White          map[string]struct{}
 }
 
 func transform(servers []NameServer) []*nameserver {
@@ -263,6 +275,7 @@ func New(config Config) *Resolver {
 		mapping: config.EnhancedMode == MAPPING,
 		fakeip:  config.EnhancedMode == FAKEIP,
 		pool:    config.Pool,
+		White:   config.White,
 	}
 	if config.Fallback != nil {
 		r.fallback = transform(config.Fallback)
