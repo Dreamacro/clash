@@ -58,7 +58,6 @@ func updateDNS(c *config.DNS) {
 		IPv6:         c.IPv6,
 		EnhancedMode: c.EnhancedMode,
 		Pool:         c.FakeIPRange,
-		White:        c.White,
 	})
 	T.Instance().SetResolver(r)
 	if err := dns.ReCreateServer(c.Listen, r); err != nil {
