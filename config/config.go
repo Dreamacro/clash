@@ -492,21 +492,19 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 func parseWhite(rawCfg *rawConfig) map[string]struct{} {
 	whitelist := map[string]struct{}{}
 
-	if rawCfg.DNS.EnhancedMode == dns.FAKEIP {
-		for _, mapping := range rawCfg.Proxy {
-			server, existServer := mapping["server"].(string)
-			if !existServer {
-				continue
-			}
-			if net.ParseIP(server) != nil {
-				continue
-			}
-			server = strings.ToLower(server)
-			if strings.HasSuffix(server, ".") {
-				server = server[:len(server)-1]
-			}
-			whitelist[server] = struct{}{}
+	for _, mapping := range rawCfg.Proxy {
+		server, existServer := mapping["server"].(string)
+		if !existServer {
+			continue
 		}
+		if net.ParseIP(server) != nil {
+			continue
+		}
+		server = strings.ToLower(server)
+		if strings.HasSuffix(server, ".") {
+			server = server[:len(server)-1]
+		}
+		whitelist[server] = struct{}{}
 	}
 
 	return whitelist
