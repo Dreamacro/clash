@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/Dreamacro/clash/log"
 	"net"
 	"strconv"
 
@@ -58,7 +59,10 @@ type v2rayObfsOption struct {
 }
 
 func (ss *ShadowSocks) Dial(metadata *C.Metadata) (net.Conn, error) {
-	c, err := net.DialTimeout("tcp", ss.server, tcpTimeout)
+	server := resolveIP(ss.server)
+	log.Debugln("-----ss.server %s to %v", ss.server, server)
+
+	c, err := net.DialTimeout("tcp", server, tcpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %s", ss.server, err.Error())
 	}

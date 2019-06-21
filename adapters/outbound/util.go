@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"github.com/Dreamacro/clash/log"
 	"net"
 	"net/url"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/tunnel"
 )
 
 const (
@@ -21,7 +23,27 @@ const (
 var (
 	globalClientSessionCache tls.ClientSessionCache
 	once                     sync.Once
+	tun                      = tunnel.Instance()
 )
+
+func resolveIP(hostport string) string {
+	resolver := tun.GetResolver()
+	if resolver == nil {
+		return hostport
+	}
+
+	host, port, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return hostport
+	}
+
+	ipAddr, err := resolver.InternalResolveIP(host)
+	if err != nil {
+		log.Debugln("ResolveIP.err: %v", err)
+		return hostport
+	}
+	return net.JoinHostPort(ipAddr.String(), port)
+}
 
 func urlToMetadata(rawURL string) (addr C.Metadata, err error) {
 	u, err := url.Parse(rawURL)

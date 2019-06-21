@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/Dreamacro/clash/log"
 	"io"
 	"net"
 	"net/http"
@@ -36,7 +37,10 @@ type HttpOption struct {
 }
 
 func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
-	c, err := net.DialTimeout("tcp", h.addr, tcpTimeout)
+	addr := resolveIP(h.addr)
+	log.Debugln("-----h.addr %s to %v", h.addr, addr)
+
+	c, err := net.DialTimeout("tcp", addr, tcpTimeout)
 	if err == nil && h.tls {
 		cc := tls.Client(c, h.tlsConfig)
 		err = cc.Handshake()

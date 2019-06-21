@@ -147,6 +147,58 @@ func (r *Resolver) resolveIP(m *D.Msg) (msg *D.Msg, err error) {
 	return
 }
 
+func (r *Resolver) InternalResolveIP(host string) (ip net.IP, err error) {
+	ip = net.ParseIP(host)
+	if ip != nil {
+		return ip, nil
+	}
+
+	query := &D.Msg{}
+	dnsType := D.TypeA
+	if r.ipv6 {
+		dnsType = D.TypeAAAA
+	}
+	query.SetQuestion(D.Fqdn(host), dnsType)
+
+	var msg *D.Msg
+	q := query.Question[0]
+
+	cache := r.cache.Get(q.String())
+	if cache != nil {
+		msg = cache.(*D.Msg).Copy()
+	} else {
+		defer func() {
+			if msg == nil {
+				return
+			}
+
+			putMsgToCache(r.cache, q.String(), msg)
+			if r.mapping {
+				ips := r.msgToIP(msg)
+				for _, ip := range ips {
+					putMsgToCache(r.cache, ip.String(), msg)
+				}
+			}
+		}()
+
+		msgCh := r.resolve(r.main, query)
+
+		res := <-msgCh
+		msg, err = res.Msg, res.Error
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	ips := r.msgToIP(msg)
+	if len(ips) == 0 {
+		return nil, errors.New("can't found ip")
+	}
+
+	ip = ips[0]
+	return
+}
+
 func (r *Resolver) ResolveIP(host string) (ip net.IP, err error) {
 	ip = net.ParseIP(host)
 	if ip != nil {

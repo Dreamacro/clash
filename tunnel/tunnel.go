@@ -91,6 +91,11 @@ func (t *Tunnel) SetResolver(resolver *dns.Resolver) {
 	t.resolver = resolver
 }
 
+// SetResolver change the resolver of tunnel
+func (t *Tunnel) GetResolver() *dns.Resolver {
+	return t.resolver
+}
+
 func (t *Tunnel) hasResolver() bool {
 	return t.resolver != nil
 }
