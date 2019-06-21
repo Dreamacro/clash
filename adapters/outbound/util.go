@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"github.com/Dreamacro/clash/log"
 	"net"
 	"net/url"
 	"strconv"
@@ -26,23 +25,22 @@ var (
 	tun                      = tunnel.Instance()
 )
 
-func resolveIP(hostport string) string {
+func resolveIP(hostport string) (addr string, err error) {
 	resolver := tun.GetResolver()
 	if resolver == nil {
-		return hostport
+		return hostport, nil
 	}
 
 	host, port, err := net.SplitHostPort(hostport)
 	if err != nil {
-		return hostport
+		return "", err
 	}
 
 	ipAddr, err := resolver.InternalResolveIP(host)
 	if err != nil {
-		log.Debugln("ResolveIP.err: %v", err)
-		return hostport
+		return "", err
 	}
-	return net.JoinHostPort(ipAddr.String(), port)
+	return net.JoinHostPort(ipAddr.String(), port), nil
 }
 
 func urlToMetadata(rawURL string) (addr C.Metadata, err error) {

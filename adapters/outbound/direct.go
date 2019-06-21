@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"github.com/Dreamacro/clash/log"
 	"net"
 
 	C "github.com/Dreamacro/clash/constant"
@@ -16,8 +15,11 @@ func (d *Direct) Dial(metadata *C.Metadata) (net.Conn, error) {
 	if metadata.DstIP != nil {
 		address = net.JoinHostPort(metadata.DstIP.String(), metadata.DstPort)
 	} else {
-		address = resolveIP(address)
-		log.Debugln("-----metadata.Host %s to %v", net.JoinHostPort(metadata.Host, metadata.DstPort), address)
+		ipAddr, err := resolveIP(address)
+		if err != nil {
+			return nil, err
+		}
+		address = ipAddr
 	}
 
 	c, err := net.DialTimeout("tcp", address, tcpTimeout)

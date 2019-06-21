@@ -2,7 +2,6 @@ package adapters
 
 import (
 	"fmt"
-	"github.com/Dreamacro/clash/log"
 	"net"
 	"strconv"
 	"strings"
@@ -33,8 +32,10 @@ type VmessOption struct {
 }
 
 func (v *Vmess) Dial(metadata *C.Metadata) (net.Conn, error) {
-	server := resolveIP(v.server)
-	log.Debugln("-----v.server %s to %v", v.server, server)
+	server, err := resolveIP(v.server)
+	if err != nil {
+		return nil, err
+	}
 
 	c, err := net.DialTimeout("tcp", server, tcpTimeout)
 	if err != nil {

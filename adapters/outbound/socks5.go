@@ -3,7 +3,6 @@ package adapters
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/Dreamacro/clash/log"
 	"net"
 	"strconv"
 
@@ -33,8 +32,10 @@ type Socks5Option struct {
 }
 
 func (ss *Socks5) Dial(metadata *C.Metadata) (net.Conn, error) {
-	addr := resolveIP(ss.addr)
-	log.Debugln("-----ss.addr %s to %v", ss.addr, addr)
+	addr, err := resolveIP(ss.addr)
+	if err != nil {
+		return nil, err
+	}
 	c, err := net.DialTimeout("tcp", addr, tcpTimeout)
 
 	if err == nil && ss.tls {
