@@ -36,6 +36,9 @@ const (
 // MaxAddrLen is the maximum size of SOCKS address in bytes.
 const MaxAddrLen = 1 + 1 + 255 + 2
 
+// Control the max length of auth data.
+const MaxAuthLen = 512
+
 // Addr represents a SOCKS address as defined in RFC 1928 section 5.
 type Addr = []byte
 
@@ -82,6 +85,11 @@ func ServerHandshake(rw io.ReadWriter, authenticator auth.Authenticator) (addr A
 
 		// Get username
 		userLen := int(header[1])
+		if userLen <= 0 || userLen >= MaxAuthLen {
+			rw.Write([]byte{1, 1})
+			err = ErrGeneralFailure
+			return
+		}
 		user := make([]byte, userLen)
 		if _, err = io.ReadAtLeast(rw, user, userLen); err != nil {
 			return
@@ -92,6 +100,11 @@ func ServerHandshake(rw io.ReadWriter, authenticator auth.Authenticator) (addr A
 			return
 		}
 		passLen := int(header[0])
+		if passLen <= 0 || passLen >= MaxAuthLen {
+			rw.Write([]byte{1, 1})
+			err = ErrGeneralFailure
+			return
+		}
 		pass := make([]byte, passLen)
 		if _, err = io.ReadAtLeast(rw, pass, passLen); err != nil {
 			return

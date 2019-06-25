@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/Dreamacro/clash/log"
 	"io/ioutil"
 	"strings"
 	"sync"
@@ -71,6 +72,7 @@ func NewAuthenticator(al AuthLoader) Authenticator {
 
 	au := &inMemoryAuthenticator{}
 	for _, user := range users {
+		log.Infoln("Loaded user %s:%s", user.User, user.Pass)
 		au.Store(user.User, user.Pass)
 	}
 	return au
