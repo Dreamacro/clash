@@ -64,7 +64,7 @@ func ReCreateHTTP(port int) error {
 	}
 
 	var err error
-	httpListener, err = http.NewHttpProxy(addr)
+	httpListener, err = http.NewHttpProxy(addr, authenticator)
 	if err != nil {
 		return err
 	}
