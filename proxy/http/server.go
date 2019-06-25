@@ -3,13 +3,13 @@ package http
 import (
 	"bufio"
 	"encoding/base64"
-	"github.com/Dreamacro/clash/common/cache"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/common/cache"
 	"github.com/Dreamacro/clash/component/auth"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
