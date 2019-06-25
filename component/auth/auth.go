@@ -1,10 +1,11 @@
 package auth
 
 import (
-	"github.com/Dreamacro/clash/log"
 	"io/ioutil"
 	"strings"
 	"sync"
+
+	"github.com/Dreamacro/clash/log"
 )
 
 type User struct {

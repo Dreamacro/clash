@@ -3,10 +3,11 @@ package socks5
 import (
 	"bytes"
 	"errors"
-	"github.com/Dreamacro/clash/component/auth"
 	"io"
 	"net"
 	"strconv"
+
+	"github.com/Dreamacro/clash/component/auth"
 )
 
 // Error represents a SOCKS error
