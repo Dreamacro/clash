@@ -26,7 +26,7 @@ type General struct {
 	Port               int          `json:"port"`
 	SocksPort          int          `json:"socks-port"`
 	RedirPort          int          `json:"redir-port"`
-	AuthSource         string       `json:"auth-source"`
+	Logins             []C.AuthUser `json:"logins"`
 	AllowLan           bool         `json:"allow-lan"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
@@ -51,12 +51,19 @@ type Experimental struct {
 	IgnoreResolveFail bool `yaml:"ignore-resolve-fail"`
 }
 
+// Authenticate config
+type Login struct {
+	User string `yaml:"user"`
+	Pass string `yaml:"pass"`
+}
+
 // Config is clash config manager
 type Config struct {
 	General      *General
 	DNS          *DNS
 	Experimental *Experimental
 	Rules        []C.Rule
+	Logins       []C.AuthUser
 	Proxies      map[string]C.Proxy
 }
 
@@ -74,7 +81,7 @@ type rawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`
 	RedirPort          int          `yaml:"redir-port"`
-	AuthSource         string       `yaml:"auth-source"`
+	Logins             []string     `yaml:"logins"`
 	AllowLan           bool         `yaml:"allow-lan"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
@@ -119,9 +126,9 @@ func readConfig(path string) (*rawConfig, error) {
 
 	// config with some default value
 	rawConfig := &rawConfig{
-		AuthSource: "auth.txt",
 		AllowLan:   false,
 		Mode:       T.Rule,
+		Logins:     []string{},
 		LogLevel:   log.INFO,
 		Rule:       []string{},
 		Proxy:      []map[string]interface{}{},
@@ -172,6 +179,8 @@ func Parse(path string) (*Config, error) {
 	}
 	config.DNS = dnsCfg
 
+	config.Logins = general.Logins
+
 	return config, nil
 }
 
@@ -179,7 +188,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	port := cfg.Port
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
-	authSource := cfg.AuthSource
+	logins := parseLogins(cfg.Logins)
 	allowLan := cfg.AllowLan
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
@@ -201,7 +210,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		Port:               port,
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
-		AuthSource:         authSource,
+		Logins:             logins,
 		AllowLan:           allowLan,
 		Mode:               mode,
 		LogLevel:           logLevel,
@@ -524,4 +533,15 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 	}
 
 	return dnsCfg, nil
+}
+
+func parseLogins(rawRecords []string) []C.AuthUser {
+	users := make([]C.AuthUser, 0)
+	for _, line := range rawRecords {
+		userData := strings.SplitN(line, ":", 2)
+		if len(userData) == 2 {
+			users = append(users, C.AuthUser{User: userData[0], Pass: userData[1]})
+		}
+	}
+	return users
 }

@@ -5,7 +5,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/Dreamacro/clash/component/auth"
+	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/proxy/http"
 	"github.com/Dreamacro/clash/proxy/redir"
 	"github.com/Dreamacro/clash/proxy/socks"
@@ -18,7 +18,7 @@ var (
 	httpListener  *http.HttpListener
 	redirListener *redir.RedirListener
 
-	authenticator auth.Authenticator
+	authenticator C.Authenticator
 )
 
 type listener interface {
@@ -40,7 +40,11 @@ func SetAllowLan(al bool) {
 	allowLan = al
 }
 
-func SetAuthenticator(au auth.Authenticator) {
+func Authenticator() C.Authenticator {
+	return authenticator
+}
+
+func SetAuthenticator(au C.Authenticator) {
 	authenticator = au
 }
 
