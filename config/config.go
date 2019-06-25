@@ -26,6 +26,7 @@ type General struct {
 	Port               int          `json:"port"`
 	SocksPort          int          `json:"socks-port"`
 	RedirPort          int          `json:"redir-port"`
+	AuthSource         string       `json:"auth-source"`
 	AllowLan           bool         `json:"allow-lan"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
@@ -73,6 +74,7 @@ type rawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`
 	RedirPort          int          `yaml:"redir-port"`
+	AuthSource         string       `yaml:"auth-source"`
 	AllowLan           bool         `yaml:"allow-lan"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
@@ -117,6 +119,7 @@ func readConfig(path string) (*rawConfig, error) {
 
 	// config with some default value
 	rawConfig := &rawConfig{
+		AuthSource: "auth.txt",
 		AllowLan:   false,
 		Mode:       T.Rule,
 		LogLevel:   log.INFO,
@@ -176,6 +179,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	port := cfg.Port
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
+	authSource := cfg.AuthSource
 	allowLan := cfg.AllowLan
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
@@ -197,6 +201,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		Port:               port,
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
+		AuthSource:         authSource,
 		AllowLan:           allowLan,
 		Mode:               mode,
 		LogLevel:           logLevel,

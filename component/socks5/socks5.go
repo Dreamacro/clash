@@ -3,6 +3,7 @@ package socks5
 import (
 	"bytes"
 	"errors"
+	"github.com/Dreamacro/clash/component/auth"
 	"io"
 	"net"
 	"strconv"
@@ -56,7 +57,7 @@ type User struct {
 }
 
 // ServerHandshake fast-tracks SOCKS initialization to get target address to connect on server side.
-func ServerHandshake(rw io.ReadWriter) (addr Addr, command Command, err error) {
+func ServerHandshake(rw io.ReadWriter, authenticator auth.Authenticator) (addr Addr, command Command, err error) {
 	// Read RFC 1928 for request and reply structure and sizes.
 	buf := make([]byte, MaxAddrLen)
 	// read VER, NMETHODS, METHODS
@@ -68,8 +69,52 @@ func ServerHandshake(rw io.ReadWriter) (addr Addr, command Command, err error) {
 		return
 	}
 	// write VER METHOD
-	if _, err = rw.Write([]byte{5, 0}); err != nil {
-		return
+	if authenticator.Enabled() {
+		if _, err = rw.Write([]byte{5, 2}); err != nil {
+			return
+		}
+
+		// Get header
+		header := []byte{0, 0}
+		if _, err = io.ReadAtLeast(rw, header, 2); err != nil {
+			return
+		}
+
+		// Get username
+		userLen := int(header[1])
+		user := make([]byte, userLen)
+		if _, err = io.ReadAtLeast(rw, user, userLen); err != nil {
+			return
+		}
+
+		// Get password
+		if _, err = rw.Read(header[:1]); err != nil {
+			return
+		}
+		passLen := int(header[0])
+		pass := make([]byte, passLen)
+		if _, err = io.ReadAtLeast(rw, pass, passLen); err != nil {
+			return
+		}
+
+		// Verify
+		ok := authenticator.Verify(string(user), string(pass))
+		if !ok {
+			rw.Write([]byte{1, 1})
+			err = ErrGeneralFailure
+			return
+		}
+
+		// Response auth state
+		_, err = rw.Write([]byte{1, 0})
+		if err != nil {
+			return
+		}
+
+	} else {
+		if _, err = rw.Write([]byte{5, 0}); err != nil {
+			return
+		}
 	}
 	// read VER CMD RSV ATYP DST.ADDR DST.PORT
 	if _, err = io.ReadFull(rw, buf[:3]); err != nil {

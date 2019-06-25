@@ -1,6 +1,7 @@
 package executor
 
 import (
+	A "github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/config"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
@@ -90,6 +91,10 @@ func updateGeneral(general *config.General) {
 	allowLan := general.AllowLan
 
 	P.SetAllowLan(allowLan)
+
+	auth := A.NewAuthenticator(A.NewAuthLoader(general.AuthSource))
+	P.SetAuthenticator(auth)
+
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())
 	}
