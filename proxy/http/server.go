@@ -97,6 +97,7 @@ func handleConn(conn net.Conn, auth C.Authenticator, cache *cache.Cache) {
 		return
 	} else {
 		if !doAuth(authStrings[1], auth, cache) {
+			log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
 			conn.Close()
 			return
 		}

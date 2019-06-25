@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/log"
 )
 
 // Error represents a SOCKS error
@@ -61,7 +62,7 @@ type User struct {
 }
 
 // ServerHandshake fast-tracks SOCKS initialization to get target address to connect on server side.
-func ServerHandshake(rw io.ReadWriter, authenticator C.Authenticator) (addr Addr, command Command, err error) {
+func ServerHandshake(rw net.Conn, authenticator C.Authenticator) (addr Addr, command Command, err error) {
 	// Read RFC 1928 for request and reply structure and sizes.
 	buf := make([]byte, MaxAddrLen)
 	// read VER, NMETHODS, METHODS
@@ -114,6 +115,7 @@ func ServerHandshake(rw io.ReadWriter, authenticator C.Authenticator) (addr Addr
 		// Verify
 		ok := authenticator.Verify(string(user), string(pass))
 		if !ok {
+			log.Infoln("Auth failed from %s", rw.RemoteAddr().String())
 			rw.Write([]byte{1, 1})
 			err = ErrGeneralFailure
 			return
