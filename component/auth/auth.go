@@ -7,6 +7,18 @@ import (
 	"github.com/Dreamacro/clash/log"
 )
 
+var (
+	authenticator C.Authenticator
+)
+
+func Authenticator() C.Authenticator {
+	return authenticator
+}
+
+func SetAuthenticator(au C.Authenticator) {
+	authenticator = au
+}
+
 type inMemoryAuthenticator struct {
 	sync.Map
 	logins []C.AuthUser

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/component/auth"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 	"github.com/Dreamacro/clash/tunnel"
@@ -25,7 +26,7 @@ type HttpListener struct {
 	closed  bool
 }
 
-func NewHttpProxy(addr string, auth C.Authenticator) (*HttpListener, error) {
+func NewHttpProxy(addr string) (*HttpListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func NewHttpProxy(addr string, auth C.Authenticator) (*HttpListener, error) {
 				}
 				continue
 			}
-			go handleConn(c, auth, authCache)
+			go handleConn(c, auth.Authenticator(), authCache)
 		}
 	}()
 

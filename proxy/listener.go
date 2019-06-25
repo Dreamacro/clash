@@ -40,14 +40,6 @@ func SetAllowLan(al bool) {
 	allowLan = al
 }
 
-func Authenticator() C.Authenticator {
-	return authenticator
-}
-
-func SetAuthenticator(au C.Authenticator) {
-	authenticator = au
-}
-
 func ReCreateHTTP(port int) error {
 	addr := genAddr(port, allowLan)
 
@@ -64,7 +56,7 @@ func ReCreateHTTP(port int) error {
 	}
 
 	var err error
-	httpListener, err = http.NewHttpProxy(addr, authenticator)
+	httpListener, err = http.NewHttpProxy(addr)
 	if err != nil {
 		return err
 	}
@@ -88,7 +80,7 @@ func ReCreateSocks(port int) error {
 	}
 
 	var err error
-	socksListener, err = socks.NewSocksProxy(addr, authenticator)
+	socksListener, err = socks.NewSocksProxy(addr)
 	if err != nil {
 		return err
 	}
