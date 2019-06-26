@@ -22,6 +22,7 @@ func ParseWithPath(path string) (*config.Config, error) {
 
 // ApplyConfig dispatch configure to all parts
 func ApplyConfig(cfg *config.Config, force bool) {
+	updateUsers(cfg.Users)
 	if force {
 		updateGeneral(cfg.General)
 	}
@@ -37,7 +38,6 @@ func GetGeneral() *config.General {
 		Port:      ports.Port,
 		SocksPort: ports.SocksPort,
 		RedirPort: ports.RedirPort,
-		Users:     P.Authenticator().Users(),
 		AllowLan:  P.AllowLan(),
 		Mode:      T.Instance().Mode(),
 		LogLevel:  log.Level(),
@@ -93,14 +93,6 @@ func updateGeneral(general *config.General) {
 
 	P.SetAllowLan(allowLan)
 
-	authenticator := auth.NewAuthenticator(general.Users)
-	P.SetAuthenticator(authenticator)
-	if authenticator != nil {
-		for _, login := range authenticator.Users() {
-			log.Infoln("Loaded user: %s:%s", login.User, login.Pass)
-		}
-	}
-
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())
 	}
@@ -111,5 +103,13 @@ func updateGeneral(general *config.General) {
 
 	if err := P.ReCreateRedir(general.RedirPort); err != nil {
 		log.Errorln("Start Redir server error: %s", err.Error())
+	}
+}
+
+func updateUsers(users []auth.AuthUser) {
+	authenticator := auth.NewAuthenticator(users)
+	P.SetAuthenticator(authenticator)
+	for _, username := range authenticator.Users() {
+		log.Infoln("Loaded user: %s", username)
 	}
 }

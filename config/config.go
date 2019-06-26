@@ -24,16 +24,15 @@ import (
 
 // General config
 type General struct {
-	Port               int             `json:"port"`
-	SocksPort          int             `json:"socks-port"`
-	RedirPort          int             `json:"redir-port"`
-	Users              []auth.AuthUser `json:"logins"`
-	AllowLan           bool            `json:"allow-lan"`
-	Mode               T.Mode          `json:"mode"`
-	LogLevel           log.LogLevel    `json:"log-level"`
-	ExternalController string          `json:"-"`
-	ExternalUI         string          `json:"-"`
-	Secret             string          `json:"-"`
+	Port               int          `json:"port"`
+	SocksPort          int          `json:"socks-port"`
+	RedirPort          int          `json:"redir-port"`
+	AllowLan           bool         `json:"allow-lan"`
+	Mode               T.Mode       `json:"mode"`
+	LogLevel           log.LogLevel `json:"log-level"`
+	ExternalController string       `json:"-"`
+	ExternalUI         string       `json:"-"`
+	Secret             string       `json:"-"`
 }
 
 // DNS config
@@ -174,7 +173,7 @@ func Parse(path string) (*Config, error) {
 	}
 	config.DNS = dnsCfg
 
-	config.Users = general.Users
+	config.Users = parseUsers(rawCfg.Users)
 
 	return config, nil
 }
@@ -183,7 +182,6 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	port := cfg.Port
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
-	users := parseUsers(cfg.Users)
 	allowLan := cfg.AllowLan
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
@@ -205,7 +203,6 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		Port:               port,
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
-		Users:              users,
 		AllowLan:           allowLan,
 		Mode:               mode,
 		LogLevel:           logLevel,
