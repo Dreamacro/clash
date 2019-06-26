@@ -37,6 +37,9 @@ const (
 // MaxAddrLen is the maximum size of SOCKS address in bytes.
 const MaxAddrLen = 1 + 1 + 255 + 2
 
+// MaxAuthLen is the maximum size of user/password field in SOCKS5 Auth
+const MaxAuthLen = 255
+
 // Addr represents a SOCKS address as defined in RFC 1928 section 5.
 type Addr = []byte
 
@@ -72,8 +75,9 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 	if _, err = io.ReadFull(rw, buf[:nmethods]); err != nil {
 		return
 	}
+
 	// write VER METHOD
-	if authenticator == nil {
+	if authenticator != nil {
 		if _, err = rw.Write([]byte{5, 2}); err != nil {
 			return
 		}
@@ -84,6 +88,7 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 			return
 		}
 
+		authBuf := make([]byte, MaxAuthLen)
 		// Get username
 		userLen := int(header[1])
 		if userLen <= 0 {
@@ -91,10 +96,10 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 			err = ErrAuth
 			return
 		}
-		user := make([]byte, userLen)
-		if _, err = io.ReadFull(rw, user); err != nil {
+		if _, err = io.ReadFull(rw, authBuf[:userLen]); err != nil {
 			return
 		}
+		user := string(authBuf[:userLen])
 
 		// Get password
 		if _, err = rw.Read(header[:1]); err != nil {
@@ -106,10 +111,10 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 			err = ErrAuth
 			return
 		}
-		pass := make([]byte, passLen)
-		if _, err = io.ReadFull(rw, pass); err != nil {
+		if _, err = io.ReadFull(rw, authBuf[:passLen]); err != nil {
 			return
 		}
+		pass := string(authBuf[:passLen])
 
 		// Verify
 		if ok := authenticator.Verify(string(user), string(pass)); !ok {
@@ -122,7 +127,6 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 		if _, err = rw.Write([]byte{1, 0}); err != nil {
 			return
 		}
-
 	} else {
 		if _, err = rw.Write([]byte{5, 0}); err != nil {
 			return
