@@ -11,6 +11,7 @@ import (
 
 	adapters "github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/common/structure"
+	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/component/fakeip"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
@@ -23,16 +24,16 @@ import (
 
 // General config
 type General struct {
-	Port               int          `json:"port"`
-	SocksPort          int          `json:"socks-port"`
-	RedirPort          int          `json:"redir-port"`
-	Logins             []C.AuthUser `json:"logins"`
-	AllowLan           bool         `json:"allow-lan"`
-	Mode               T.Mode       `json:"mode"`
-	LogLevel           log.LogLevel `json:"log-level"`
-	ExternalController string       `json:"-"`
-	ExternalUI         string       `json:"-"`
-	Secret             string       `json:"-"`
+	Port               int             `json:"port"`
+	SocksPort          int             `json:"socks-port"`
+	RedirPort          int             `json:"redir-port"`
+	Users              []auth.AuthUser `json:"logins"`
+	AllowLan           bool            `json:"allow-lan"`
+	Mode               T.Mode          `json:"mode"`
+	LogLevel           log.LogLevel    `json:"log-level"`
+	ExternalController string          `json:"-"`
+	ExternalUI         string          `json:"-"`
+	Secret             string          `json:"-"`
 }
 
 // DNS config
@@ -51,19 +52,13 @@ type Experimental struct {
 	IgnoreResolveFail bool `yaml:"ignore-resolve-fail"`
 }
 
-// Authenticate config
-type Login struct {
-	User string `yaml:"user"`
-	Pass string `yaml:"pass"`
-}
-
 // Config is clash config manager
 type Config struct {
 	General      *General
 	DNS          *DNS
 	Experimental *Experimental
 	Rules        []C.Rule
-	Logins       []C.AuthUser
+	Users        []auth.AuthUser
 	Proxies      map[string]C.Proxy
 }
 
@@ -81,7 +76,7 @@ type rawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`
 	RedirPort          int          `yaml:"redir-port"`
-	Logins             []string     `yaml:"logins"`
+	Users              []string     `yaml:"local-users"`
 	AllowLan           bool         `yaml:"allow-lan"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
@@ -128,7 +123,7 @@ func readConfig(path string) (*rawConfig, error) {
 	rawConfig := &rawConfig{
 		AllowLan:   false,
 		Mode:       T.Rule,
-		Logins:     []string{},
+		Users:      []string{},
 		LogLevel:   log.INFO,
 		Rule:       []string{},
 		Proxy:      []map[string]interface{}{},
@@ -179,7 +174,7 @@ func Parse(path string) (*Config, error) {
 	}
 	config.DNS = dnsCfg
 
-	config.Logins = general.Logins
+	config.Users = general.Users
 
 	return config, nil
 }
@@ -188,7 +183,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	port := cfg.Port
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
-	logins := parseLogins(cfg.Logins)
+	users := parseUsers(cfg.Users)
 	allowLan := cfg.AllowLan
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
@@ -210,7 +205,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		Port:               port,
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
-		Logins:             logins,
+		Users:              users,
 		AllowLan:           allowLan,
 		Mode:               mode,
 		LogLevel:           logLevel,
@@ -535,12 +530,12 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 	return dnsCfg, nil
 }
 
-func parseLogins(rawRecords []string) []C.AuthUser {
-	users := make([]C.AuthUser, 0)
+func parseUsers(rawRecords []string) []auth.AuthUser {
+	users := make([]auth.AuthUser, 0)
 	for _, line := range rawRecords {
 		userData := strings.SplitN(line, ":", 2)
 		if len(userData) == 2 {
-			users = append(users, C.AuthUser{User: userData[0], Pass: userData[1]})
+			users = append(users, auth.AuthUser{User: userData[0], Pass: userData[1]})
 		}
 	}
 	return users

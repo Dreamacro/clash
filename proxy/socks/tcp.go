@@ -21,7 +21,7 @@ type SockListener struct {
 	closed  bool
 }
 
-func NewSocksProxy(addr string) (*SockListener, error) {
+func NewSocksProxy(addr string, authenticator auth.Authenticator) (*SockListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func NewSocksProxy(addr string) (*SockListener, error) {
 				}
 				continue
 			}
-			go handleSocks(c)
+			go handleSocks(c, authenticator)
 		}
 	}()
 
@@ -54,8 +54,8 @@ func (l *SockListener) Address() string {
 	return l.address
 }
 
-func handleSocks(conn net.Conn) {
-	target, command, err := socks5.ServerHandshake(conn, auth.Authenticator())
+func handleSocks(conn net.Conn, authenticator auth.Authenticator) {
+	target, command, err := socks5.ServerHandshake(conn, authenticator)
 	if err != nil {
 		conn.Close()
 		return

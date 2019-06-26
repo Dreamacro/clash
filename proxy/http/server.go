@@ -11,7 +11,6 @@ import (
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
 	"github.com/Dreamacro/clash/common/cache"
 	"github.com/Dreamacro/clash/component/auth"
-	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 	"github.com/Dreamacro/clash/tunnel"
 )
@@ -24,18 +23,19 @@ type HttpListener struct {
 	net.Listener
 	address string
 	closed  bool
+	cache   *cache.Cache
 }
 
-func NewHttpProxy(addr string) (*HttpListener, error) {
+func NewHttpProxy(addr string, authenticator auth.Authenticator) (*HttpListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	hl := &HttpListener{l, addr, false}
+	hl := &HttpListener{l, addr, false, cache.New(30 * time.Second)}
 
 	go func() {
 		log.Infoln("HTTP proxy listening at: %s", addr)
-		authCache := cache.New(30 * time.Second)
+
 		for {
 			c, err := hl.Accept()
 			if err != nil {
@@ -44,7 +44,7 @@ func NewHttpProxy(addr string) (*HttpListener, error) {
 				}
 				continue
 			}
-			go handleConn(c, auth.Authenticator(), authCache)
+			go handleConn(c, authenticator, hl.cache)
 		}
 	}()
 
@@ -60,14 +60,7 @@ func (l *HttpListener) Address() string {
 	return l.address
 }
 
-func handleAuth(conn net.Conn) {
-	_, err := conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
-	if err != nil {
-		return
-	}
-}
-
-func doAuth(loginStr string, auth C.Authenticator, cache *cache.Cache) (ret bool) {
+func doAuth(loginStr string, auth auth.Authenticator, cache *cache.Cache) (ret bool) {
 	if result := cache.Get(loginStr); result == nil {
 		loginData, err := base64.StdEncoding.DecodeString(loginStr)
 		login := strings.Split(string(loginData), ":")
@@ -83,7 +76,7 @@ func doAuth(loginStr string, auth C.Authenticator, cache *cache.Cache) (ret bool
 	return
 }
 
-func handleConn(conn net.Conn, auth C.Authenticator, cache *cache.Cache) {
+func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
 	br := bufio.NewReader(conn)
 	request, err := http.ReadRequest(br)
 	if err != nil || request.URL.Host == "" {
@@ -92,8 +85,8 @@ func handleConn(conn net.Conn, auth C.Authenticator, cache *cache.Cache) {
 	}
 
 	authStrings := strings.Split(request.Header.Get("Proxy-Authorization"), " ")
-	if auth.Enabled() && len(authStrings) != 2 {
-		handleAuth(conn)
+	if auth != nil && len(authStrings) != 2 {
+		_, err = conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
 		return
 	} else {
 		if !doAuth(authStrings[1], auth, cache) {

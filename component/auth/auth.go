@@ -2,53 +2,40 @@ package auth
 
 import (
 	"sync"
-
-	C "github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/log"
 )
 
-var (
-	authenticator C.Authenticator
-)
-
-func Authenticator() C.Authenticator {
-	return authenticator
+type Authenticator interface {
+	Verify(user string, pass string) bool
+	Users() []AuthUser
 }
 
-func SetAuthenticator(au C.Authenticator) {
-	authenticator = au
+type AuthUser struct {
+	User string
+	Pass string
 }
 
 type inMemoryAuthenticator struct {
-	sync.Map
-	logins []C.AuthUser
+	storage sync.Map
+	logins  []AuthUser
 }
 
-func (au inMemoryAuthenticator) Verify(user string, pass string) bool {
-	if realPass, ok := au.Load(user); ok && realPass == pass {
+func (au *inMemoryAuthenticator) Verify(user string, pass string) bool {
+	if realPass, ok := au.storage.Load(user); ok && realPass == pass {
 		return true
 	}
 	return false
 }
 
-func (au inMemoryAuthenticator) Enabled() bool        { return true }
-func (au inMemoryAuthenticator) Logins() []C.AuthUser { return au.logins }
+func (au *inMemoryAuthenticator) Users() []AuthUser { return au.logins }
 
-type noAuthenticator struct{}
-
-func (au noAuthenticator) Verify(user string, pass string) bool { return true }
-func (au noAuthenticator) Enabled() bool                        { return false }
-func (au noAuthenticator) Logins() []C.AuthUser                 { return []C.AuthUser{} }
-
-func NewAuthenticator(users []C.AuthUser) C.Authenticator {
+func NewAuthenticator(users []AuthUser) Authenticator {
 	if len(users) == 0 {
-		return noAuthenticator{}
+		return nil
 	}
 
-	au := &inMemoryAuthenticator{}
+	au := &inMemoryAuthenticator{logins: users}
 	for _, user := range users {
-		log.Infoln("Loaded user %s:%s", user.User, user.Pass)
-		au.Store(user.User, user.Pass)
+		au.storage.Store(user.User, user.Pass)
 	}
 	return au
 }

@@ -7,8 +7,7 @@ import (
 	"net"
 	"strconv"
 
-	C "github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/log"
+	"github.com/Dreamacro/clash/component/auth"
 )
 
 // Error represents a SOCKS error
@@ -38,9 +37,6 @@ const (
 // MaxAddrLen is the maximum size of SOCKS address in bytes.
 const MaxAddrLen = 1 + 1 + 255 + 2
 
-// Control the max length of auth data.
-const MaxAuthLen = 512
-
 // Addr represents a SOCKS address as defined in RFC 1928 section 5.
 type Addr = []byte
 
@@ -56,13 +52,16 @@ const (
 	ErrAddressNotSupported  = Error(8)
 )
 
+// Auth errors used to return a specific "Auth failed" error
+var ErrAuth = errors.New("auth failed")
+
 type User struct {
 	Username string
 	Password string
 }
 
 // ServerHandshake fast-tracks SOCKS initialization to get target address to connect on server side.
-func ServerHandshake(rw net.Conn, authenticator C.Authenticator) (addr Addr, command Command, err error) {
+func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, command Command, err error) {
 	// Read RFC 1928 for request and reply structure and sizes.
 	buf := make([]byte, MaxAddrLen)
 	// read VER, NMETHODS, METHODS
@@ -74,26 +73,26 @@ func ServerHandshake(rw net.Conn, authenticator C.Authenticator) (addr Addr, com
 		return
 	}
 	// write VER METHOD
-	if authenticator.Enabled() {
+	if authenticator == nil {
 		if _, err = rw.Write([]byte{5, 2}); err != nil {
 			return
 		}
 
 		// Get header
-		header := []byte{0, 0}
-		if _, err = io.ReadAtLeast(rw, header, 2); err != nil {
+		header := make([]byte, 2)
+		if _, err = io.ReadFull(rw, header); err != nil {
 			return
 		}
 
 		// Get username
 		userLen := int(header[1])
-		if userLen <= 0 || userLen >= MaxAuthLen {
+		if userLen <= 0 {
 			rw.Write([]byte{1, 1})
-			err = ErrGeneralFailure
+			err = ErrAuth
 			return
 		}
 		user := make([]byte, userLen)
-		if _, err = io.ReadAtLeast(rw, user, userLen); err != nil {
+		if _, err = io.ReadFull(rw, user); err != nil {
 			return
 		}
 
@@ -102,28 +101,25 @@ func ServerHandshake(rw net.Conn, authenticator C.Authenticator) (addr Addr, com
 			return
 		}
 		passLen := int(header[0])
-		if passLen <= 0 || passLen >= MaxAuthLen {
+		if passLen <= 0 {
 			rw.Write([]byte{1, 1})
-			err = ErrGeneralFailure
+			err = ErrAuth
 			return
 		}
 		pass := make([]byte, passLen)
-		if _, err = io.ReadAtLeast(rw, pass, passLen); err != nil {
+		if _, err = io.ReadFull(rw, pass); err != nil {
 			return
 		}
 
 		// Verify
-		ok := authenticator.Verify(string(user), string(pass))
-		if !ok {
-			log.Infoln("Auth failed from %s", rw.RemoteAddr().String())
+		if ok := authenticator.Verify(string(user), string(pass)); !ok {
 			rw.Write([]byte{1, 1})
-			err = ErrGeneralFailure
+			err = ErrAuth
 			return
 		}
 
 		// Response auth state
-		_, err = rw.Write([]byte{1, 0})
-		if err != nil {
+		if _, err = rw.Write([]byte{1, 0}); err != nil {
 			return
 		}
 
@@ -132,6 +128,7 @@ func ServerHandshake(rw net.Conn, authenticator C.Authenticator) (addr Addr, com
 			return
 		}
 	}
+
 	// read VER CMD RSV ATYP DST.ADDR DST.PORT
 	if _, err = io.ReadFull(rw, buf[:3]); err != nil {
 		return

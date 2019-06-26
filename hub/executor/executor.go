@@ -37,7 +37,7 @@ func GetGeneral() *config.General {
 		Port:      ports.Port,
 		SocksPort: ports.SocksPort,
 		RedirPort: ports.RedirPort,
-		Logins:    auth.Authenticator().Logins(),
+		Users:     P.Authenticator().Users(),
 		AllowLan:  P.AllowLan(),
 		Mode:      T.Instance().Mode(),
 		LogLevel:  log.Level(),
@@ -93,8 +93,11 @@ func updateGeneral(general *config.General) {
 
 	P.SetAllowLan(allowLan)
 
-	authenticator := auth.NewAuthenticator(general.Logins)
-	auth.SetAuthenticator(authenticator)
+	authenticator := auth.NewAuthenticator(general.Users)
+	P.SetAuthenticator(authenticator)
+	for _, login := range authenticator.Users() {
+		log.Infoln("Loaded user: %s:%s", login.User, login.Pass)
+	}
 
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())

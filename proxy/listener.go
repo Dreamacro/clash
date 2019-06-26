@@ -5,7 +5,7 @@ import (
 	"net"
 	"strconv"
 
-	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/proxy/http"
 	"github.com/Dreamacro/clash/proxy/redir"
 	"github.com/Dreamacro/clash/proxy/socks"
@@ -18,7 +18,7 @@ var (
 	httpListener  *http.HttpListener
 	redirListener *redir.RedirListener
 
-	authenticator C.Authenticator
+	authenticator auth.Authenticator
 )
 
 type listener interface {
@@ -40,6 +40,14 @@ func SetAllowLan(al bool) {
 	allowLan = al
 }
 
+func Authenticator() auth.Authenticator {
+	return authenticator
+}
+
+func SetAuthenticator(au auth.Authenticator) {
+	authenticator = au
+}
+
 func ReCreateHTTP(port int) error {
 	addr := genAddr(port, allowLan)
 
@@ -56,7 +64,7 @@ func ReCreateHTTP(port int) error {
 	}
 
 	var err error
-	httpListener, err = http.NewHttpProxy(addr)
+	httpListener, err = http.NewHttpProxy(addr, authenticator)
 	if err != nil {
 		return err
 	}
@@ -80,7 +88,7 @@ func ReCreateSocks(port int) error {
 	}
 
 	var err error
-	socksListener, err = socks.NewSocksProxy(addr)
+	socksListener, err = socks.NewSocksProxy(addr, authenticator)
 	if err != nil {
 		return err
 	}
