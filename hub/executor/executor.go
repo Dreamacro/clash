@@ -38,6 +38,7 @@ func GetGeneral() *config.General {
 		Port:      ports.Port,
 		SocksPort: ports.SocksPort,
 		RedirPort: ports.RedirPort,
+		Users:     P.Authenticator().Users(),
 		AllowLan:  P.AllowLan(),
 		Mode:      T.Instance().Mode(),
 		LogLevel:  log.Level(),

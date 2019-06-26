@@ -27,6 +27,7 @@ type General struct {
 	Port               int          `json:"port"`
 	SocksPort          int          `json:"socks-port"`
 	RedirPort          int          `json:"redir-port"`
+	Users              []string     `json:"users"`
 	AllowLan           bool         `json:"allow-lan"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
