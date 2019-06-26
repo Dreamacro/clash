@@ -91,6 +91,7 @@ func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
 			return
 		} else {
 			if !doAuth(authStrings[1], auth, cache) {
+				conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
 				log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
 				conn.Close()
 				return
