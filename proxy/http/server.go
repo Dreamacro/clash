@@ -84,15 +84,16 @@ func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
 		return
 	}
 
-	authStrings := strings.Split(request.Header.Get("Proxy-Authorization"), " ")
-	if auth != nil && len(authStrings) != 2 {
-		_, err = conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
-		return
-	} else {
-		if !doAuth(authStrings[1], auth, cache) {
-			log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
-			conn.Close()
+	if auth != nil {
+		if authStrings := strings.Split(request.Header.Get("Proxy-Authorization"), " "); len(authStrings) != 2 {
+			_, err = conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
 			return
+		} else {
+			if !doAuth(authStrings[1], auth, cache) {
+				log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
+				conn.Close()
+				return
+			}
 		}
 	}
 
