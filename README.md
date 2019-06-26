@@ -110,7 +110,7 @@ experimental:
   ignore-resolve-fail: true # ignore dns resolve fail, default value is true
 
 # authenticate of local SOCKS5/HTTP(S) server
-# logins:
+# local-users:
 #  - "user1:pass1"
 #  - "user2:pass2"
 

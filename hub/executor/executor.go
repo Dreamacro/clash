@@ -95,8 +95,10 @@ func updateGeneral(general *config.General) {
 
 	authenticator := auth.NewAuthenticator(general.Users)
 	P.SetAuthenticator(authenticator)
-	for _, login := range authenticator.Users() {
-		log.Infoln("Loaded user: %s:%s", login.User, login.Pass)
+	if authenticator != nil {
+		for _, login := range authenticator.Users() {
+			log.Infoln("Loaded user: %s:%s", login.User, login.Pass)
+		}
 	}
 
 	if err := P.ReCreateHTTP(general.Port); err != nil {

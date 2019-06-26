@@ -66,8 +66,9 @@ func doAuth(loginStr string, auth auth.Authenticator, cache *cache.Cache) (ret b
 		login := strings.Split(string(loginData), ":")
 		if err != nil || len(login) != 2 || !auth.Verify(login[0], login[1]) {
 			ret = false
+		} else {
+			ret = true
 		}
-		ret = true
 	} else {
 		ret = result.(bool)
 	}
