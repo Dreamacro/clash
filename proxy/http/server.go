@@ -60,18 +60,13 @@ func (l *HttpListener) Address() string {
 	return l.address
 }
 
-func doAuth(loginStr string, auth auth.Authenticator, cache *cache.Cache) (ret bool) {
-	if result := cache.Get(loginStr); result == nil {
-		loginData, err := base64.StdEncoding.DecodeString(loginStr)
-		login := strings.Split(string(loginData), ":")
-		if err != nil || len(login) != 2 || !auth.Verify(login[0], login[1]) {
-			ret = false
-		} else {
-			ret = true
-		}
-	} else {
+func canActivate(loginStr string, auth auth.Authenticator, cache *cache.Cache) (ret bool) {
+	if result := cache.Get(loginStr); result != nil {
 		ret = result.(bool)
 	}
+	loginData, err := base64.StdEncoding.DecodeString(loginStr)
+	login := strings.Split(string(loginData), ":")
+	ret = err == nil && len(login) != 2 && auth.Verify(login[0], login[1])
 
 	cache.Put(loginStr, ret, time.Minute)
 	return
@@ -89,13 +84,11 @@ func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
 		if authStrings := strings.Split(request.Header.Get("Proxy-Authorization"), " "); len(authStrings) != 2 {
 			_, err = conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
 			return
-		} else {
-			if !doAuth(authStrings[1], auth, cache) {
-				conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
-				log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
-				conn.Close()
-				return
-			}
+		} else if !canActivate(authStrings[1], auth, cache) {
+			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
+			log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
+			conn.Close()
+			return
 		}
 	}
 
