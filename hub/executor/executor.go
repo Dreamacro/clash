@@ -35,13 +35,13 @@ func ApplyConfig(cfg *config.Config, force bool) {
 func GetGeneral() *config.General {
 	ports := P.GetPorts()
 	return &config.General{
-		Port:      ports.Port,
-		SocksPort: ports.SocksPort,
-		RedirPort: ports.RedirPort,
-		Users:     P.Authenticator().Users(),
-		AllowLan:  P.AllowLan(),
-		Mode:      T.Instance().Mode(),
-		LogLevel:  log.Level(),
+		Port:           ports.Port,
+		SocksPort:      ports.SocksPort,
+		RedirPort:      ports.RedirPort,
+		Authentication: P.Authenticator().Users(),
+		AllowLan:       P.AllowLan(),
+		Mode:           T.Instance().Mode(),
+		LogLevel:       log.Level(),
 	}
 }
 

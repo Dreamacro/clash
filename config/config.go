@@ -27,7 +27,7 @@ type General struct {
 	Port               int          `json:"port"`
 	SocksPort          int          `json:"socks-port"`
 	RedirPort          int          `json:"redir-port"`
-	Users              []string     `json:"users"`
+	Authentication     []string     `json:"authentication"`
 	AllowLan           bool         `json:"allow-lan"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
@@ -76,7 +76,7 @@ type rawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`
 	RedirPort          int          `yaml:"redir-port"`
-	Users              []string     `yaml:"local-users"`
+	Authentication     []string     `yaml:"authentication"`
 	AllowLan           bool         `yaml:"allow-lan"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
@@ -121,13 +121,13 @@ func readConfig(path string) (*rawConfig, error) {
 
 	// config with some default value
 	rawConfig := &rawConfig{
-		AllowLan:   false,
-		Mode:       T.Rule,
-		Users:      []string{},
-		LogLevel:   log.INFO,
-		Rule:       []string{},
-		Proxy:      []map[string]interface{}{},
-		ProxyGroup: []map[string]interface{}{},
+		AllowLan:       false,
+		Mode:           T.Rule,
+		Authentication: []string{},
+		LogLevel:       log.INFO,
+		Rule:           []string{},
+		Proxy:          []map[string]interface{}{},
+		ProxyGroup:     []map[string]interface{}{},
 		Experimental: Experimental{
 			IgnoreResolveFail: true,
 		},
@@ -174,7 +174,7 @@ func Parse(path string) (*Config, error) {
 	}
 	config.DNS = dnsCfg
 
-	config.Users = parseUsers(rawCfg.Users)
+	config.Users = parseAuthentication(rawCfg.Authentication)
 
 	return config, nil
 }
@@ -528,7 +528,7 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 	return dnsCfg, nil
 }
 
-func parseUsers(rawRecords []string) []auth.AuthUser {
+func parseAuthentication(rawRecords []string) []auth.AuthUser {
 	users := make([]auth.AuthUser, 0)
 	for _, line := range rawRecords {
 		userData := strings.SplitN(line, ":", 2)
