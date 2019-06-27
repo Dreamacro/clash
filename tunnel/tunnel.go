@@ -3,6 +3,7 @@ package tunnel
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -33,6 +34,12 @@ type Tunnel struct {
 
 	// Outbound Rule
 	mode Mode
+}
+
+// Add request to queue
+func (t *Tunnel) Close() error {
+	filepath := filepath.Join(C.Path.HomeDir(), "dnscache")
+	return t.resolver.Save(filepath)
 }
 
 // Add request to queue

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -215,6 +216,10 @@ func (r *Resolver) IsFakeIP() bool {
 	return r.fakeip
 }
 
+func (r *Resolver) Save(filepath string) error {
+	return r.cache.Save(filepath)
+}
+
 type NameServer struct {
 	Net  string
 	Addr string
@@ -264,6 +269,9 @@ func New(config Config) *Resolver {
 		fakeip:  config.EnhancedMode == FAKEIP,
 		pool:    config.Pool,
 	}
+	nums := r.cache.Reload(filepath.Join(C.Path.HomeDir(), "dnscache"))
+	r.pool.AddMin(nums)
+
 	if config.Fallback != nil {
 		r.fallback = transform(config.Fallback)
 	}
