@@ -109,7 +109,7 @@ external-controller: 127.0.0.1:9090
 experimental:
   ignore-resolve-fail: true # ignore dns resolve fail, default value is true
 
-# authenticate of local SOCKS5/HTTP(S) server
+# authentication of local SOCKS5/HTTP(S) server
 # authentication:
 #  - "user1:pass1"
 #  - "user2:pass2"
