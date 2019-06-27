@@ -12,6 +12,7 @@ import (
 	"github.com/Dreamacro/clash/common/cache"
 	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/log"
+	authStore "github.com/Dreamacro/clash/proxy/auth"
 	"github.com/Dreamacro/clash/tunnel"
 )
 
@@ -26,7 +27,7 @@ type HttpListener struct {
 	cache   *cache.Cache
 }
 
-func NewHttpProxy(addr string, authenticator auth.Authenticator) (*HttpListener, error) {
+func NewHttpProxy(addr string) (*HttpListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -44,7 +45,7 @@ func NewHttpProxy(addr string, authenticator auth.Authenticator) (*HttpListener,
 				}
 				continue
 			}
-			go handleConn(c, authenticator, hl.cache)
+			go handleConn(c, hl.cache)
 		}
 	}()
 
@@ -60,19 +61,19 @@ func (l *HttpListener) Address() string {
 	return l.address
 }
 
-func canActivate(loginStr string, auth auth.Authenticator, cache *cache.Cache) (ret bool) {
+func canActivate(loginStr string, authenticator auth.Authenticator, cache *cache.Cache) (ret bool) {
 	if result := cache.Get(loginStr); result != nil {
 		ret = result.(bool)
 	}
 	loginData, err := base64.StdEncoding.DecodeString(loginStr)
 	login := strings.Split(string(loginData), ":")
-	ret = err == nil && len(login) != 2 && auth.Verify(login[0], login[1])
+	ret = err == nil && len(login) != 2 && authenticator.Verify(login[0], login[1])
 
 	cache.Put(loginStr, ret, time.Minute)
 	return
 }
 
-func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
+func handleConn(conn net.Conn, cache *cache.Cache) {
 	br := bufio.NewReader(conn)
 	request, err := http.ReadRequest(br)
 	if err != nil || request.URL.Host == "" {
@@ -80,11 +81,12 @@ func handleConn(conn net.Conn, auth auth.Authenticator, cache *cache.Cache) {
 		return
 	}
 
-	if auth != nil {
+	authenticator := authStore.Authenticator()
+	if authenticator != nil {
 		if authStrings := strings.Split(request.Header.Get("Proxy-Authorization"), " "); len(authStrings) != 2 {
 			_, err = conn.Write([]byte("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic\r\n\r\n"))
 			return
-		} else if !canActivate(authStrings[1], auth, cache) {
+		} else if !canActivate(authStrings[1], authenticator, cache) {
 			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
 			log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
 			conn.Close()

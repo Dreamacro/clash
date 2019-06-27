@@ -7,6 +7,7 @@ import (
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
 	P "github.com/Dreamacro/clash/proxy"
+	authStore "github.com/Dreamacro/clash/proxy/auth"
 	T "github.com/Dreamacro/clash/tunnel"
 )
 
@@ -38,7 +39,7 @@ func GetGeneral() *config.General {
 		Port:           ports.Port,
 		SocksPort:      ports.SocksPort,
 		RedirPort:      ports.RedirPort,
-		Authentication: P.Authenticator().Users(),
+		Authentication: authStore.Authenticator().Users(),
 		AllowLan:       P.AllowLan(),
 		Mode:           T.Instance().Mode(),
 		LogLevel:       log.Level(),
@@ -109,8 +110,10 @@ func updateGeneral(general *config.General) {
 
 func updateUsers(users []auth.AuthUser) {
 	authenticator := auth.NewAuthenticator(users)
-	P.SetAuthenticator(authenticator)
-	for _, username := range authenticator.Users() {
-		log.Infoln("Loaded user: %s", username)
+	authStore.SetAuthenticator(authenticator)
+	if authenticator != nil{
+		for _, username := range authenticator.Users() {
+			log.Infoln("Loaded user: %s", username)
+		}
 	}
 }

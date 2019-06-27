@@ -4,10 +4,10 @@ import (
 	"net"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
-	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
+	authStore "github.com/Dreamacro/clash/proxy/auth"
 	"github.com/Dreamacro/clash/tunnel"
 )
 
@@ -21,7 +21,7 @@ type SockListener struct {
 	closed  bool
 }
 
-func NewSocksProxy(addr string, authenticator auth.Authenticator) (*SockListener, error) {
+func NewSocksProxy(addr string) (*SockListener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func NewSocksProxy(addr string, authenticator auth.Authenticator) (*SockListener
 				}
 				continue
 			}
-			go handleSocks(c, authenticator)
+			go handleSocks(c)
 		}
 	}()
 
@@ -54,8 +54,8 @@ func (l *SockListener) Address() string {
 	return l.address
 }
 
-func handleSocks(conn net.Conn, authenticator auth.Authenticator) {
-	target, command, err := socks5.ServerHandshake(conn, authenticator)
+func handleSocks(conn net.Conn) {
+	target, command, err := socks5.ServerHandshake(conn, authStore.Authenticator())
 	if err != nil {
 		conn.Close()
 		return

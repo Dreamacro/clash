@@ -53,7 +53,7 @@ func ReCreateHTTP(port int) error {
 	}
 
 	var err error
-	httpListener, err = http.NewHttpProxy(addr, authenticator)
+	httpListener, err = http.NewHttpProxy(addr)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func ReCreateSocks(port int) error {
 	}
 
 	var err error
-	socksListener, err = socks.NewSocksProxy(addr, authenticator)
+	socksListener, err = socks.NewSocksProxy(addr)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-package proxy
+package auth
 
 import (
 	"github.com/Dreamacro/clash/component/auth"
