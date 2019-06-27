@@ -111,9 +111,7 @@ func updateGeneral(general *config.General) {
 func updateUsers(users []auth.AuthUser) {
 	authenticator := auth.NewAuthenticator(users)
 	authStore.SetAuthenticator(authenticator)
-	if authenticator != nil{
-		for _, username := range authenticator.Users() {
-			log.Infoln("Loaded user: %s", username)
-		}
+	if authenticator != nil {
+		log.Infoln("Authentication of local server is enabled")
 	}
 }
