@@ -54,19 +54,30 @@ func downloadMMDB(path string) (err error) {
 	return nil
 }
 
+func fileNotExists(path string) bool {
+	if _, err := os.Stat(C.Path.Config()); os.IsNotExist(err) {
+		return true
+	}
+	return false
+}
+
 // Init prepare necessary files
 func Init(dir string) error {
 	// initial homedir
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	if fileNotExists(dir) {
 		if err := os.MkdirAll(dir, 0777); err != nil {
 			return fmt.Errorf("Can't create config directory %s: %s", dir, err.Error())
 		}
 	}
 
 	// initial config.yaml
-	if _, err := os.Stat(C.Path.Config()); os.IsNotExist(err) {
-		log.Info("Can't find config, create an empty file")
-		os.OpenFile(C.Path.Config(), os.O_CREATE|os.O_WRONLY, 0644)
+	if fileNotExists(C.Path.Config()) {
+		if fileNotExists(C.Path.OldConfig()) {
+			log.Info("Can't find config, create an empty file")
+			os.OpenFile(C.Path.Config(), os.O_CREATE|os.O_WRONLY, 0644)
+		} else {
+			log.Infof("%s is deprecated, you should use %s instead", C.Path.OldConfig(), C.Path.Config())
+		}
 	}
 
 	// initial mmdb

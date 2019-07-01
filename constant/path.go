@@ -45,6 +45,10 @@ func (p *path) Config() string {
 	return P.Join(p.homedir, "config.yaml")
 }
 
+func (p *path) OldConfig() string {
+	return P.Join(p.homedir, "config.yml")
+}
+
 func (p *path) MMDB() string {
 	return P.Join(p.homedir, "Country.mmdb")
 }
