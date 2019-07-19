@@ -88,7 +88,8 @@ socks-port: 7891
 
 allow-lan: false
 
-allow-udp: false
+# default is true
+allow-udp: true
 
 # Rule / Global/ Direct (default is Rule)
 mode: Rule

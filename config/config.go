@@ -127,7 +127,7 @@ func readConfig(path string) (*rawConfig, error) {
 	// config with some default value
 	rawConfig := &rawConfig{
 		AllowLan:       false,
-		AllowUDP:       false,
+		AllowUDP:       true,
 		Mode:           T.Rule,
 		Authentication: []string{},
 		LogLevel:       log.INFO,
