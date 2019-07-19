@@ -7,6 +7,7 @@ import (
 	"time"
 
 	InboundAdapter "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
@@ -17,6 +18,8 @@ import (
 var (
 	tunnel *Tunnel
 	once   sync.Once
+
+	udpNATMap *socks5.NATMap
 )
 
 // Tunnel handle relay inbound proxy and outbound proxy
@@ -103,7 +106,6 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 }
 
 func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
-	defer localConn.Close()
 	metadata := localConn.Metadata()
 
 	if !metadata.Valid() {
@@ -138,15 +140,45 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		}
 	}
 
-	if metadata.NetWork == C.UDP {
-		pc, addr, err := proxy.DialUDP(metadata)
+	if adapter, ok := localConn.(*InboundAdapter.SocketAdapter); ok {
+		if _, ok = adapter.Conn.(*socks5.UDPConn); ok {
+			t.handleUDPConn(localConn, metadata, proxy)
+			return
+		}
+	}
+	t.handleTCPConn(localConn, metadata, proxy)
+}
+
+func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
+	if metadata.NetWork != C.UDP {
+		log.Warnln("Network type mismatch: %v", metadata.NetWork)
+		return
+	}
+
+	if udpNATMap == nil {
+		log.Warnln("UDP NatMap cannot be nil")
+		return
+	}
+
+	pc := udpNATMap.Get(localConn.RemoteAddr().String())
+	if pc == nil {
+		c, addr, err := proxy.DialUDP(metadata)
 		if err != nil {
 			log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
 			return
 		}
-		defer pc.Close()
+		pc = socks5.NewUDPConn(c, nil, addr)
+		target := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
+		udpNATMap.Set(localConn.RemoteAddr().String(), pc)
+		go t.handleUDPToLocal(localConn, pc, target)
+	}
+	t.handleUDPToRemote(localConn, pc)
+}
 
-		t.handleUDPOverTCP(localConn, pc, addr)
+func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
+	defer localConn.Close()
+	if metadata.NetWork == C.UDP {
+		t.handleUDPAssociate(localConn)
 		return
 	}
 
@@ -196,6 +228,7 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
 			}
 
 			if metadata.NetWork == C.UDP && !adapter.SupportUDP() {
+				log.Debugln("%v UDP is not supported", adapter.Name())
 				continue
 			}
 
@@ -224,4 +257,9 @@ func Instance() *Tunnel {
 		go tunnel.process()
 	})
 	return tunnel
+}
+
+// Tunnel's UDP NAT table
+func NATMap(timeout time.Duration) {
+	udpNATMap = socks5.NewNATMap(timeout)
 }

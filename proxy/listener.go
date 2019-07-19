@@ -12,10 +12,12 @@ import (
 
 var (
 	allowLan = false
+	allowUDP = false
 
-	socksListener *socks.SockListener
-	httpListener  *http.HttpListener
-	redirListener *redir.RedirListener
+	socksListener    *socks.SockListener
+	socksUDPListener *socks.SockUDPListener
+	httpListener     *http.HttpListener
+	redirListener    *redir.RedirListener
 )
 
 type listener interface {
@@ -35,6 +37,14 @@ func AllowLan() bool {
 
 func SetAllowLan(al bool) {
 	allowLan = al
+}
+
+func AllowUDP() bool {
+	return allowUDP
+}
+
+func SetAllowUDP(al bool) {
+	allowUDP = al
 }
 
 func ReCreateHTTP(port int) error {
@@ -78,6 +88,34 @@ func ReCreateSocks(port int) error {
 
 	var err error
 	socksListener, err = socks.NewSocksProxy(addr)
+	if err != nil {
+		return err
+	}
+
+	if allowUDP {
+		return reCreateSocksUDP(port)
+	}
+
+	return nil
+}
+
+func reCreateSocksUDP(port int) error {
+	addr := genAddr(port, allowLan)
+
+	if socksUDPListener != nil {
+		if socksUDPListener.Address() == addr {
+			return nil
+		}
+		socksUDPListener.Close()
+		socksUDPListener = nil
+	}
+
+	if portIsZero(addr) {
+		return nil
+	}
+
+	var err error
+	socksUDPListener, err = socks.NewSocksUDPProxy(addr)
 	if err != nil {
 		return err
 	}

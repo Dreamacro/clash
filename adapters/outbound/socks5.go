@@ -3,9 +3,11 @@ package adapters
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 
+	"github.com/Dreamacro/clash/common/pool"
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 )
@@ -51,7 +53,7 @@ func (ss *Socks5) Dial(metadata *C.Metadata) (net.Conn, error) {
 			Password: ss.pass,
 		}
 	}
-	if err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
+	if _, err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -78,10 +80,44 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 		}
 	}
 
-	if err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdUDPAssociate, user); err != nil {
+	bindAddr, err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdUDPAssociate, user)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%v client hanshake error", err)
+	}
+
+	addr, err := net.ResolveUDPAddr("udp", bindAddr.String())
+	if err != nil {
 		return nil, nil, err
 	}
-	return &fakeUDPConn{Conn: c}, c.LocalAddr(), nil
+
+	remoteAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	go handleTCP(c)
+
+	pc, err := net.ListenPacket("udp", "")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &socksUDPConn{PacketConn: pc, rAddr: remoteAddr}, addr, nil
+}
+
+func handleTCP(c net.Conn) {
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+
+	defer c.Close()
+	for {
+		_, err := c.Read(buf)
+		if err == io.EOF {
+			return
+		} else if err != nil {
+			return
+		}
+	}
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {
@@ -107,4 +143,29 @@ func NewSocks5(option Socks5Option) *Socks5 {
 		skipCertVerify: option.SkipCertVerify,
 		tlsConfig:      tlsConfig,
 	}
+}
+
+type socksUDPConn struct {
+	net.PacketConn
+	rAddr net.Addr
+}
+
+func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+	n, err = socks5.EncodeUDPPacket(uc.rAddr.String(), b, buf)
+	if err != nil {
+		return
+	}
+	return uc.PacketConn.WriteTo(buf[:n], addr)
+}
+
+func (uc *socksUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, a, e := uc.PacketConn.ReadFrom(b)
+	rAddr, err := socks5.DecodeUDPPacket(b)
+	if err != nil {
+		return 0, nil, err
+	}
+	copy(b, b[3+len(rAddr):])
+	return n - len(rAddr) - 3, a, e
 }

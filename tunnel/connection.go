@@ -10,6 +10,7 @@ import (
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
 	"github.com/Dreamacro/clash/common/pool"
+	"github.com/Dreamacro/clash/component/socks5"
 )
 
 func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
@@ -68,7 +69,65 @@ func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn
 	relay(request, conn)
 }
 
-func (t *Tunnel) handleUDPOverTCP(conn net.Conn, pc net.PacketConn, addr net.Addr) error {
+// Reference: https://github.com/shadowsocks/go-shadowsocks2/tcp.go
+// UDP: keep the connection until disconnect then free the UDP socket
+func (t *Tunnel) handleUDPAssociate(conn net.Conn) {
+	buf := make([]byte, 1)
+	// block here
+	for {
+		_, err := conn.Read(buf)
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			continue
+		}
+		return
+	}
+}
+
+func (t *Tunnel) handleUDPToRemote(conn, pc net.Conn) {
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	if _, err = pc.Write(buf[:n]); err != nil {
+		return
+	}
+	t.traffic.Up() <- int64(n)
+}
+
+func (t *Tunnel) handleUDPToLocal(conn, pc net.Conn, target socks5.Addr) {
+	src := newTrafficTrack(pc, t.Traffic())
+	src.SetReadDeadline(time.Now().Add(udpNATMap.Timeout))
+
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+
+	packet := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(packet[:cap(packet)])
+
+	for {
+		n, err := src.Read(buf)
+		if err != nil {
+			break
+		}
+
+		n, err = socks5.EncodeUDPPacket(target.String(), buf[:n], packet)
+		if err != nil {
+			break
+		}
+		if _, err = conn.Write(packet[:n]); err != nil {
+			break
+		}
+	}
+
+	if pc := udpNATMap.Del(conn.RemoteAddr().String()); pc != nil {
+		pc.Close()
+	}
+}
+
+/*
+func (t *Tunnel) handleUDPOverTCP(conn, pc net.Conn, addr net.Addr) error {
 	ch := make(chan error, 1)
 
 	go func() {
@@ -81,7 +140,7 @@ func (t *Tunnel) handleUDPOverTCP(conn net.Conn, pc net.PacketConn, addr net.Add
 				return
 			}
 			pc.SetReadDeadline(time.Now().Add(120 * time.Second))
-			if _, err = pc.WriteTo(buf[:n], addr); err != nil {
+			if _, err = pc.Write(buf[:n]); err != nil {
 				ch <- err
 				return
 			}
@@ -110,6 +169,7 @@ func (t *Tunnel) handleUDPOverTCP(conn net.Conn, pc net.PacketConn, addr net.Add
 	<-ch
 	return nil
 }
+*/
 
 // relay copies between left and right bidirectionally.
 func relay(leftConn, rightConn net.Conn) {
