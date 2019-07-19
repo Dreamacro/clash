@@ -126,51 +126,6 @@ func (t *Tunnel) handleUDPToLocal(conn, pc net.Conn, target socks5.Addr) {
 	}
 }
 
-/*
-func (t *Tunnel) handleUDPOverTCP(conn, pc net.Conn, addr net.Addr) error {
-	ch := make(chan error, 1)
-
-	go func() {
-		buf := pool.BufPool.Get().([]byte)
-		defer pool.BufPool.Put(buf)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				ch <- err
-				return
-			}
-			pc.SetReadDeadline(time.Now().Add(120 * time.Second))
-			if _, err = pc.Write(buf[:n]); err != nil {
-				ch <- err
-				return
-			}
-			t.traffic.Up() <- int64(n)
-			ch <- nil
-		}
-	}()
-
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf)
-
-	for {
-		pc.SetReadDeadline(time.Now().Add(120 * time.Second))
-		n, _, err := pc.ReadFrom(buf)
-		if err != nil {
-			break
-		}
-
-		if _, err := conn.Write(buf[:n]); err != nil {
-			break
-		}
-
-		t.traffic.Down() <- int64(n)
-	}
-
-	<-ch
-	return nil
-}
-*/
-
 // relay copies between left and right bidirectionally.
 func relay(leftConn, rightConn net.Conn) {
 	ch := make(chan error)
