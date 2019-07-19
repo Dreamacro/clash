@@ -2,17 +2,16 @@ package socks
 
 import (
 	"net"
-	"time"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/common/pool"
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/tunnel"
 )
 
-const udpBufSize = 20 * 1024
-
-var udpTimeout = 120 * time.Second
+var (
+	_ = adapters.NATMapInstance()
+)
 
 type SockUDPListener struct {
 	net.PacketConn
@@ -21,8 +20,6 @@ type SockUDPListener struct {
 }
 
 func NewSocksUDPProxy(addr string) (*SockUDPListener, error) {
-	tunnel.NATMap(udpTimeout)
-
 	l, err := net.ListenPacket("udp", addr)
 	if err != nil {
 		return nil, err
@@ -30,7 +27,8 @@ func NewSocksUDPProxy(addr string) (*SockUDPListener, error) {
 
 	sl := &SockUDPListener{l, addr, false}
 	go func() {
-		buf := make([]byte, udpBufSize)
+		buf := pool.BufPool.Get().([]byte)
+		defer pool.BufPool.Put(buf[:cap(buf)])
 		for {
 			n, remoteAddr, err := l.ReadFrom(buf)
 			if err != nil {
@@ -61,6 +59,6 @@ func handleSocksUDP(c net.PacketConn, packet []byte, remoteAddr net.Addr) {
 		// Unresolved UDP packet, do nothing
 		return
 	}
-	conn := socks5.NewUDPConn(c, packet[3+len(target):], remoteAddr)
+	conn := adapters.NewFakeConn(c, packet[3+len(target):], remoteAddr)
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
 }

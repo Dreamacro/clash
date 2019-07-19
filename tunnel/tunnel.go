@@ -18,8 +18,6 @@ import (
 var (
 	tunnel *Tunnel
 	once   sync.Once
-
-	udpNATMap *socks5.NATMap
 )
 
 // Tunnel handle relay inbound proxy and outbound proxy
@@ -141,7 +139,7 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	}
 
 	if adapter, ok := localConn.(*InboundAdapter.SocketAdapter); ok {
-		if _, ok = adapter.Conn.(*socks5.UDPConn); ok {
+		if _, ok = adapter.Conn.(*InboundAdapter.FakeConn); ok {
 			t.handleUDPConn(localConn, metadata, proxy)
 			return
 		}
@@ -155,10 +153,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		return
 	}
 
-	if udpNATMap == nil {
-		log.Warnln("UDP NatMap cannot be nil")
-		return
-	}
+	udpNATMap := InboundAdapter.NATMapInstance()
 
 	pc := udpNATMap.Get(localConn.RemoteAddr().String())
 	if pc == nil {
@@ -167,11 +162,15 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 			log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
 			return
 		}
-		pc = socks5.NewUDPConn(c, nil, addr)
-		target := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
+		pc = InboundAdapter.NewFakeConn(c, nil, addr)
+		pc.SetReadDeadline(time.Now().Add(udpNATMap.Timeout))
+
 		udpNATMap.Set(localConn.RemoteAddr().String(), pc)
+
+		target := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
 		go t.handleUDPToLocal(localConn, pc, target)
 	}
+
 	t.handleUDPToRemote(localConn, pc)
 }
 
@@ -257,9 +256,4 @@ func Instance() *Tunnel {
 		go tunnel.process()
 	})
 	return tunnel
-}
-
-// Tunnel's UDP NAT table
-func NATMap(timeout time.Duration) {
-	udpNATMap = socks5.NewNATMap(timeout)
 }

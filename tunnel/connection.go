@@ -97,8 +97,8 @@ func (t *Tunnel) handleUDPToRemote(conn, pc net.Conn) {
 }
 
 func (t *Tunnel) handleUDPToLocal(conn, pc net.Conn, target socks5.Addr) {
-	src := newTrafficTrack(pc, t.Traffic())
-	src.SetReadDeadline(time.Now().Add(udpNATMap.Timeout))
+	trackPc := newTrafficTrack(pc, t.Traffic())
+	defer trackPc.Close()
 
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
@@ -107,22 +107,18 @@ func (t *Tunnel) handleUDPToLocal(conn, pc net.Conn, target socks5.Addr) {
 	defer pool.BufPool.Put(packet[:cap(packet)])
 
 	for {
-		n, err := src.Read(buf)
+		n, err := trackPc.Read(buf)
 		if err != nil {
-			break
+			return
 		}
 
 		n, err = socks5.EncodeUDPPacket(target.String(), buf[:n], packet)
 		if err != nil {
-			break
+			return
 		}
 		if _, err = conn.Write(packet[:n]); err != nil {
-			break
+			return
 		}
-	}
-
-	if pc := udpNATMap.Del(conn.RemoteAddr().String()); pc != nil {
-		pc.Close()
 	}
 }
 
