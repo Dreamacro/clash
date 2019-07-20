@@ -12,6 +12,7 @@ type Table struct {
 }
 
 type table struct {
+	mutex   sync.Mutex
 	mapping sync.Map
 	janitor *janitor
 	timeout time.Duration
@@ -34,11 +35,6 @@ func (t *table) Set(key net.Addr, rConn net.PacketConn, rAddr net.Addr) {
 }
 
 func (t *table) Get(key net.Addr) (rConn net.PacketConn, rAddr net.Addr) {
-	rConn, rAddr, _ = t.GetWithExpire(key)
-	return
-}
-
-func (t *table) GetWithExpire(key net.Addr) (rConn net.PacketConn, rAddr net.Addr, expired time.Time) {
 	item, exist := t.mapping.Load(key)
 	if !exist {
 		return
@@ -51,7 +47,11 @@ func (t *table) GetWithExpire(key net.Addr) (rConn net.PacketConn, rAddr net.Add
 		t.mapping.Delete(key)
 		return
 	}
-	return elm.RemoteConn, elm.RemoteAddr, elm.Expired
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	// reset expired time
+	elm.Expired = time.Now().Add(t.timeout)
+	return elm.RemoteConn, elm.RemoteAddr
 }
 
 func (t *table) cleanup() {
