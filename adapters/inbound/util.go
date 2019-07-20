@@ -79,10 +79,7 @@ type FakeConn struct {
 }
 
 func NewFakeConn(conn net.PacketConn, buf []byte, remoteAddr net.Addr) *FakeConn {
-	var buffer *bytes.Buffer
-	if buf != nil {
-		buffer = bytes.NewBuffer(buf)
-	}
+	buffer := bytes.NewBuffer(buf)
 	return &FakeConn{
 		PacketConn: conn,
 		buffer:     buffer,
@@ -91,10 +88,6 @@ func NewFakeConn(conn net.PacketConn, buf []byte, remoteAddr net.Addr) *FakeConn
 }
 
 func (c *FakeConn) Read(b []byte) (n int, err error) {
-	if c.buffer == nil {
-		n, _, err = c.ReadFrom(b)
-		return
-	}
 	return c.buffer.Read(b)
 }
 

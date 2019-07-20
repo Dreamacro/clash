@@ -152,9 +152,9 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		return
 	}
 
-	udpNATMap := InboundAdapter.NATInstance()
+	natTable := InboundAdapter.NATInstance()
 
-	pc, addr := udpNATMap.Get(localConn.RemoteAddr())
+	pc, addr := natTable.Get(localConn.RemoteAddr())
 	if pc == nil {
 		var err error
 		pc, addr, err = proxy.DialUDP(metadata)
@@ -163,7 +163,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 			return
 		}
 
-		udpNATMap.Set(localConn.RemoteAddr(), pc, addr)
+		natTable.Set(localConn.RemoteAddr(), pc, addr)
 
 		target := net.JoinHostPort(metadata.String(), metadata.DstPort)
 		go t.handleUDPToLocal(localConn, pc, addr, target)
