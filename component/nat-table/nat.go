@@ -56,7 +56,7 @@ func (t *table) GetWithExpire(key net.Addr) (rConn net.PacketConn, rAddr net.Add
 
 func (t *table) cleanup() {
 	t.mapping.Range(func(k, v interface{}) bool {
-		key := k.(string)
+		key := k.(net.Addr)
 		elm := v.(*element)
 		if time.Since(elm.Expired) > 0 {
 			// close and delete
