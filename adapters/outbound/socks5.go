@@ -153,10 +153,11 @@ type socksUDPConn struct {
 func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
-	n, err = socks5.EncodeUDPPacket(uc.rAddr.String(), b, buf)
+	buffer, err := socks5.EncodeUDPPacket(uc.rAddr.String(), b)
 	if err != nil {
 		return
 	}
+	n, _ = buffer.Read(buf)
 	return uc.PacketConn.WriteTo(buf[:n], addr)
 }
 

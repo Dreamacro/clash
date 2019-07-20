@@ -15,6 +15,7 @@ const (
 
 	HTTP Type = iota
 	SOCKS
+	SOCKSUDP
 	REDIR
 )
 

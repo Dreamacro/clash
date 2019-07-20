@@ -137,21 +137,15 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		}
 	}
 
-	if adapter, ok := localConn.(*InboundAdapter.SocketAdapter); ok {
-		if _, ok = adapter.Conn.(*InboundAdapter.FakeConn); ok {
-			t.handleUDPConn(localConn, metadata, proxy)
-			return
-		}
+	switch metadata.NetWork {
+	case C.TCP:
+		t.handleTCPConn(localConn, metadata, proxy)
+	case C.UDP:
+		t.handleUDPConn(localConn, metadata, proxy)
 	}
-	t.handleTCPConn(localConn, metadata, proxy)
 }
 
 func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
-	if metadata.NetWork != C.UDP {
-		log.Warnln("Network type mismatch: %v", metadata.NetWork)
-		return
-	}
-
 	natTable := InboundAdapter.NATInstance()
 
 	pc, addr := natTable.Get(localConn.RemoteAddr())
@@ -174,7 +168,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
 	defer localConn.Close()
-	if metadata.NetWork == C.UDP {
+	if metadata.Type == C.SOCKSUDP {
 		t.handleUDPAssociate(localConn)
 		return
 	}

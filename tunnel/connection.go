@@ -72,7 +72,8 @@ func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn
 // Reference: https://github.com/shadowsocks/go-shadowsocks2/tcp.go
 // UDP: keep the connection until disconnect then free the UDP socket
 func (t *Tunnel) handleUDPAssociate(conn net.Conn) {
-	buf := make([]byte, 1)
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
 	// block here
 	for {
 		_, err := conn.Read(buf)
@@ -86,6 +87,7 @@ func (t *Tunnel) handleUDPAssociate(conn net.Conn) {
 func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Addr) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
+
 	n, err := conn.Read(buf)
 	if err != nil {
 		return
@@ -100,9 +102,6 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, addr net.Add
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
 
-	packet := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(packet[:cap(packet)])
-
 	for {
 		n, rAddr, err := pc.ReadFrom(buf)
 		if err != nil {
@@ -114,11 +113,12 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, addr net.Add
 			return
 		}
 
-		n, err = socks5.EncodeUDPPacket(target, buf[:n], packet)
+		buffer, err := socks5.EncodeUDPPacket(target, buf[:n])
 		if err != nil {
 			return
 		}
-		n, err = conn.Write(packet[:n])
+		n, _ = buffer.Read(buf[:cap(buf)])
+		n, err = conn.Write(buf[:n])
 		if err != nil {
 			return
 		}

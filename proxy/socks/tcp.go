@@ -62,7 +62,7 @@ func handleSocks(conn net.Conn) {
 	}
 	conn.(*net.TCPConn).SetKeepAlive(true)
 	if command == socks5.CmdUDPAssociate {
-		tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
+		tun.Add(adapters.NewSocket(target, conn, C.SOCKSUDP, C.TCP))
 		return
 	}
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.TCP))
