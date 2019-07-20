@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	_ = adapters.NATMapInstance()
+	_ = adapters.NATInstance()
 )
 
 type SockUDPListener struct {

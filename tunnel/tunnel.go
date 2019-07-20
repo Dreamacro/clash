@@ -7,7 +7,6 @@ import (
 	"time"
 
 	InboundAdapter "github.com/Dreamacro/clash/adapters/inbound"
-	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
@@ -153,25 +152,24 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		return
 	}
 
-	udpNATMap := InboundAdapter.NATMapInstance()
+	udpNATMap := InboundAdapter.NATInstance()
 
-	pc := udpNATMap.Get(localConn.RemoteAddr().String())
+	pc, addr := udpNATMap.Get(localConn.RemoteAddr())
 	if pc == nil {
-		c, addr, err := proxy.DialUDP(metadata)
+		var err error
+		pc, addr, err = proxy.DialUDP(metadata)
 		if err != nil {
 			log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
 			return
 		}
-		pc = InboundAdapter.NewFakeConn(c, nil, addr)
-		pc.SetReadDeadline(time.Now().Add(udpNATMap.Timeout))
 
-		udpNATMap.Set(localConn.RemoteAddr().String(), pc)
+		udpNATMap.Set(localConn.RemoteAddr(), pc, addr)
 
-		target := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
-		go t.handleUDPToLocal(localConn, pc, target)
+		target := net.JoinHostPort(metadata.String(), metadata.DstPort)
+		go t.handleUDPToLocal(localConn, pc, addr, target)
 	}
 
-	t.handleUDPToRemote(localConn, pc)
+	t.handleUDPToRemote(localConn, pc, addr)
 }
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {

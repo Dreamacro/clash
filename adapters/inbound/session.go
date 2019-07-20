@@ -1,47 +1,22 @@
 package adapters
 
 import (
-	"net"
 	"sync"
 	"time"
 
-	"github.com/Dreamacro/clash/common/cache"
+	nat "github.com/Dreamacro/clash/component/nat-table"
 )
 
 var (
-	natMap *NATMap
-	once   sync.Once
+	natTable *nat.Table
+	once     sync.Once
 
 	natTimeout = 120 * time.Second
 )
 
-type NATMap struct {
-	cache   *cache.Cache
-	Timeout time.Duration
-}
-
-func (m *NATMap) Get(key string) net.Conn {
-	item := m.cache.Get(key)
-	if item == nil {
-		return nil
-	}
-	return item.(net.Conn)
-}
-
-func (m *NATMap) Set(key string, conn net.Conn) {
-	m.cache.Put(key, conn, m.Timeout)
-}
-
-func newNATMap() *NATMap {
-	return &NATMap{
-		cache:   cache.New(natTimeout),
-		Timeout: natTimeout,
-	}
-}
-
-func NATMapInstance() *NATMap {
+func NATInstance() *nat.Table {
 	once.Do(func() {
-		natMap = newNATMap()
+		natTable = nat.New(natTimeout)
 	})
-	return natMap
+	return natTable
 }
