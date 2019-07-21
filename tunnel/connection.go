@@ -64,26 +64,6 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 	}
 }
 
-func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn) {
-	conn := newTrafficTrack(outbound, t.traffic)
-	relay(request, conn)
-}
-
-// Reference: https://github.com/shadowsocks/go-shadowsocks2/tcp.go
-// UDP: keep the connection until disconnect then free the UDP socket
-func (t *Tunnel) handleUDPAssociate(conn net.Conn) {
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf[:cap(buf)])
-	// block here
-	for {
-		_, err := conn.Read(buf)
-		if err, ok := err.(net.Error); ok && err.Timeout() {
-			continue
-		}
-		return
-	}
-}
-
 func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Addr) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
@@ -98,19 +78,14 @@ func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Ad
 	t.traffic.Up() <- int64(n)
 }
 
-func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, addr net.Addr, target string) {
+func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, target string) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
 
 	for {
-		n, rAddr, err := pc.ReadFrom(buf)
+		n, _, err := pc.ReadFrom(buf)
 		if err != nil {
 			return
-		}
-
-		if rAddr.String() != addr.String() {
-			// address mismatch
-			continue
 		}
 
 		buffer, err := socks5.EncodeUDPPacket(target, buf[:n])
@@ -124,6 +99,11 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, addr net.Add
 		}
 		t.traffic.Down() <- int64(n)
 	}
+}
+
+func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn) {
+	conn := newTrafficTrack(outbound, t.traffic)
+	relay(request, conn)
 }
 
 // relay copies between left and right bidirectionally.

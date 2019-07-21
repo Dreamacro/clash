@@ -158,7 +158,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		natTable.Set(localConn.RemoteAddr(), pc, addr)
 
 		target := net.JoinHostPort(metadata.String(), metadata.DstPort)
-		go t.handleUDPToLocal(localConn, pc, addr, target)
+		go t.handleUDPToLocal(localConn, pc, target)
 	}
 
 	t.handleUDPToRemote(localConn, pc, addr)
@@ -166,10 +166,6 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
 	defer localConn.Close()
-	if metadata.Type == C.SOCKSUDP {
-		t.handleUDPAssociate(localConn)
-		return
-	}
 
 	remoConn, err := proxy.Dial(metadata)
 	if err != nil {
