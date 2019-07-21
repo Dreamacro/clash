@@ -173,6 +173,8 @@ func ServerHandshake(rw net.Conn, authenticator auth.Authenticator) (addr Addr, 
 			_, err = rw.Write(bytes.Join([][]byte{{5, 0, 0}, localAddr}, []byte{}))
 		}
 	case CmdBind:
+		fallthrough
+	default:
 		err = ErrCommandNotSupported
 	}
 
