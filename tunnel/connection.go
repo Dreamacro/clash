@@ -110,7 +110,7 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, addr net.Add
 
 		if rAddr.String() != addr.String() {
 			// address mismatch
-			return
+			continue
 		}
 
 		buffer, err := socks5.EncodeUDPPacket(target, buf[:n])
