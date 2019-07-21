@@ -1,4 +1,4 @@
-package adapters
+package tunnel
 
 import (
 	"sync"
@@ -9,13 +9,13 @@ import (
 
 var (
 	natTable *nat.Table
-	once     sync.Once
+	natOnce  sync.Once
 
 	natTimeout = 120 * time.Second
 )
 
 func NATInstance() *nat.Table {
-	once.Do(func() {
+	natOnce.Do(func() {
 		natTable = nat.New(natTimeout)
 	})
 	return natTable

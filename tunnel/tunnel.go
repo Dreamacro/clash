@@ -146,8 +146,6 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 }
 
 func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
-	natTable := InboundAdapter.NATInstance()
-
 	pc, addr := natTable.Get(localConn.RemoteAddr())
 	if pc == nil {
 		var err error

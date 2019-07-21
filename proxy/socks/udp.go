@@ -7,10 +7,11 @@ import (
 	"github.com/Dreamacro/clash/common/pool"
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/tunnel"
 )
 
 var (
-	_ = adapters.NATInstance()
+	_ = tunnel.NATInstance()
 )
 
 type SockUDPListener struct {
