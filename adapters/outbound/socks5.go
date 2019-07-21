@@ -91,7 +91,7 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 		return nil, nil, err
 	}
 
-	remoteAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
+	targetAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -106,7 +106,7 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 		return nil, nil, err
 	}
 
-	return &socksUDPConn{PacketConn: pc, rAddr: remoteAddr}, addr, nil
+	return &socksUDPConn{PacketConn: pc, rAddr: targetAddr}, addr, nil
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {

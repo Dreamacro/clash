@@ -92,13 +92,13 @@ func (ss *ShadowSocks) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, 
 		return nil, nil, err
 	}
 
-	remoteAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
+	targetAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	pc = ss.cipher.PacketConn(pc)
-	return &ssUDPConn{PacketConn: pc, rAddr: remoteAddr}, addr, nil
+	return &ssUDPConn{PacketConn: pc, rAddr: targetAddr}, addr, nil
 }
 
 func (ss *ShadowSocks) MarshalJSON() ([]byte, error) {
