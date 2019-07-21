@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"strconv"
 
@@ -95,7 +96,10 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 		return nil, nil, err
 	}
 
-	go handleTCP(c)
+	go func() {
+		io.Copy(ioutil.Discard, c)
+		c.Close()
+	}()
 
 	pc, err := net.ListenPacket("udp", "")
 	if err != nil {
@@ -103,21 +107,6 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 	}
 
 	return &socksUDPConn{PacketConn: pc, rAddr: remoteAddr}, addr, nil
-}
-
-func handleTCP(c net.Conn) {
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf[:cap(buf)])
-
-	defer c.Close()
-	for {
-		_, err := c.Read(buf)
-		if err == io.EOF {
-			return
-		} else if err != nil {
-			return
-		}
-	}
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {
