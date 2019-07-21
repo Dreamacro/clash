@@ -12,7 +12,7 @@ import (
 
 var (
 	allowLan = false
-	allowUDP = false
+	// allowUDP = true
 
 	socksListener    *socks.SockListener
 	socksUDPListener *socks.SockUDPListener
@@ -37,14 +37,6 @@ func AllowLan() bool {
 
 func SetAllowLan(al bool) {
 	allowLan = al
-}
-
-func AllowUDP() bool {
-	return allowUDP
-}
-
-func SetAllowUDP(al bool) {
-	allowUDP = al
 }
 
 func ReCreateHTTP(port int) error {
@@ -92,11 +84,7 @@ func ReCreateSocks(port int) error {
 		return err
 	}
 
-	if allowUDP {
-		return reCreateSocksUDP(port)
-	}
-
-	return nil
+	return reCreateSocksUDP(port)
 }
 
 func reCreateSocksUDP(port int) error {

@@ -26,7 +26,6 @@ type configSchema struct {
 	SocksPort *int          `json:"socks-port"`
 	RedirPort *int          `json:"redir-port"`
 	AllowLan  *bool         `json:"allow-lan"`
-	AllowUDP  *bool         `json:"allow-udp"`
 	Mode      *T.Mode       `json:"mode"`
 	LogLevel  *log.LogLevel `json:"log-level"`
 }
@@ -54,10 +53,6 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if general.AllowLan != nil {
 		P.SetAllowLan(*general.AllowLan)
-	}
-
-	if general.AllowUDP != nil {
-		P.SetAllowUDP(*general.AllowUDP)
 	}
 
 	ports := P.GetPorts()

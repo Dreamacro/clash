@@ -30,7 +30,6 @@ type General struct {
 	RedirPort          int          `json:"redir-port"`
 	Authentication     []string     `json:"authentication"`
 	AllowLan           bool         `json:"allow-lan"`
-	AllowUDP           bool         `json:"allow-udp"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
 	ExternalController string       `json:"-"`
@@ -82,7 +81,6 @@ type rawConfig struct {
 	RedirPort          int          `yaml:"redir-port"`
 	Authentication     []string     `yaml:"authentication"`
 	AllowLan           bool         `yaml:"allow-lan"`
-	AllowUDP           bool         `yaml:"allow-udp"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
 	ExternalController string       `yaml:"external-controller"`
@@ -127,7 +125,6 @@ func readConfig(path string) (*rawConfig, error) {
 	// config with some default value
 	rawConfig := &rawConfig{
 		AllowLan:       false,
-		AllowUDP:       true,
 		Mode:           T.Rule,
 		Authentication: []string{},
 		LogLevel:       log.INFO,
@@ -191,7 +188,6 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
 	allowLan := cfg.AllowLan
-	allowUDP := cfg.AllowUDP
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
 	secret := cfg.Secret
@@ -213,7 +209,6 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
 		AllowLan:           allowLan,
-		AllowUDP:           allowUDP,
 		Mode:               mode,
 		LogLevel:           logLevel,
 		ExternalController: externalController,

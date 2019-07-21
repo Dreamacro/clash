@@ -46,7 +46,6 @@ func GetGeneral() *config.General {
 		RedirPort:      ports.RedirPort,
 		Authentication: authenticator,
 		AllowLan:       P.AllowLan(),
-		AllowUDP:       P.AllowUDP(),
 		Mode:           T.Instance().Mode(),
 		LogLevel:       log.Level(),
 	}
@@ -105,9 +104,6 @@ func updateGeneral(general *config.General) {
 
 	allowLan := general.AllowLan
 	P.SetAllowLan(allowLan)
-
-	allowUDP := general.AllowUDP
-	P.SetAllowUDP(allowUDP)
 
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())
