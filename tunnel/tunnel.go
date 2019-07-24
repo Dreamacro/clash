@@ -168,9 +168,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		}
 
 		natTable.Set(localConn.RemoteAddr(), pc, addr)
-
-		target := net.JoinHostPort(metadata.String(), metadata.DstPort)
-		go t.handleUDPToLocal(localConn, pc, target)
+		go t.handleUDPToLocal(localConn, pc)
 	}
 
 	t.handleUDPToRemote(localConn, pc, addr)

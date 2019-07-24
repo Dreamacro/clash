@@ -10,7 +10,6 @@ import (
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
 	"github.com/Dreamacro/clash/common/pool"
-	"github.com/Dreamacro/clash/component/socks5"
 )
 
 func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
@@ -78,7 +77,7 @@ func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Ad
 	t.traffic.Up() <- int64(n)
 }
 
-func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, target string) {
+func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
 
@@ -88,11 +87,7 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, target strin
 			return
 		}
 
-		packet, err := socks5.EncodeUDPPacket(target, buf[:n])
-		if err != nil {
-			return
-		}
-		n, err = conn.Write(packet)
+		n, err = conn.Write(buf[:n])
 		if err != nil {
 			return
 		}

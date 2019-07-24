@@ -60,6 +60,6 @@ func handleSocksUDP(c net.PacketConn, packet []byte, remoteAddr net.Addr) {
 		// Unresolved UDP packet, do nothing
 		return
 	}
-	conn := newfakeConn(c, payload, remoteAddr)
+	conn := newfakeConn(c, target.String(), remoteAddr, payload)
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
 }
