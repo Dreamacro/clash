@@ -25,7 +25,7 @@ type element struct {
 
 func (t *table) Set(key net.Addr, rConn net.PacketConn, rAddr net.Addr) {
 	// set conn read timeout
-	_ = rConn.SetReadDeadline(time.Now().Add(t.timeout))
+	rConn.SetReadDeadline(time.Now().Add(t.timeout))
 	t.mapping.Store(key, &element{
 		RemoteAddr: rAddr,
 		RemoteConn: rConn,
@@ -42,7 +42,7 @@ func (t *table) Get(key net.Addr) (rConn net.PacketConn, rAddr net.Addr) {
 	// expired
 	if time.Since(elm.Expired) > 0 {
 		t.mapping.Delete(key)
-		_ = elm.RemoteConn.Close()
+		elm.RemoteConn.Close()
 		return
 	}
 	// reset expired time
@@ -56,7 +56,7 @@ func (t *table) cleanup() {
 		elm := v.(*element)
 		if time.Since(elm.Expired) > 0 {
 			t.mapping.Delete(key)
-			_ = elm.RemoteConn.Close()
+			elm.RemoteConn.Close()
 		}
 		return true
 	})
