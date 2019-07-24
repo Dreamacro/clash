@@ -12,7 +12,6 @@ import (
 
 var (
 	allowLan = false
-	// allowUDP = true
 
 	socksListener    *socks.SockListener
 	socksUDPListener *socks.SockUDPListener
