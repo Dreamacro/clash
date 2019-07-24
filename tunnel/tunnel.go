@@ -103,8 +103,15 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 }
 
 func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
-	metadata := localConn.Metadata()
+	defer func() {
+		if adapter, ok := localConn.(*InboundAdapter.SocketAdapter); ok {
+			if _, ok = adapter.Conn.(*net.TCPConn); ok {
+				localConn.Close()
+			}
+		}
+	}()
 
+	metadata := localConn.Metadata()
 	if !metadata.Valid() {
 		log.Warnln("[Metadata] not valid: %#v", metadata)
 		return
@@ -165,8 +172,6 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 }
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
-	defer localConn.Close()
-
 	remoConn, err := proxy.Dial(metadata)
 	if err != nil {
 		log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
