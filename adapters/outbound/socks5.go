@@ -159,10 +159,10 @@ func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 
 func (uc *socksUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, a, e := uc.PacketConn.ReadFrom(b)
-	rAddr, err := socks5.DecodeUDPPacket(b)
+	addr, payload, err := socks5.DecodeUDPPacket(b)
 	if err != nil {
 		return 0, nil, err
 	}
-	copy(b, b[3+len(rAddr):])
-	return n - len(rAddr) - 3, a, e
+	copy(b, payload)
+	return n - len(addr) - 3, a, e
 }

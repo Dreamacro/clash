@@ -55,11 +55,11 @@ func (l *SockUDPListener) Address() string {
 }
 
 func handleSocksUDP(c net.PacketConn, packet []byte, remoteAddr net.Addr) {
-	target, err := socks5.DecodeUDPPacket(packet)
+	target, payload, err := socks5.DecodeUDPPacket(packet)
 	if err != nil {
 		// Unresolved UDP packet, do nothing
 		return
 	}
-	conn := newfakeConn(c, packet[3+len(target):], remoteAddr)
+	conn := newfakeConn(c, payload, remoteAddr)
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
 }

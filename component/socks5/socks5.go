@@ -337,7 +337,7 @@ func ParseAddr(s string) Addr {
 	return addr
 }
 
-func DecodeUDPPacket(packet []byte) (addr Addr, err error) {
+func DecodeUDPPacket(packet []byte) (addr Addr, payload []byte, err error) {
 	if len(packet) < 5 {
 		err = errors.New("insufficient length of packet")
 		return
@@ -358,6 +358,8 @@ func DecodeUDPPacket(packet []byte) (addr Addr, err error) {
 	if addr == nil {
 		err = errors.New("failed to read UDP header")
 	}
+
+	payload = bytes.Join([][]byte{packet[3+len(addr):]}, []byte{})
 	return
 }
 
