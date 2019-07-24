@@ -8,7 +8,6 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/Dreamacro/clash/common/pool"
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 )
@@ -140,14 +139,11 @@ type socksUDPConn struct {
 }
 
 func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf[:cap(buf)])
-	buffer, err := socks5.EncodeUDPPacket(uc.rAddr.String(), b)
+	packet, err := socks5.EncodeUDPPacket(uc.rAddr.String(), b)
 	if err != nil {
 		return
 	}
-	n, _ = buffer.Read(buf)
-	return uc.PacketConn.WriteTo(buf[:n], addr)
+	return uc.PacketConn.WriteTo(packet, addr)
 }
 
 func (uc *socksUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {

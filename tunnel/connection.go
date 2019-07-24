@@ -88,12 +88,11 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, target strin
 			return
 		}
 
-		buffer, err := socks5.EncodeUDPPacket(target, buf[:n])
+		packet, err := socks5.EncodeUDPPacket(target, buf[:n])
 		if err != nil {
 			return
 		}
-		n, _ = buffer.Read(buf[:cap(buf)])
-		n, err = conn.Write(buf[:n])
+		n, err = conn.Write(packet)
 		if err != nil {
 			return
 		}

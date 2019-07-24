@@ -361,12 +361,12 @@ func DecodeUDPPacket(packet []byte) (addr Addr, err error) {
 	return
 }
 
-func EncodeUDPPacket(addr string, payload []byte) (packet *bytes.Buffer, err error) {
+func EncodeUDPPacket(addr string, payload []byte) (packet []byte, err error) {
 	rAddr := ParseAddr(addr)
 	if rAddr == nil {
 		err = errors.New("cannot parse addr")
 		return
 	}
-	packet = bytes.NewBuffer(bytes.Join([][]byte{{0, 0, 0}, rAddr, payload}, []byte{}))
+	packet = bytes.Join([][]byte{{0, 0, 0}, rAddr, payload}, []byte{})
 	return
 }
