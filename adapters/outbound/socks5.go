@@ -59,18 +59,25 @@ func (ss *Socks5) Dial(metadata *C.Metadata) (net.Conn, error) {
 	return c, nil
 }
 
-func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ net.PacketConn, _ net.Addr, err error) {
 	c, err := dialTimeout("tcp", ss.addr, tcpTimeout)
+	if err != nil {
+		err = fmt.Errorf("%s connect error", ss.addr)
+		return
+	}
 
-	if err == nil && ss.tls {
+	if ss.tls {
 		cc := tls.Client(c, ss.tlsConfig)
 		err = cc.Handshake()
 		c = cc
 	}
 
-	if err != nil {
-		return nil, nil, fmt.Errorf("%s connect error", ss.addr)
-	}
+	defer func() {
+		if err != nil {
+			c.Close()
+		}
+	}()
+
 	tcpKeepAlive(c)
 	var user *socks5.User
 	if ss.user != "" {
@@ -82,28 +89,32 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error
 
 	bindAddr, err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdUDPAssociate, user)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%v client hanshake error", err)
+		err = fmt.Errorf("%v client hanshake error", err)
+		return
 	}
 
 	addr, err := net.ResolveUDPAddr("udp", bindAddr.String())
 	if err != nil {
-		return nil, nil, err
+		return
 	}
 
 	targetAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
 	if err != nil {
-		return nil, nil, err
+		return
+	}
+
+	pc, err := net.ListenPacket("udp", "")
+	if err != nil {
+		return
 	}
 
 	go func() {
 		io.Copy(ioutil.Discard, c)
 		c.Close()
+		// A UDP association terminates when the TCP connection that the UDP
+		// ASSOCIATE request arrived on terminates. RFC1928
+		pc.Close()
 	}()
-
-	pc, err := net.ListenPacket("udp", "")
-	if err != nil {
-		return nil, nil, err
-	}
 
 	return &socksUDPConn{PacketConn: pc, rAddr: targetAddr}, addr, nil
 }
