@@ -104,10 +104,15 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 
 func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	defer func() {
-		if adapter, ok := localConn.(*InboundAdapter.SocketAdapter); ok {
-			if _, ok = adapter.Conn.(*net.TCPConn); ok {
-				localConn.Close()
-			}
+		var conn net.Conn
+		switch adapter := localConn.(type) {
+		case *InboundAdapter.HTTPAdapter:
+			conn = adapter.Conn
+		case *InboundAdapter.SocketAdapter:
+			conn = adapter.Conn
+		}
+		if _, ok := conn.(*net.TCPConn); ok {
+			localConn.Close()
 		}
 	}()
 
