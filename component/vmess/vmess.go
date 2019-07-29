@@ -86,7 +86,7 @@ type Config struct {
 	WebSocketPath    string
 	WebSocketHeaders map[string]string
 	SkipCertVerify   bool
-	SessionCacahe    tls.ClientSessionCache
+	SessionCache     tls.ClientSessionCache
 }
 
 // New return a Conn with net.Conn and DstAddr
@@ -139,7 +139,7 @@ func NewClient(config Config) (*Client, error) {
 		tlsConfig = &tls.Config{
 			ServerName:         config.HostName,
 			InsecureSkipVerify: config.SkipCertVerify,
-			ClientSessionCache: config.SessionCacahe,
+			ClientSessionCache: config.SessionCache,
 		}
 		if tlsConfig.ClientSessionCache == nil {
 			tlsConfig.ClientSessionCache = getClientSessionCache()
