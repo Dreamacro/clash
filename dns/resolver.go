@@ -182,7 +182,8 @@ func (r *Resolver) batchExchange(clients []resolver, m *D.Msg) (msg *D.Msg, err 
 	defer cancel()
 	fast, ctx := picker.WithContext(ctx)
 
-	for _, r := range clients {
+	for _, client := range clients {
+		r := client
 		fast.Go(func() (interface{}, error) {
 			msg, err := r.ExchangeContext(ctx, m)
 			if err != nil || msg.Rcode != D.RcodeSuccess {
