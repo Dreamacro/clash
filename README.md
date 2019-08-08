@@ -64,7 +64,7 @@ If you have Docker installed, you can run clash directly using `docker-compose`.
 
 The default configuration directory is `$HOME/.config/clash`
 
-The name of the configuration file is `config.yml`
+The name of the configuration file is `config.yaml`
 
 If you want to use another directory, you can use `-d` to control the configuration directory
 
@@ -107,7 +107,12 @@ external-controller: 127.0.0.1:9090
 
 # experimental feature
 experimental:
-  ignore-resolve-fail: true # ignore dns reslove fail, default value is true
+  ignore-resolve-fail: true # ignore dns resolve fail, default value is true
+
+# authentication of local SOCKS5/HTTP(S) server
+# authentication:
+#  - "user1:pass1"
+#  - "user2:pass2"
 
 # dns:
   # enable: true # set true to enable dns (default is false)
@@ -115,26 +120,36 @@ experimental:
   # listen: 0.0.0.0:53
   # enhanced-mode: redir-host # or fake-ip
   # # fake-ip-range: 198.18.0.1/16 # if you don't know what it is, don't change it
+  # # experimental hosts, support wildcard (e.g. *.clash.dev Even *.foo.*.example.com)
+  # # static domain has a higher priority than wildcard domain (foo.example.com > *.example.com)
+  # # NOTE: hosts don't work with `fake-ip`
+  # hosts:
+  #   '*.clash.dev': 127.0.0.1
+  #   'alpha.clash.dev': '::1'
   # nameserver:
   #   - 114.114.114.114
   #   - tls://dns.rubyfish.cn:853 # dns over tls
+  #   - https://1.1.1.1/dns-query # dns over https
   # fallback: # concurrent request with nameserver, fallback used when GEOIP country isn't CN
   #   - tcp://1.1.1.1
 
 Proxy:
 
 # shadowsocks
-# The types of cipher are consistent with go-shadowsocks2
-# support AEAD_AES_128_GCM AEAD_AES_192_GCM AEAD_AES_256_GCM AEAD_CHACHA20_POLY1305 AES-128-CTR AES-192-CTR AES-256-CTR AES-128-CFB AES-192-CFB AES-256-CFB CHACHA20-IETF XCHACHA20
-# In addition to what go-shadowsocks2 supports, it also supports chacha20 rc4-md5 xchacha20-ietf-poly1305
-- { name: "ss1", type: ss, server: server, port: 443, cipher: AEAD_CHACHA20_POLY1305, password: "password", udp: true }
+# The supported ciphers(encrypt methods):
+#   aes-128-gcm aes-192-gcm aes-256-gcm
+#   aes-128-cfb aes-192-cfb aes-256-cfb
+#   aes-128-ctr aes-192-ctr aes-256-ctr
+#   rc4-md5 chacha20 chacha20-ietf xchacha20
+#   chacha20-ietf-poly1305 xchacha20-ietf-poly1305
+- { name: "ss1", type: ss, server: server, port: 443, cipher: chacha20-ietf-poly1305, password: "password", udp: true }
 
 # old obfs configuration remove after prerelease
 - name: "ss2"
   type: ss
   server: server
   port: 443
-  cipher: AEAD_CHACHA20_POLY1305
+  cipher: chacha20-ietf-poly1305
   password: "password"
   plugin: obfs
   plugin-opts:
@@ -145,7 +160,7 @@ Proxy:
   type: ss
   server: server
   port: 443
-  cipher: AEAD_CHACHA20_POLY1305
+  cipher: chacha20-ietf-poly1305
   password: "password"
   plugin: v2ray-plugin
   plugin-opts:

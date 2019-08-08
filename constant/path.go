@@ -42,7 +42,7 @@ func (p *path) HomeDir() string {
 }
 
 func (p *path) Config() string {
-	return P.Join(p.homedir, "config.yml")
+	return P.Join(p.homedir, "config.yaml")
 }
 
 func (p *path) MMDB() string {

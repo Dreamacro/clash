@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/Dreamacro/clash/common/observable"
 
@@ -15,6 +16,7 @@ var (
 )
 
 func init() {
+	log.SetOutput(os.Stdout)
 	log.SetLevel(log.DebugLevel)
 }
 
@@ -58,6 +60,11 @@ func Fatalln(format string, v ...interface{}) {
 func Subscribe() observable.Subscription {
 	sub, _ := source.Subscribe()
 	return sub
+}
+
+func UnSubscribe(sub observable.Subscription) {
+	source.UnSubscribe(sub)
+	return
 }
 
 func Level() LogLevel {

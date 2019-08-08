@@ -26,7 +26,6 @@ type Tunnel struct {
 	proxies   map[string]C.Proxy
 	configMux *sync.RWMutex
 	traffic   *C.Traffic
-	resolver  *dns.Resolver
 
 	// experimental features
 	ignoreResolveFail bool
@@ -86,15 +85,6 @@ func (t *Tunnel) SetMode(mode Mode) {
 	t.mode = mode
 }
 
-// SetResolver change the resolver of tunnel
-func (t *Tunnel) SetResolver(resolver *dns.Resolver) {
-	t.resolver = resolver
-}
-
-func (t *Tunnel) hasResolver() bool {
-	return t.resolver != nil
-}
-
 func (t *Tunnel) process() {
 	queue := t.queue.Out()
 	for {
@@ -105,26 +95,28 @@ func (t *Tunnel) process() {
 }
 
 func (t *Tunnel) resolveIP(host string) (net.IP, error) {
-	if t.resolver == nil {
-		ipAddr, err := net.ResolveIPAddr("ip", host)
-		if err != nil {
-			return nil, err
-		}
-
-		return ipAddr.IP, nil
-	}
-
-	return t.resolver.ResolveIP(host)
+	return dns.ResolveIP(host)
 }
 
 func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
-	return t.hasResolver() && (t.resolver.IsMapping() || t.resolver.IsFakeIP()) && metadata.Host == "" && metadata.DstIP != nil
+	return dns.DefaultResolver != nil && (dns.DefaultResolver.IsMapping() || dns.DefaultResolver.IsFakeIP()) && metadata.Host == "" && metadata.DstIP != nil
 }
 
 func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
-	defer localConn.Close()
-	metadata := localConn.Metadata()
+	defer func() {
+		var conn net.Conn
+		switch adapter := localConn.(type) {
+		case *InboundAdapter.HTTPAdapter:
+			conn = adapter.Conn
+		case *InboundAdapter.SocketAdapter:
+			conn = adapter.Conn
+		}
+		if _, ok := conn.(*net.TCPConn); ok {
+			localConn.Close()
+		}
+	}()
 
+	metadata := localConn.Metadata()
 	if !metadata.Valid() {
 		log.Warnln("[Metadata] not valid: %#v", metadata)
 		return
@@ -132,11 +124,11 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 
 	// preprocess enhanced-mode metadata
 	if t.needLookupIP(metadata) {
-		host, exist := t.resolver.IPToHost(*metadata.DstIP)
+		host, exist := dns.DefaultResolver.IPToHost(*metadata.DstIP)
 		if exist {
 			metadata.Host = host
 			metadata.AddrType = C.AtypDomainName
-			if t.resolver.IsFakeIP() {
+			if dns.DefaultResolver.IsFakeIP() {
 				metadata.DstIP = nil
 			}
 		}
@@ -157,17 +149,32 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		}
 	}
 
-	if metadata.NetWork == C.UDP {
-		pc, addr, err := proxy.DialUDP(metadata)
-		defer pc.Close()
+	switch metadata.NetWork {
+	case C.TCP:
+		t.handleTCPConn(localConn, metadata, proxy)
+	case C.UDP:
+		t.handleUDPConn(localConn, metadata, proxy)
+	}
+}
+
+func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
+	pc, addr := natTable.Get(localConn.RemoteAddr())
+	if pc == nil {
+		var err error
+		pc, addr, err = proxy.DialUDP(metadata)
 		if err != nil {
 			log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
+			return
 		}
 
-		t.handleUDPOverTCP(localConn, pc, addr)
-		return
+		natTable.Set(localConn.RemoteAddr(), pc, addr)
+		go t.handleUDPToLocal(localConn, pc)
 	}
 
+	t.handleUDPToRemote(localConn, pc, addr)
+}
+
+func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
 	remoConn, err := proxy.Dial(metadata)
 
 	if err != nil {
@@ -217,6 +224,7 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
 			}
 
 			if metadata.NetWork == C.UDP && !adapter.SupportUDP() {
+				log.Debugln("%v UDP is not supported", adapter.Name())
 				continue
 			}
 

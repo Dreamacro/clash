@@ -16,7 +16,7 @@ func (d *Direct) Dial(metadata *C.Metadata) (C.Conn, error) {
 		address = net.JoinHostPort(metadata.DstIP.String(), metadata.DstPort)
 	}
 
-	c, err := net.DialTimeout("tcp", address, tcpTimeout)
+	c, err := dialTimeout("tcp", address, tcpTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (d *Direct) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error)
 		return nil, nil, err
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
+	addr, err := resolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
 	if err != nil {
 		return nil, nil, err
 	}

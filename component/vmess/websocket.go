@@ -22,7 +22,7 @@ type websocketConn struct {
 type WebsocketConfig struct {
 	Host      string
 	Path      string
-	Headers   map[string]string
+	Headers   http.Header
 	TLS       bool
 	TLSConfig *tls.Config
 }
@@ -131,14 +131,14 @@ func NewWebsocketConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
 
 	headers := http.Header{}
 	if c.Headers != nil {
-		for k, v := range c.Headers {
-			headers.Set(k, v)
+		for k := range c.Headers {
+			headers.Add(k, c.Headers.Get(k))
 		}
 	}
 
 	wsConn, resp, err := dialer.Dial(uri.String(), headers)
 	if err != nil {
-		var reason string
+		reason := err.Error()
 		if resp != nil {
 			reason = resp.Status
 		}

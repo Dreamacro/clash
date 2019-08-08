@@ -9,6 +9,7 @@ import (
 	"time"
 
 	A "github.com/Dreamacro/clash/adapters/outbound"
+	"github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 	T "github.com/Dreamacro/clash/tunnel"
 
@@ -110,27 +111,27 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 
 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
 
-	sigCh := make(chan uint16)
-	go func() {
-		t, err := proxy.URLTest(url)
-		if err != nil {
-			sigCh <- 0
-		}
-		sigCh <- t
-	}()
+	picker, ctx, cancel := picker.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+	defer cancel()
+	picker.Go(func() (interface{}, error) {
+		return proxy.URLTest(ctx, url)
+	})
 
-	select {
-	case <-time.After(time.Millisecond * time.Duration(timeout)):
+	elm := picker.Wait()
+	if elm == nil {
 		render.Status(r, http.StatusRequestTimeout)
 		render.JSON(w, r, ErrRequestTimeout)
-	case t := <-sigCh:
-		if t == 0 {
-			render.Status(r, http.StatusServiceUnavailable)
-			render.JSON(w, r, newError("An error occurred in the delay test"))
-		} else {
-			render.JSON(w, r, render.M{
-				"delay": t,
-			})
-		}
+		return
 	}
+
+	delay := elm.(uint16)
+	if delay == 0 {
+		render.Status(r, http.StatusServiceUnavailable)
+		render.JSON(w, r, newError("An error occurred in the delay test"))
+		return
+	}
+
+	render.JSON(w, r, render.M{
+		"delay": delay,
+	})
 }

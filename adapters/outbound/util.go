@@ -12,6 +12,7 @@ import (
 
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/dns"
 )
 
 const (
@@ -95,4 +96,31 @@ func (fuc *fakeUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 func (fuc *fakeUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	n, err := fuc.Conn.Read(b)
 	return n, fuc.RemoteAddr(), err
+}
+
+func dialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+
+	ip, err := dns.ResolveIP(host)
+	if err != nil {
+		return nil, err
+	}
+
+	return net.DialTimeout(network, net.JoinHostPort(ip.String(), port), timeout)
+}
+
+func resolveUDPAddr(network, address string) (*net.UDPAddr, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+
+	ip, err := dns.ResolveIP(host)
+	if err != nil {
+		return nil, err
+	}
+	return net.ResolveUDPAddr(network, net.JoinHostPort(ip.String(), port))
 }

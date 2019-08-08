@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"time"
@@ -106,4 +107,35 @@ func setMsgTTL(msg *D.Msg, ttl uint32) {
 	for _, extra := range msg.Extra {
 		extra.Header().Ttl = ttl
 	}
+}
+
+func isIPRequest(q D.Question) bool {
+	if q.Qclass == D.ClassINET && (q.Qtype == D.TypeA || q.Qtype == D.TypeAAAA) {
+		return true
+	}
+	return false
+}
+
+func transform(servers []NameServer) []resolver {
+	ret := []resolver{}
+	for _, s := range servers {
+		if s.Net == "https" {
+			ret = append(ret, &dohClient{url: s.Addr})
+			continue
+		}
+
+		ret = append(ret, &client{
+			Client: &D.Client{
+				Net: s.Net,
+				TLSConfig: &tls.Config{
+					ClientSessionCache: globalSessionCache,
+					// alpn identifier, see https://tools.ietf.org/html/draft-hoffman-dprive-dns-tls-alpn-00#page-6
+					NextProtos: []string{"dns"},
+				},
+				UDPSize: 4096,
+			},
+			Address: s.Addr,
+		})
+	}
+	return ret
 }

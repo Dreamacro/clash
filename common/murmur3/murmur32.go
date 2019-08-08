@@ -4,6 +4,7 @@ package murmur3
 
 import (
 	"hash"
+	"math/bits"
 	"unsafe"
 )
 
@@ -54,11 +55,11 @@ func (d *digest32) bmix(p []byte) (tail []byte) {
 		k1 := *(*uint32)(unsafe.Pointer(&p[i*4]))
 
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 
 		h1 ^= k1
-		h1 = (h1 << 13) | (h1 >> 19) // rotl32(h1, 13)
+		h1 = bits.RotateLeft32(h1, 13)
 		h1 = h1*4 + h1 + 0xe6546b64
 	}
 	d.h1 = h1
@@ -80,7 +81,7 @@ func (d *digest32) Sum32() (h1 uint32) {
 	case 1:
 		k1 ^= uint32(d.tail[0])
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 		h1 ^= k1
 	}
@@ -102,20 +103,15 @@ func Sum32WithSeed(data []byte, seed uint32) uint32 {
 	h1 := seed
 
 	nblocks := len(data) / 4
-	var p uintptr
-	if len(data) > 0 {
-		p = uintptr(unsafe.Pointer(&data[0]))
-	}
-	p1 := p + uintptr(4*nblocks)
-	for ; p < p1; p += 4 {
-		k1 := *(*uint32)(unsafe.Pointer(p))
+	for i := 0; i < nblocks; i++ {
+		k1 := *(*uint32)(unsafe.Pointer(&data[i*4]))
 
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 
 		h1 ^= k1
-		h1 = (h1 << 13) | (h1 >> 19) // rotl32(h1, 13)
+		h1 = bits.RotateLeft32(h1, 13)
 		h1 = h1*4 + h1 + 0xe6546b64
 	}
 
@@ -132,7 +128,7 @@ func Sum32WithSeed(data []byte, seed uint32) uint32 {
 	case 1:
 		k1 ^= uint32(tail[0])
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) // rotl32(k1, 15)
+		k1 = bits.RotateLeft32(k1, 15)
 		k1 *= c2_32
 		h1 ^= k1
 	}

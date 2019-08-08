@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -94,7 +95,7 @@ func (f *Fallback) validTest() {
 
 	for _, p := range f.proxies {
 		go func(p C.Proxy) {
-			p.URLTest(f.rawURL)
+			p.URLTest(context.Background(), f.rawURL)
 			wg.Done()
 		}(p)
 	}

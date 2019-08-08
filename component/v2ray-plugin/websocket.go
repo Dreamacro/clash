@@ -3,6 +3,7 @@ package obfs
 import (
 	"crypto/tls"
 	"net"
+	"net/http"
 
 	"github.com/Dreamacro/clash/component/vmess"
 )
@@ -17,11 +18,16 @@ type WebsocketOption struct {
 
 // NewWebsocketObfs return a HTTPObfs
 func NewWebsocketObfs(conn net.Conn, option *WebsocketOption) (net.Conn, error) {
+	header := http.Header{}
+	for k, v := range option.Headers {
+		header.Add(k, v)
+	}
+
 	config := &vmess.WebsocketConfig{
 		Host:      option.Host,
 		Path:      option.Path,
 		TLS:       option.TLSConfig != nil,
-		Headers:   option.Headers,
+		Headers:   header,
 		TLSConfig: option.TLSConfig,
 	}
 

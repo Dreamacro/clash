@@ -1,6 +1,7 @@
 package constant
 
 import (
+	"context"
 	"net"
 	"time"
 )
@@ -50,7 +51,7 @@ type Proxy interface {
 	Alive() bool
 	DelayHistory() []DelayHistory
 	LastDelay() uint16
-	URLTest(url string) (uint16, error)
+	URLTest(ctx context.Context, url string) (uint16, error)
 }
 
 // AdapterType is enum of adapter type

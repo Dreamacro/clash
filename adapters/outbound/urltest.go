@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sort"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -58,7 +56,6 @@ func (u *URLTest) MarshalJSON() ([]byte, error) {
 	for _, proxy := range u.proxies {
 		all = append(all, proxy.Name())
 	}
-	sort.Strings(all)
 	return json.Marshal(map[string]interface{}{
 		"type": u.Type().String(),
 		"now":  u.Now(),
@@ -107,36 +104,25 @@ func (u *URLTest) speedTest() {
 	}
 	defer atomic.StoreInt32(&u.once, 0)
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(u.proxies))
-	c := make(chan interface{})
-	fast := picker.SelectFast(context.Background(), c)
-	timer := time.NewTimer(u.interval)
-
+	picker, ctx, cancel := picker.WithTimeout(context.Background(), defaultURLTestTimeout)
+	defer cancel()
 	for _, p := range u.proxies {
-		go func(p C.Proxy) {
-			_, err := p.URLTest(u.rawURL)
-			if err == nil {
-				c <- p
+		proxy := p
+		picker.Go(func() (interface{}, error) {
+			_, err := proxy.URLTest(ctx, u.rawURL)
+			if err != nil {
+				return nil, err
 			}
-			wg.Done()
-		}(p)
+			return proxy, nil
+		})
 	}
 
-	go func() {
-		wg.Wait()
-		close(c)
-	}()
-
-	select {
-	case <-timer.C:
-		// Wait for fast to return or close.
-		<-fast
-	case p, open := <-fast:
-		if open {
-			u.fast = p.(C.Proxy)
-		}
+	fast := picker.Wait()
+	if fast != nil {
+		u.fast = fast.(C.Proxy)
 	}
+
+	<-ctx.Done()
 }
 
 func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {
