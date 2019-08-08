@@ -135,6 +135,7 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	}
 
 	var proxy C.Proxy
+	var rule C.Rule
 	switch t.mode {
 	case Direct:
 		proxy = t.proxies["DIRECT"]
@@ -143,7 +144,7 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 	// Rule
 	default:
 		var err error
-		proxy, err = t.match(metadata)
+		proxy, rule, err = t.match(metadata)
 		if err != nil {
 			return
 		}
@@ -151,20 +152,27 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 
 	switch metadata.NetWork {
 	case C.TCP:
-		t.handleTCPConn(localConn, metadata, proxy)
+		t.handleTCPConn(localConn, metadata, proxy, rule)
 	case C.UDP:
-		t.handleUDPConn(localConn, metadata, proxy)
+		t.handleUDPConn(localConn, metadata, proxy, rule)
 	}
 }
 
-func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
+func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
 	pc, addr := natTable.Get(localConn.RemoteAddr())
 	if pc == nil {
-		var err error
-		pc, addr, err = proxy.DialUDP(metadata)
+		rawpc, naddr, err := proxy.DialUDP(metadata)
+		addr = naddr
+		pc = rawpc
 		if err != nil {
-			log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
+			log.Warnln("%s --> %v match %s using %s error: %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), err.Error())
 			return
+		}
+
+		if rule != nil {
+			log.Infoln("%s --> %v match %s using %s[%s]", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), rawpc.Chains()[0])
+		} else {
+			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 		}
 
 		natTable.Set(localConn.RemoteAddr(), pc, addr)
@@ -174,16 +182,20 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 	t.handleUDPToRemote(localConn, pc, addr)
 }
 
-func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy) {
+func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
 	remoConn, err := proxy.Dial(metadata)
 
 	if err != nil {
-		log.Warnln("Proxy[%s] connect [%s --> %s] error: %s", proxy.Name(), metadata.SrcIP.String(), metadata.String(), err.Error())
+		log.Warnln("%s --> %v match %s using %s error: %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), err.Error())
 		return
-	} else {
-		log.Infoln("%s <-- %s", metadata.String(), remoConn.GetChain()[0])
 	}
 	defer remoConn.Close()
+
+	if rule != nil {
+		log.Infoln("%s --> %v match %s using %s[%s]", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), remoConn.Chains()[0])
+	} else {
+		log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
+	}
 
 	switch adapter := localConn.(type) {
 	case *InboundAdapter.HTTPAdapter:
@@ -197,7 +209,7 @@ func (t *Tunnel) shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
 	return (rule.RuleType() == C.GEOIP || rule.RuleType() == C.IPCIDR) && metadata.Host != "" && metadata.DstIP == nil
 }
 
-func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
+func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	t.configMux.RLock()
 	defer t.configMux.RUnlock()
 
@@ -207,7 +219,7 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
 			ip, err := t.resolveIP(metadata.Host)
 			if err != nil {
 				if !t.ignoreResolveFail {
-					return nil, fmt.Errorf("[DNS] resolve %s error: %s", metadata.Host, err.Error())
+					return nil, nil, fmt.Errorf("[DNS] resolve %s error: %s", metadata.Host, err.Error())
 				}
 				log.Debugln("[DNS] resolve %s error: %s", metadata.Host, err.Error())
 			} else {
@@ -227,13 +239,10 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, error) {
 				log.Debugln("%v UDP is not supported", adapter.Name())
 				continue
 			}
-
-			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter())
-			return adapter, nil
+			return adapter, rule, nil
 		}
 	}
-	log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
-	return t.proxies["DIRECT"], nil
+	return t.proxies["DIRECT"], nil, nil
 }
 
 func newTunnel() *Tunnel {
