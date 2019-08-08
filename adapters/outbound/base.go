@@ -48,10 +48,10 @@ func (b *Base) MarshalJSON() ([]byte, error) {
 
 type conn struct {
 	net.Conn
-	chain []string
+	chain C.Chain
 }
 
-func (c *conn) Chains() []string {
+func (c *conn) Chains() C.Chain {
 	return c.chain
 }
 
@@ -65,10 +65,10 @@ func newConn(c net.Conn, a C.ProxyAdapter) C.Conn {
 
 type packetConn struct {
 	net.PacketConn
-	chain []string
+	chain C.Chain
 }
 
-func (c *packetConn) Chains() []string {
+func (c *packetConn) Chains() C.Chain {
 	return c.chain
 }
 

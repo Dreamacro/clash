@@ -170,7 +170,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 		}
 
 		if rule != nil {
-			log.Infoln("%s --> %v match %s using %s[%s]", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), rawpc.Chains()[0])
+			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawpc.Chains().String())
 		} else {
 			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 		}
@@ -192,7 +192,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 	defer remoConn.Close()
 
 	if rule != nil {
-		log.Infoln("%s --> %v match %s using %s[%s]", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rule.Adapter(), remoConn.Chains()[0])
+		log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), remoConn.Chains().String())
 	} else {
 		log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 	}
