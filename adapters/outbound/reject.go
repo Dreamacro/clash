@@ -13,7 +13,7 @@ type Reject struct {
 }
 
 func (r *Reject) Dial(metadata *C.Metadata) (C.Conn, error) {
-	return NewConn(&NopConn{}, r), nil
+	return newConn(&NopConn{}, r), nil
 }
 
 func NewReject() *Reject {

@@ -35,14 +35,18 @@ func (f *Fallback) Dial(metadata *C.Metadata) (C.Conn, error) {
 	proxy := f.findAliveProxy()
 	c, err := proxy.Dial(metadata)
 	if err == nil {
-		c.Append(f)
+		c.AppendToChains(f)
 	}
 	return c, err
 }
 
-func (f *Fallback) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (f *Fallback) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	proxy := f.findAliveProxy()
-	return proxy.DialUDP(metadata)
+	pc, addr, err := proxy.DialUDP(metadata)
+	if err == nil {
+		pc.AppendToChains(f)
+	}
+	return pc, addr, err
 }
 
 func (f *Fallback) SupportUDP() bool {

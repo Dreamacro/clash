@@ -38,13 +38,17 @@ func (u *URLTest) Dial(metadata *C.Metadata) (C.Conn, error) {
 	if err != nil {
 		u.fallback()
 	} else {
-		a.Append(u)
+		a.AppendToChains(u)
 	}
 	return a, err
 }
 
-func (u *URLTest) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
-	return u.fast.DialUDP(metadata)
+func (u *URLTest) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
+	pc, addr, err := u.fast.DialUDP(metadata)
+	if err == nil {
+		pc.AppendToChains(u)
+	}
+	return pc, addr, err
 }
 
 func (u *URLTest) SupportUDP() bool {

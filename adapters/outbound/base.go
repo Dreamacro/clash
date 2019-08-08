@@ -30,7 +30,7 @@ func (b *Base) Type() C.AdapterType {
 	return b.tp
 }
 
-func (b *Base) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (b *Base) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	return nil, nil, errors.New("no support")
 }
 
@@ -51,16 +51,33 @@ type conn struct {
 	chain []string
 }
 
-func (c *conn) GetChain() []string {
+func (c *conn) Chains() []string {
 	return c.chain
 }
 
-func (c *conn) Append(a C.ProxyAdapter) {
+func (c *conn) AppendToChains(a C.ProxyAdapter) {
 	c.chain = append(c.chain, a.Name())
 }
 
-func NewConn(c net.Conn, a C.ProxyAdapter) C.Conn {
+func newConn(c net.Conn, a C.ProxyAdapter) C.Conn {
 	return &conn{c, []string{a.Name()}}
+}
+
+type packetConn struct {
+	net.PacketConn
+	chain []string
+}
+
+func (c *packetConn) Chains() []string {
+	return c.chain
+}
+
+func (c *packetConn) AppendToChains(a C.ProxyAdapter) {
+	c.chain = append(c.chain, a.Name())
+}
+
+func newPacketConn(c net.PacketConn, a C.ProxyAdapter) C.PacketConn {
+	return &packetConn{c, []string{a.Name()}}
 }
 
 type Proxy struct {

@@ -51,7 +51,7 @@ func (h *Http) Dial(metadata *C.Metadata) (C.Conn, error) {
 		return nil, err
 	}
 
-	return NewConn(c, h), nil
+	return newConn(c, h), nil
 }
 
 func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {

@@ -55,6 +55,12 @@ func jumpHash(key uint64, buckets int32) int32 {
 }
 
 func (lb *LoadBalance) Dial(metadata *C.Metadata) (c C.Conn, err error) {
+	defer func() {
+		if err == nil {
+			c.AppendToChains(lb)
+		}
+	}()
+
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	buckets := int32(len(lb.proxies))
 	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {
@@ -62,18 +68,20 @@ func (lb *LoadBalance) Dial(metadata *C.Metadata) (c C.Conn, err error) {
 		proxy := lb.proxies[idx]
 		if proxy.Alive() {
 			c, err = proxy.Dial(metadata)
-			goto end
+			return
 		}
 	}
 	c, err = lb.proxies[0].Dial(metadata)
-end:
-	if err == nil {
-		c.Append(lb)
-	}
 	return
 }
 
-func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (pc C.PacketConn, addr net.Addr, err error) {
+	defer func() {
+		if err == nil {
+			pc.AppendToChains(lb)
+		}
+	}()
+
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	buckets := int32(len(lb.proxies))
 	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {

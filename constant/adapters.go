@@ -25,17 +25,26 @@ type ServerAdapter interface {
 	Metadata() *Metadata
 }
 
+type Connection interface {
+	Chains() []string
+	AppendToChains(adapter ProxyAdapter)
+}
+
 type Conn interface {
 	net.Conn
-	GetChain() []string
-	Append(adapter ProxyAdapter)
+	Connection
+}
+
+type PacketConn interface {
+	net.PacketConn
+	Connection
 }
 
 type ProxyAdapter interface {
 	Name() string
 	Type() AdapterType
 	Dial(metadata *Metadata) (Conn, error)
-	DialUDP(metadata *Metadata) (net.PacketConn, net.Addr, error)
+	DialUDP(metadata *Metadata) (PacketConn, net.Addr, error)
 	SupportUDP() bool
 	Destroy()
 	MarshalJSON() ([]byte, error)
