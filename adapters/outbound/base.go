@@ -163,7 +163,7 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	}
 	defer instance.Close()
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
 		return
 	}
