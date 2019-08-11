@@ -35,13 +35,16 @@ func or(pointers ...*int) *int {
 	return pointers[len(pointers)-1]
 }
 
-// check if ProxyGroups form DAG(Directed Acyclic Graph), and sort all ProxyGroups by dependency order. meanwhile, record the original index in the config file. if loop is detected, return an error with location of loop.
+// Check if ProxyGroups form DAG(Directed Acyclic Graph), and sort all ProxyGroups by dependency order.
+// Meanwhile, record the original index in the config file.
+// If loop is detected, return an error with location of loop.
 func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	type Node struct {
 		indegree int
-		topo     int // Topological order
-		data     map[string]interface{}
+		// Topological order
+		topo int
+		data map[string]interface{}
 		// `outdegree` and `from` are used in loop locating
 		outdegree int
 		from      []string
@@ -51,14 +54,15 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	// Step 1.1 build dependency graph
 	for idx, mapping := range groupsConfig {
-		mapping["configIdx"] = idx // record original order from configfile
+		// record original order in config file. This field can be used determinate the display order in FrontEnd.
+		mapping["configIdx"] = idx
 		groupName, existName := mapping["name"].(string)
 		if !existName {
 			return fmt.Errorf("ProxyGroup %d: missing name", idx)
 		}
 		if node, ok := graph[groupName]; ok {
 			if node.data != nil {
-				return fmt.Errorf("ProxyGroup %s: the duplicate name", groupName)
+				return fmt.Errorf("ProxyGroup %s: duplicate group name", groupName)
 			}
 			node.data = mapping
 		} else {
@@ -66,34 +70,37 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		}
 		proxies, existProxies := mapping["proxies"]
 		if !existProxies {
-			return fmt.Errorf("ProxyGroup %s: proxies is requried", groupName)
+			return fmt.Errorf("ProxyGroup %s: the `proxies` field is requried", groupName)
 		}
 		for _, proxy := range proxies.([]interface{}) {
 			proxy := proxy.(string)
 			if node, ex := graph[proxy]; ex {
-				node.indegree += 1
+				node.indegree++
 			} else {
 				graph[proxy] = &Node{1, -1, nil, 0, nil}
 			}
 		}
 	}
 	// Step 1.2 Topological Sort
-	index := 0 // topological index of **ProxyGroup** (ignore Porxy)
+	// topological index of **ProxyGroup** (ignore Porxy)
+	index := 0
 	queue := make([]string, 0)
-	for name, node := range graph { // initialize queue with node.indegree == 0
+	for name, node := range graph {
+		// in the begning, put nodes that have `node.indegree == 0` into queue.
 		if node.indegree == 0 {
 			queue = append(queue, name)
 		}
 	}
-	for ; len(queue) > 0; queue = queue[1:] { // every element in queue have indegree == 0
+	// every element in queue have indegree == 0
+	for ; len(queue) > 0; queue = queue[1:] {
 		name := queue[0]
 		node := graph[name]
 		if node.data != nil {
-			index += 1
+			index++
 			groupsConfig[len(groupsConfig)-index] = node.data
 			for _, proxy := range node.data["proxies"].([]interface{}) {
-				child, _ := graph[proxy.(string)]
-				child.indegree -= 1
+				child := graph[proxy.(string)]
+				child.indegree--
 				if child.indegree == 0 {
 					queue = append(queue, proxy.(string))
 				}
@@ -102,7 +109,7 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		delete(graph, name)
 	}
 
-	// no loop detected, return sorted ProxyGroup
+	// no loop is detected, return sorted ProxyGroup
 	if len(graph) == 0 {
 		return nil
 	}
@@ -114,26 +121,28 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 			continue
 		}
 		for _, proxy := range node.data["proxies"].([]interface{}) {
-			node.outdegree += 1
-			child, _ := graph[proxy.(string)]
+			node.outdegree++
+			child := graph[proxy.(string)]
 			if child.from == nil {
 				child.from = make([]string, 0, child.indegree)
 			}
 			child.from = append(child.from, name)
 		}
 	}
-	// Step 2.2 remove nodes outside loop
+	// Step 2.2 remove nodes outside the loop. so that we have only the loops remain in `graph`
 	queue = make([]string, 0)
-	for name, node := range graph { // initialize queue with node.outdegree == 0
+	// initialize queue with node have outdegree == 0
+	for name, node := range graph {
 		if node.outdegree == 0 {
 			queue = append(queue, name)
 		}
 	}
-	for ; len(queue) > 0; queue = queue[1:] { // every element in queue have outdegree == 0
+	// every element in queue have outdegree == 0
+	for ; len(queue) > 0; queue = queue[1:] {
 		name := queue[0]
 		node := graph[name]
 		for _, f := range node.from {
-			graph[f].outdegree -= 1
+			graph[f].outdegree--
 			if graph[f].outdegree == 0 {
 				queue = append(queue, f)
 			}
@@ -141,9 +150,10 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		delete(graph, name)
 	}
 	// Step 2.3 report the elements in loop
-	loop_elements := make([]string, 0, len(graph))
-	for name, _ := range graph {
-		loop_elements = append(loop_elements, name)
+	loopElements := make([]string, 0, len(graph))
+	for name := range graph {
+		loopElements = append(loopElements, name)
+		delete(graph, name)
 	}
-	return fmt.Errorf("Loop detected in ProxyGroup, please check following ProxyGroups: %v", loop_elements)
+	return fmt.Errorf("Loop is detected in ProxyGroup, please check following ProxyGroups: %v", loopElements)
 }
