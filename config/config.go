@@ -293,7 +293,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	}
 
 	// parse proxy group
-	if err := ProxyGroupsDagSort(groupsConfig); err != nil {
+	if err := proxyGroupsDagSort(groupsConfig); err != nil {
 		return nil, err
 	}
 	for idx, mapping := range groupsConfig {

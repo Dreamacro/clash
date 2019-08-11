@@ -35,10 +35,8 @@ func or(pointers ...*int) *int {
 	return pointers[len(pointers)-1]
 }
 
-// check if ProxyGroups form DAG(Directed Acyclic Graph), and sort all ProxyGroups by dependency order
-// meanwhile, record the original index in the config file
-// if loop is detected, return an error with location of loop
-func ProxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
+// check if ProxyGroups form DAG(Directed Acyclic Graph), and sort all ProxyGroups by dependency order. meanwhile, record the original index in the config file. if loop is detected, return an error with location of loop.
+func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	type Node struct {
 		indegree int
