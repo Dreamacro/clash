@@ -42,8 +42,9 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	type Node struct {
 		indegree int
-		// Topological order
+		// topological order
 		topo int
+		// the origional data in `groupsConfig`
 		data map[string]interface{}
 		// `outdegree` and `from` are used in loop locating
 		outdegree int
@@ -54,7 +55,8 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	// Step 1.1 build dependency graph
 	for idx, mapping := range groupsConfig {
-		// record original order in config file. This field can be used determinate the display order in FrontEnd.
+		// record original order in config file.
+		// this field can be used determinate the display order in FrontEnd.
 		mapping["configIdx"] = idx
 		groupName, existName := mapping["name"].(string)
 		if !existName {
@@ -82,7 +84,7 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		}
 	}
 	// Step 1.2 Topological Sort
-	// topological index of **ProxyGroup** (ignore Porxy)
+	// topological index of **ProxyGroup**
 	index := 0
 	queue := make([]string, 0)
 	for name, node := range graph {
