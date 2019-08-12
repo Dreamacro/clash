@@ -125,7 +125,7 @@ func readConfig(path string) (*rawConfig, error) {
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("Configuration file %s is empty", path)
+		return nil, fmt.Errorf("configuration file %s is empty", path)
 	}
 
 	// config with some default value
@@ -229,7 +229,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 
 func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	proxies := make(map[string]C.Proxy)
-	proxyList := []string{}
+	proxyList := make([]string, 0)
 	proxiesConfig := cfg.Proxy
 	groupsConfig := cfg.ProxyGroup
 
@@ -243,7 +243,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	for idx, mapping := range proxiesConfig {
 		proxyType, existType := mapping["type"].(string)
 		if !existType {
-			return nil, fmt.Errorf("Proxy %d missing type", idx)
+			return nil, fmt.Errorf("proxy %d missing type", idx)
 		}
 
 		var proxy C.ProxyAdapter
@@ -278,15 +278,15 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			}
 			proxy, err = adapters.NewVmess(*vmessOption)
 		default:
-			return nil, fmt.Errorf("Unsupport proxy type: %s", proxyType)
+			return nil, fmt.Errorf("unsupport proxy type: %s", proxyType)
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("Proxy [%d]: %s", idx, err.Error())
+			return nil, fmt.Errorf("proxy [%d]: %s", idx, err.Error())
 		}
 
 		if _, exist := proxies[proxy.Name()]; exist {
-			return nil, fmt.Errorf("Proxy %s is the duplicate name", proxy.Name())
+			return nil, fmt.Errorf("proxy %s is the duplicate name", proxy.Name())
 		}
 		proxies[proxy.Name()] = adapters.NewProxy(proxy)
 		proxyList = append(proxyList, proxy.Name())
@@ -307,7 +307,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("ProxyGroup %s: the duplicate name", groupName)
 		}
 		var group C.ProxyAdapter
-		ps := []C.Proxy{}
+		ps := make([]C.Proxy, 0)
 
 		err := fmt.Errorf("cannot parse")
 		switch groupType {
@@ -361,13 +361,13 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			group, err = adapters.NewLoadBalance(*loadBalanceOption, ps)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("Proxy %s: %s", groupName, err.Error())
+			return nil, fmt.Errorf("proxy %s: %s", groupName, err.Error())
 		}
 		proxies[groupName] = adapters.NewProxy(group)
 		proxyList = append(proxyList, groupName)
 	}
 
-	ps := []C.Proxy{}
+	ps := make([]C.Proxy, 0)
 	for _, v := range proxyList {
 		ps = append(ps, proxies[v])
 	}
@@ -378,7 +378,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 }
 
 func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
-	rules := []C.Rule{}
+	rules := make([]C.Rule, 0)
 
 	rulesConfig := cfg.Rule
 	// parse rules
@@ -396,11 +396,11 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 			payload = rule[1]
 			target = rule[2]
 		default:
-			return nil, fmt.Errorf("Rules[%d] [%s] error: format invalid", idx, line)
+			return nil, fmt.Errorf("rules[%d] [%s] error: format invalid", idx, line)
 		}
 
 		if _, ok := proxies[target]; !ok {
-			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
+			return nil, fmt.Errorf("rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
 		}
 
 		rule = trimArr(rule)
@@ -441,7 +441,7 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		}
 
 		if parsed == nil {
-			return nil, fmt.Errorf("Rules[%d] [%s] error: payload invalid", idx, line)
+			return nil, fmt.Errorf("rules[%d] [%s] error: payload invalid", idx, line)
 		}
 
 		rules = append(rules, parsed)
@@ -468,7 +468,7 @@ func hostWithDefaultPort(host string, defPort string) (string, error) {
 }
 
 func parseNameServer(servers []string) ([]dns.NameServer, error) {
-	nameservers := []dns.NameServer{}
+	nameservers := make([]dns.NameServer, 0)
 
 	for idx, server := range servers {
 		// parse without scheme .e.g 8.8.8.8:53
@@ -516,7 +516,7 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 
 func parseDNS(cfg rawDNS) (*DNS, error) {
 	if cfg.Enable && len(cfg.NameServer) == 0 {
-		return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
+		return nil, fmt.Errorf("if DNS configuration is turned on, NameServer cannot be empty")
 	}
 
 	dnsCfg := &DNS{

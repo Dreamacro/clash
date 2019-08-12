@@ -44,7 +44,7 @@ func Start(addr string, secret string) {
 
 	r := chi.NewRouter()
 
-	cors := cors.New(cors.Options{
+	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowedHeaders: []string{"Content-Type", "Authorization"},
@@ -53,7 +53,7 @@ func Start(addr string, secret string) {
 
 	r.Get("/", hello)
 	r.Group(func(r chi.Router) {
-		r.Use(cors.Handler, authentication)
+		r.Use(c.Handler, authentication)
 
 		r.Get("/logs", getLogs)
 		r.Get("/traffic", traffic)
@@ -89,9 +89,9 @@ func authentication(next http.Handler) http.Handler {
 			return
 		}
 
-		hasUnvalidHeader := text[0] != "Bearer"
-		hasUnvalidSecret := len(text) == 2 && text[1] != serverSecret
-		if hasUnvalidHeader || hasUnvalidSecret {
+		hasInvalidHeader := text[0] != "Bearer"
+		hasInvalidSecret := len(text) == 2 && text[1] != serverSecret
+		if hasInvalidHeader || hasInvalidSecret {
 			render.Status(r, http.StatusUnauthorized)
 			render.JSON(w, r, ErrUnauthorized)
 			return
@@ -185,14 +185,14 @@ func getLogs(w http.ResponseWriter, r *http.Request) {
 	var err error
 	for elm := range sub {
 		buf.Reset()
-		log := elm.(*log.Event)
-		if log.LogLevel < level {
+		logger := elm.(*log.Event)
+		if logger.LogLevel < level {
 			continue
 		}
 
 		if err := json.NewEncoder(buf).Encode(Log{
-			Type:    log.Type(),
-			Payload: log.Payload,
+			Type:    logger.Type(),
+			Payload: logger.Payload,
 		}); err != nil {
 			break
 		}

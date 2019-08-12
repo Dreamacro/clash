@@ -35,7 +35,7 @@ func ApplyConfig(cfg *config.Config, force bool) {
 
 func GetGeneral() *config.General {
 	ports := P.GetPorts()
-	authenticator := []string{}
+	authenticator := make([]string, 0)
 	if auth := authStore.Authenticator(); auth != nil {
 		authenticator = auth.Users()
 	}

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	A "github.com/Dreamacro/clash/adapters/outbound"
-	"github.com/Dreamacro/clash/common/picker"
+	P "github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 	T "github.com/Dreamacro/clash/tunnel"
 
@@ -101,7 +101,7 @@ func updateProxy(w http.ResponseWriter, r *http.Request) {
 
 func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	url := query.Get("url")
+	urlStr := query.Get("url")
 	timeout, err := strconv.ParseInt(query.Get("timeout"), 10, 16)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
@@ -111,10 +111,10 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 
 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
 
-	picker, ctx, cancel := picker.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+	picker, ctx, cancel := P.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
 	defer cancel()
 	picker.Go(func() (interface{}, error) {
-		return proxy.URLTest(ctx, url)
+		return proxy.URLTest(ctx, urlStr)
 	})
 
 	elm := picker.Wait()

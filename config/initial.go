@@ -44,8 +44,8 @@ func downloadMMDB(path string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
 		_, err = io.Copy(f, tr)
+		f.Close()
 		if err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func Init(dir string) error {
 	// initial homedir
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		if err := os.MkdirAll(dir, 0777); err != nil {
-			return fmt.Errorf("Can't create config directory %s: %s", dir, err.Error())
+			return fmt.Errorf("can't create config directory %s: %s", dir, err.Error())
 		}
 	}
 
@@ -74,7 +74,7 @@ func Init(dir string) error {
 		log.Info("Can't find MMDB, start download")
 		err := downloadMMDB(C.Path.MMDB())
 		if err != nil {
-			return fmt.Errorf("Can't download MMDB: %s", err.Error())
+			return fmt.Errorf("can't download MMDB: %s", err.Error())
 		}
 	}
 	return nil

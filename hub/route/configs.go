@@ -90,7 +90,7 @@ func updateConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if !filepath.IsAbs(req.Path) {
 		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, newError("path is not a absoluted path"))
+		render.JSON(w, r, newError("path is not a absolute path"))
 		return
 	}
 
