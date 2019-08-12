@@ -116,7 +116,7 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, _ net.Addr, err
 		pc.Close()
 	}()
 
-	return newPacketConn(&socksUDPConn{PacketConn: pc, rAddr: targetAddr}, ss), addr, nil
+	return newPacketConn(&socksUDPConn{PacketConn: pc, rAddr: targetAddr, tcpConn: c}, ss), addr, nil
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {
@@ -146,7 +146,8 @@ func NewSocks5(option Socks5Option) *Socks5 {
 
 type socksUDPConn struct {
 	net.PacketConn
-	rAddr net.Addr
+	rAddr   net.Addr
+	tcpConn net.Conn
 }
 
 func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
@@ -165,4 +166,9 @@ func (uc *socksUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}
 	copy(b, payload)
 	return n - len(addr) - 3, a, e
+}
+
+func (uc *socksUDPConn) Close() error {
+	uc.tcpConn.Close()
+	return uc.PacketConn.Close()
 }
