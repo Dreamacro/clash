@@ -229,7 +229,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 
 func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	proxies := make(map[string]C.Proxy)
-	proxyList := make([]string, 0)
+	proxyList := []string{}
 	proxiesConfig := cfg.Proxy
 	groupsConfig := cfg.ProxyGroup
 
@@ -307,7 +307,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("ProxyGroup %s: the duplicate name", groupName)
 		}
 		var group C.ProxyAdapter
-		ps := make([]C.Proxy, 0)
+		ps := []C.Proxy{}
 
 		err := fmt.Errorf("cannot parse")
 		switch groupType {
@@ -367,7 +367,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 		proxyList = append(proxyList, groupName)
 	}
 
-	ps := make([]C.Proxy, 0)
+	ps := []C.Proxy{}
 	for _, v := range proxyList {
 		ps = append(ps, proxies[v])
 	}
@@ -378,7 +378,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 }
 
 func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
-	rules := make([]C.Rule, 0)
+	rules := []C.Rule{}
 
 	rulesConfig := cfg.Rule
 	// parse rules
@@ -468,7 +468,7 @@ func hostWithDefaultPort(host string, defPort string) (string, error) {
 }
 
 func parseNameServer(servers []string) ([]dns.NameServer, error) {
-	nameservers := make([]dns.NameServer, 0)
+	nameservers := []dns.NameServer{}
 
 	for idx, server := range servers {
 		// parse without scheme .e.g 8.8.8.8:53

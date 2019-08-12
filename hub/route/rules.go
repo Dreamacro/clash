@@ -24,7 +24,7 @@ type Rule struct {
 func getRules(w http.ResponseWriter, r *http.Request) {
 	rawRules := T.Instance().Rules()
 
-	rules := make([]Rule, 0)
+	rules := []Rule{}
 	for _, rule := range rawRules {
 		rules = append(rules, Rule{
 			Type:    rule.RuleType().String(),
