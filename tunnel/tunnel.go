@@ -191,7 +191,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 	defer remoteConn.Close()
 
 	if rule != nil {
-		log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), remoConn.Chains().String())
+		log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), remoteConn.Chains().String())
 	} else {
 		log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 	}
