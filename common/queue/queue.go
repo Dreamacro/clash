@@ -48,7 +48,7 @@ func (q *Queue) First() interface{} {
 
 // Copy get the copy of queue.
 func (q *Queue) Copy() []interface{} {
-	items := []interface{}{}
+	items := make([]interface{}, 0)
 	q.lock.RLock()
 	items = append(items, q.items...)
 	q.lock.RUnlock()

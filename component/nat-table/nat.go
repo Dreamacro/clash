@@ -5,14 +5,18 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/Dreamacro/clash/common/queue"
 )
 
+// NAT table is a simple map to store connections.
 type Table struct {
 	*table
 }
 
 type table struct {
 	mapping sync.Map
+	queue   *queue.Queue
 	janitor *janitor
 	timeout time.Duration
 }
@@ -23,17 +27,19 @@ type element struct {
 	RemoteConn net.PacketConn
 }
 
-func (t *table) Set(key net.Addr, rConn net.PacketConn, rAddr net.Addr) {
+// Set store network mapping to NAT table.
+func (t *table) Set(key net.Addr, remoteConn net.PacketConn, rAddr net.Addr) {
 	// set conn read timeout
-	rConn.SetReadDeadline(time.Now().Add(t.timeout))
+	remoteConn.SetReadDeadline(time.Now().Add(t.timeout))
 	t.mapping.Store(key, &element{
 		RemoteAddr: rAddr,
-		RemoteConn: rConn,
+		RemoteConn: remoteConn,
 		Expired:    time.Now().Add(t.timeout),
 	})
 }
 
-func (t *table) Get(key net.Addr) (rConn net.PacketConn, rAddr net.Addr) {
+// Get return target network connection and address.
+func (t *table) Get(key net.Addr) (remoteConn net.PacketConn, rAddr net.Addr) {
 	item, exist := t.mapping.Load(key)
 	if !exist {
 		return
@@ -50,16 +56,42 @@ func (t *table) Get(key net.Addr) (rConn net.PacketConn, rAddr net.Addr) {
 	return elm.RemoteConn, elm.RemoteAddr
 }
 
+// AddConn put associate connections to queue
+func (t *table) AddConn(conn net.Conn) {
+	t.queue.Put(conn)
+}
+
 func (t *table) cleanup() {
+	items := make([]interface{}, 0)
+	queueLength := int(t.queue.Len())
+	for i := 0; i < queueLength; i++ {
+		items = append(items, t.queue.Pop())
+	}
+
+	var mapLength int
 	t.mapping.Range(func(k, v interface{}) bool {
 		key := k.(net.Addr)
 		elm := v.(*element)
 		if time.Since(elm.Expired) > 0 {
 			t.mapping.Delete(key)
 			elm.RemoteConn.Close()
+		} else {
+			mapLength += 1
 		}
 		return true
 	})
+
+	// if none active packet connection exists,
+	// then close all tcp connections from queue.
+	for _, item := range items {
+		if mapLength != 0 {
+			t.queue.Put(item)
+		} else {
+			if conn, ok := item.(net.Conn); ok {
+				conn.Close()
+			}
+		}
+	}
 }
 
 type janitor struct {
@@ -84,7 +116,7 @@ func stopJanitor(t *Table) {
 	t.janitor.stop <- struct{}{}
 }
 
-// New return *Cache
+// New is a constructor for a new NAT table.
 func New(interval time.Duration) *Table {
 	j := &janitor{
 		interval: interval,

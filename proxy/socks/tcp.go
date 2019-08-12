@@ -15,6 +15,7 @@ import (
 
 var (
 	tun = tunnel.Instance()
+	nat = tunnel.NATInstance()
 )
 
 type SockListener struct {
@@ -64,6 +65,9 @@ func handleSocks(conn net.Conn) {
 	}
 	conn.(*net.TCPConn).SetKeepAlive(true)
 	if command == socks5.CmdUDPAssociate {
+		// add UDP associate tcp connection to NAT table
+		nat.AddConn(conn)
+
 		defer conn.Close()
 		io.Copy(ioutil.Discard, conn)
 		return
