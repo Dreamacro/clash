@@ -161,16 +161,16 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
 	pc, addr := natTable.Get(localConn.RemoteAddr())
 	if pc == nil {
-		rawpc, naddr, err := proxy.DialUDP(metadata)
-		addr = naddr
-		pc = rawpc
+		rawPc, nAddr, err := proxy.DialUDP(metadata)
+		addr = nAddr
+		pc = rawPc
 		if err != nil {
 			log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
 			return
 		}
 
 		if rule != nil {
-			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawpc.Chains().String())
+			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
 		} else {
 			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 		}
@@ -183,12 +183,12 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 }
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
-	remoConn, err := proxy.Dial(metadata)
+	remoteConn, err := proxy.Dial(metadata)
 	if err != nil {
 		log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
 		return
 	}
-	defer remoConn.Close()
+	defer remoteConn.Close()
 
 	if rule != nil {
 		log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), remoConn.Chains().String())
@@ -198,9 +198,9 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, 
 
 	switch adapter := localConn.(type) {
 	case *InboundAdapter.HTTPAdapter:
-		t.handleHTTP(adapter, remoConn)
+		t.handleHTTP(adapter, remoteConn)
 	case *InboundAdapter.SocketAdapter:
-		t.handleSocket(adapter, remoConn)
+		t.handleSocket(adapter, remoteConn)
 	}
 }
 
