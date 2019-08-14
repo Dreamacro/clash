@@ -363,12 +363,11 @@ func DecodeUDPPacket(packet []byte) (addr Addr, payload []byte, err error) {
 	return
 }
 
-func EncodeUDPPacket(addr string, payload []byte) (packet []byte, err error) {
-	rAddr := ParseAddr(addr)
-	if rAddr == nil {
-		err = errors.New("cannot parse addr")
+func EncodeUDPPacket(addr Addr, payload []byte) (packet []byte, err error) {
+	if addr == nil {
+		err = errors.New("address is invalid")
 		return
 	}
-	packet = bytes.Join([][]byte{{0, 0, 0}, rAddr, payload}, []byte{})
+	packet = bytes.Join([][]byte{{0, 0, 0}, addr, payload}, []byte{})
 	return
 }

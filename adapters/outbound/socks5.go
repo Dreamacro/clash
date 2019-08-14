@@ -98,9 +98,9 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, _ net.Addr, err
 		return
 	}
 
-	targetAddr, err := net.ResolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
-	if err != nil {
-		return
+	targetAddr := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
+	if targetAddr == nil {
+		return nil, nil, fmt.Errorf("parse address error: %v:%v", metadata.String(), metadata.DstPort)
 	}
 
 	pc, err := net.ListenPacket("udp", "")
@@ -146,12 +146,12 @@ func NewSocks5(option Socks5Option) *Socks5 {
 
 type socksUDPConn struct {
 	net.PacketConn
-	rAddr   net.Addr
+	rAddr   socks5.Addr
 	tcpConn net.Conn
 }
 
 func (uc *socksUDPConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
-	packet, err := socks5.EncodeUDPPacket(uc.rAddr.String(), b)
+	packet, err := socks5.EncodeUDPPacket(uc.rAddr, b)
 	if err != nil {
 		return
 	}
