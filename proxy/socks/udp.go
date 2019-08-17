@@ -38,7 +38,7 @@ func NewSocksUDPProxy(addr string) (*SockUDPListener, error) {
 				}
 				continue
 			}
-			go handleSocksUDP(l, buf[:n], remoteAddr)
+			handleSocksUDP(l, buf[:n], remoteAddr)
 		}
 	}()
 
