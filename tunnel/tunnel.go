@@ -21,7 +21,8 @@ var (
 
 // Tunnel handle relay inbound proxy and outbound proxy
 type Tunnel struct {
-	queue     *channels.InfiniteChannel
+	tcpQueue  *channels.InfiniteChannel
+	udpQueue  *channels.InfiniteChannel
 	rules     []C.Rule
 	proxies   map[string]C.Proxy
 	configMux *sync.RWMutex
@@ -36,7 +37,12 @@ type Tunnel struct {
 
 // Add request to queue
 func (t *Tunnel) Add(req C.ServerAdapter) {
-	t.queue.In() <- req
+	switch req.Metadata().NetWork {
+	case C.TCP:
+		t.tcpQueue.In() <- req
+	case C.UDP:
+		t.udpQueue.In() <- req
+	}
 }
 
 // Traffic return traffic of all connections
@@ -86,11 +92,20 @@ func (t *Tunnel) SetMode(mode Mode) {
 }
 
 func (t *Tunnel) process() {
-	queue := t.queue.Out()
+	go func() {
+		queue := t.udpQueue.Out()
+		for {
+			elm := <-queue
+			conn := elm.(C.ServerAdapter)
+			t.handleUDPConn(conn)
+		}
+	}()
+
+	queue := t.tcpQueue.Out()
 	for {
 		elm := <-queue
 		conn := elm.(C.ServerAdapter)
-		go t.handleConn(conn)
+		go t.handleTCPConn(conn)
 	}
 }
 
@@ -102,26 +117,10 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 	return dns.DefaultResolver != nil && (dns.DefaultResolver.IsMapping() || dns.DefaultResolver.IsFakeIP()) && metadata.Host == "" && metadata.DstIP != nil
 }
 
-func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
-	defer func() {
-		var conn net.Conn
-		switch adapter := localConn.(type) {
-		case *InboundAdapter.HTTPAdapter:
-			conn = adapter.Conn
-		case *InboundAdapter.SocketAdapter:
-			conn = adapter.Conn
-		}
-		if _, ok := conn.(*net.TCPConn); ok {
-			localConn.Close()
-		}
-	}()
-
-	metadata := localConn.Metadata()
+func (t *Tunnel) checkMetadata(metadata *C.Metadata) bool {
 	if !metadata.Valid() {
-		log.Warnln("[Metadata] not valid: %#v", metadata)
-		return
+		return false
 	}
-
 	// preprocess enhanced-mode metadata
 	if t.needLookupIP(metadata) {
 		host, exist := dns.DefaultResolver.IPToHost(*metadata.DstIP)
@@ -133,7 +132,10 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 			}
 		}
 	}
+	return true
+}
 
+func (t *Tunnel) parseMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	var proxy C.Proxy
 	var rule C.Rule
 	switch t.mode {
@@ -146,43 +148,91 @@ func (t *Tunnel) handleConn(localConn C.ServerAdapter) {
 		var err error
 		proxy, rule, err = t.match(metadata)
 		if err != nil {
-			return
+			return nil, nil, err
 		}
 	}
-
-	switch metadata.NetWork {
-	case C.TCP:
-		t.handleTCPConn(localConn, metadata, proxy, rule)
-	case C.UDP:
-		t.handleUDPConn(localConn, metadata, proxy, rule)
-	}
+	return proxy, rule, nil
 }
 
-func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
-	pc, addr := natTable.Get(localConn.RemoteAddr())
-	if pc == nil {
-		rawPc, nAddr, err := proxy.DialUDP(metadata)
-		addr = nAddr
-		pc = rawPc
-		if err != nil {
-			log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
-			return
-		}
+func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
+	metadata := localConn.Metadata()
+	if ok := t.checkMetadata(metadata); !ok {
+		log.Warnln("[Metadata] not valid: %#v", metadata)
+		return
+	}
 
-		if rule != nil {
-			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
+	src := localConn.RemoteAddr().String()
+	dst := net.JoinHostPort(metadata.String(), metadata.DstPort)
+	key := src + dst
+
+	// Get from NAT table
+	pc, addr := natTable.Get(key)
+	if pc != nil {
+		t.handleUDPToRemote(localConn, pc, addr)
+		return
+	}
+
+	go func() {
+		// Require WaitGroup from NAT pool
+		wg, ok := natPool.Get(key)
+		if ok {
+			defer func() {
+				wg.Done()
+				natPool.Del(key)
+			}()
+
+			proxy, rule, err := t.parseMetadata(metadata)
+			if err != nil {
+				log.Warnln("Parse metadata failed: %v", err)
+				return
+			}
+
+			rawPc, nAddr, err := proxy.DialUDP(metadata)
+			addr = nAddr
+			pc = rawPc
+			if err != nil {
+				log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
+				return
+			}
+
+			if rule != nil {
+				log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
+			} else {
+				log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
+			}
+
+			natTable.Add(key, pc, addr, func() {
+				t.handleUDPToLocal(localConn, pc, udpTimeout)
+			})
+
+			t.handleUDPToRemote(localConn, pc, addr)
 		} else {
-			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
+			// Wait for the first UDP packet process finished
+			wg.Wait()
+
+			pc, addr = natTable.Get(key)
+			if pc != nil {
+				t.handleUDPToRemote(localConn, pc, addr)
+			}
 		}
-
-		natTable.Set(localConn.RemoteAddr(), pc, addr)
-		go t.handleUDPToLocal(localConn, pc)
-	}
-
-	t.handleUDPToRemote(localConn, pc, addr)
+	}()
 }
 
-func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter, metadata *C.Metadata, proxy C.Proxy, rule C.Rule) {
+func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
+	defer localConn.Close()
+
+	metadata := localConn.Metadata()
+	if ok := t.checkMetadata(metadata); !ok {
+		log.Warnln("[Metadata] not valid: %#v", metadata)
+		return
+	}
+
+	proxy, rule, err := t.parseMetadata(metadata)
+	if err != nil {
+		log.Warnln("Parse metadata failed: %v", err)
+		return
+	}
+
 	remoteConn, err := proxy.Dial(metadata)
 	if err != nil {
 		log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
@@ -246,7 +296,8 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 
 func newTunnel() *Tunnel {
 	return &Tunnel{
-		queue:     channels.NewInfiniteChannel(),
+		tcpQueue:  channels.NewInfiniteChannel(),
+		udpQueue:  channels.NewInfiniteChannel(),
 		proxies:   make(map[string]C.Proxy),
 		configMux: &sync.RWMutex{},
 		traffic:   C.NewTraffic(time.Second),

@@ -8,15 +8,17 @@ import (
 )
 
 var (
-	natTable *nat.Table
 	natOnce  sync.Once
+	natPool  *nat.Pool
+	natTable *nat.Table
 
-	natTimeout = 120 * time.Second
+	udpTimeout = 120 * time.Second
 )
 
 func NATInstance() *nat.Table {
 	natOnce.Do(func() {
-		natTable = nat.New(natTimeout)
+		natPool = nat.NewPool()
+		natTable = nat.NewTable()
 	})
 	return natTable
 }
