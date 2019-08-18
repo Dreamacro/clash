@@ -359,7 +359,8 @@ func DecodeUDPPacket(packet []byte) (addr Addr, payload []byte, err error) {
 		err = errors.New("failed to read UDP header")
 	}
 
-	payload = bytes.Join([][]byte{packet[3+len(addr):]}, []byte{})
+	payload = make([]byte, len(packet[3+len(addr):]))
+	copy(payload, packet[3+len(addr):])
 	return
 }
 
