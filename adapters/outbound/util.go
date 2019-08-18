@@ -85,19 +85,6 @@ func serializesSocksAddr(metadata *C.Metadata) []byte {
 	return bytes.Join(buf, nil)
 }
 
-type fakeUDPConn struct {
-	net.Conn
-}
-
-func (fuc *fakeUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	return fuc.Conn.Write(b)
-}
-
-func (fuc *fakeUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	n, err := fuc.Conn.Read(b)
-	return n, fuc.RemoteAddr(), err
-}
-
 func dialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
