@@ -135,7 +135,7 @@ func (t *Tunnel) checkMetadata(metadata *C.Metadata) bool {
 	return true
 }
 
-func (t *Tunnel) parseMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
+func (t *Tunnel) resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	var proxy C.Proxy
 	var rule C.Rule
 	switch t.mode {
@@ -181,7 +181,7 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 				natPool.Del(key)
 			}()
 
-			proxy, rule, err := t.parseMetadata(metadata)
+			proxy, rule, err := t.resolveMetadata(metadata)
 			if err != nil {
 				log.Warnln("Parse metadata failed: %v", err)
 				return
@@ -227,7 +227,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
 		return
 	}
 
-	proxy, rule, err := t.parseMetadata(metadata)
+	proxy, rule, err := t.resolveMetadata(metadata)
 	if err != nil {
 		log.Warnln("Parse metadata failed: %v", err)
 		return
