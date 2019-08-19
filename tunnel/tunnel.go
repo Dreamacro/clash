@@ -176,9 +176,13 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 		// Require WaitGroup from NAT pool
 		wg, ok := natPool.Get(key)
 		if ok {
+			var err error
 			defer func() {
 				wg.Done()
-				natPool.Del(key)
+				if err != nil {
+					// Delete when error occurred
+					natPool.Del(key)
+				}
 			}()
 
 			proxy, rule, err := t.resolveMetadata(metadata)
@@ -203,6 +207,8 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 
 			natTable.Add(key, pc, addr, func() {
 				t.handleUDPToLocal(localConn, pc, udpTimeout)
+				// Remove from pool until last func done
+				natPool.Del(key)
 			})
 
 			t.handleUDPToRemote(localConn, pc, addr)
