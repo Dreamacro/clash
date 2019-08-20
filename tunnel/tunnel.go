@@ -7,6 +7,7 @@ import (
 	"time"
 
 	InboundAdapter "github.com/Dreamacro/clash/adapters/inbound"
+	"github.com/Dreamacro/clash/component/nat"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
@@ -17,12 +18,16 @@ import (
 var (
 	tunnel *Tunnel
 	once   sync.Once
+
+	// default timeout for UDP session
+	udpTimeout = 60 * time.Second
 )
 
 // Tunnel handle relay inbound proxy and outbound proxy
 type Tunnel struct {
 	tcpQueue  *channels.InfiniteChannel
 	udpQueue  *channels.InfiniteChannel
+	natQueue  *nat.Queue
 	rules     []C.Rule
 	proxies   map[string]C.Proxy
 	configMux *sync.RWMutex
@@ -165,61 +170,61 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 	dst := net.JoinHostPort(metadata.String(), metadata.DstPort)
 	key := src + dst
 
-	// Get from NAT table
-	pc, addr := natTable.Get(key)
-	if pc != nil {
-		t.handleUDPToRemote(localConn, pc, addr)
+	var first bool
+	var queue *channels.InfiniteChannel
+	// Get from NAT Queue
+	queue, first = t.natQueue.Get(key)
+	if !first {
+		defer func() {
+			// in case channel is closed
+			recover()
+		}()
+
+		// add UDP conn to queue
+		queue.In() <- localConn
 		return
 	}
 
 	go func() {
-		// Require WaitGroup from NAT pool
-		wg, ok := natPool.Get(key)
-		if ok {
-			var err error
-			defer func() {
-				wg.Done()
-				if err != nil {
-					// Delete when error occurred
-					natPool.Del(key)
+		var err error
+		defer func() {
+			if err != nil {
+				// delete when error occurred
+				if ch := t.natQueue.Del(key); ch != nil {
+					ch.Close()
 				}
-			}()
-
-			proxy, rule, err := t.resolveMetadata(metadata)
-			if err != nil {
-				log.Warnln("Parse metadata failed: %v", err)
-				return
 			}
+		}()
 
-			rawPc, nAddr, err := proxy.DialUDP(metadata)
-			addr = nAddr
-			pc = rawPc
-			if err != nil {
-				log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
-				return
-			}
+		proxy, rule, err := t.resolveMetadata(metadata)
+		if err != nil {
+			log.Warnln("Parse metadata failed: %v", err)
+			return
+		}
 
-			if rule != nil {
-				log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
-			} else {
-				log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
-			}
+		pc, addr, err := proxy.DialUDP(metadata)
+		if err != nil {
+			log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
+			return
+		}
 
-			natTable.Add(key, pc, addr, func() {
-				t.handleUDPToLocal(localConn, pc, udpTimeout)
-				// Remove from pool until last func done
-				natPool.Del(key)
-			})
-
-			t.handleUDPToRemote(localConn, pc, addr)
+		if rule != nil {
+			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), pc.Chains().String())
 		} else {
-			// Wait for the first UDP packet process finished
-			wg.Wait()
+			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
+		}
 
-			pc, addr = natTable.Get(key)
-			if pc != nil {
-				t.handleUDPToRemote(localConn, pc, addr)
-			}
+		t.natQueue.Add(key, func() {
+			defer pc.Close()
+			t.handleUDPToLocal(localConn, pc, udpTimeout)
+		})
+
+		queue.In() <- localConn
+
+		// read data from queue and send them to remote
+		for item := range queue.Out() {
+			conn := item.(C.ServerAdapter)
+			t.handleUDPToRemote(conn, pc, addr)
 		}
 	}()
 }
@@ -304,6 +309,7 @@ func newTunnel() *Tunnel {
 	return &Tunnel{
 		tcpQueue:  channels.NewInfiniteChannel(),
 		udpQueue:  channels.NewInfiniteChannel(),
+		natQueue:  nat.NewQueue(),
 		proxies:   make(map[string]C.Proxy),
 		configMux: &sync.RWMutex{},
 		traffic:   C.NewTraffic(time.Second),
