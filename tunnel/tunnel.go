@@ -208,12 +208,12 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 		}
 
+		queue.In() <- localConn
+
 		t.natQueue.Add(key, func() {
 			defer pc.Close()
 			t.handleUDPToLocal(localConn, pc, udpTimeout)
 		})
-
-		queue.In() <- localConn
 
 		// read data from queue and send them to remote
 		for elm := range queue.Out() {
