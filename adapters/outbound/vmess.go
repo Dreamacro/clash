@@ -116,11 +116,11 @@ type vmessUDPConn struct {
 	net.Conn
 }
 
-func (c *vmessUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	return c.Conn.Write(b)
+func (uc *vmessUDPConn) WriteTo(b []byte, addr net.Addr) (int, error) {
+	return uc.Conn.Write(b)
 }
 
-func (c *vmessUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	n, err := c.Conn.Read(b)
-	return n, c.RemoteAddr(), err
+func (uc *vmessUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
+	n, err := uc.Conn.Read(b)
+	return n, uc.RemoteAddr(), err
 }
