@@ -30,7 +30,7 @@ func (d *Direct) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 		return nil, nil, err
 	}
 
-	addr, err := resolveUDPAddr("udp", net.JoinHostPort(metadata.String(), metadata.DstPort))
+	addr, err := resolveUDPAddr("udp", metadata.RemoteAddress())
 	if err != nil {
 		return nil, nil, err
 	}

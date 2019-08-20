@@ -41,11 +41,18 @@ type Metadata struct {
 	Host     string
 }
 
+func (m *Metadata) RemoteAddress() string {
+	return net.JoinHostPort(m.String(), m.DstPort)
+}
+
 func (m *Metadata) String() string {
-	if m.Host == "" {
+	if m.Host != "" {
+		return m.Host
+	} else if m.DstIP != nil {
 		return m.DstIP.String()
+	} else {
+		return "<nil>"
 	}
-	return m.Host
 }
 
 func (m *Metadata) Valid() bool {

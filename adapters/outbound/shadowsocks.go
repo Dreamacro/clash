@@ -92,7 +92,7 @@ func (ss *ShadowSocks) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, er
 		return nil, nil, err
 	}
 
-	targetAddr := socks5.ParseAddr(net.JoinHostPort(metadata.String(), metadata.DstPort))
+	targetAddr := socks5.ParseAddr(metadata.RemoteAddress())
 	if targetAddr == nil {
 		return nil, nil, fmt.Errorf("parse address error: %v:%v", metadata.String(), metadata.DstPort)
 	}

@@ -122,10 +122,7 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 	return dns.DefaultResolver != nil && (dns.DefaultResolver.IsMapping() || dns.DefaultResolver.IsFakeIP()) && metadata.Host == "" && metadata.DstIP != nil
 }
 
-func (t *Tunnel) checkMetadata(metadata *C.Metadata) bool {
-	if !metadata.Valid() {
-		return false
-	}
+func (t *Tunnel) resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	// preprocess enhanced-mode metadata
 	if t.needLookupIP(metadata) {
 		host, exist := dns.DefaultResolver.IPToHost(*metadata.DstIP)
@@ -137,10 +134,7 @@ func (t *Tunnel) checkMetadata(metadata *C.Metadata) bool {
 			}
 		}
 	}
-	return true
-}
 
-func (t *Tunnel) resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	var proxy C.Proxy
 	var rule C.Rule
 	switch t.mode {
@@ -161,14 +155,14 @@ func (t *Tunnel) resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) 
 
 func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 	metadata := localConn.Metadata()
-	if ok := t.checkMetadata(metadata); !ok {
+	if !metadata.Valid() {
 		log.Warnln("[Metadata] not valid: %#v", metadata)
 		return
 	}
 
 	src := localConn.RemoteAddr().String()
-	dst := net.JoinHostPort(metadata.String(), metadata.DstPort)
-	key := src + dst
+	dst := metadata.RemoteAddress()
+	key := src + "-" + dst
 
 	var first bool
 	var queue *channels.InfiniteChannel
@@ -233,7 +227,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
 	defer localConn.Close()
 
 	metadata := localConn.Metadata()
-	if ok := t.checkMetadata(metadata); !ok {
+	if !metadata.Valid() {
 		log.Warnln("[Metadata] not valid: %#v", metadata)
 		return
 	}

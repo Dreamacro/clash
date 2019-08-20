@@ -58,7 +58,7 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	var buf bytes.Buffer
 	var err error
 
-	addr := net.JoinHostPort(metadata.String(), metadata.DstPort)
+	addr := metadata.RemoteAddress()
 	buf.WriteString("CONNECT " + addr + " HTTP/1.1\r\n")
 	buf.WriteString("Host: " + metadata.String() + "\r\n")
 	buf.WriteString("Proxy-Connection: Keep-Alive\r\n")
