@@ -222,8 +222,8 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 		queue.In() <- localConn
 
 		// read data from queue and send them to remote
-		for item := range queue.Out() {
-			conn := item.(C.ServerAdapter)
+		for elm := range queue.Out() {
+			conn := elm.(C.ServerAdapter)
 			t.handleUDPToRemote(conn, pc, addr)
 		}
 	}()
