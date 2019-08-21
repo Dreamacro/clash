@@ -1,6 +1,7 @@
 package socks
 
 import (
+	"bytes"
 	"net"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
@@ -49,12 +50,17 @@ func (l *SockUDPListener) Address() string {
 	return l.address
 }
 
-func handleSocksUDP(c net.PacketConn, packet []byte, remoteAddr net.Addr) {
-	target, payload, err := socks5.DecodeUDPPacket(packet)
+func handleSocksUDP(c net.PacketConn, buf []byte, addr net.Addr) {
+	target, payload, err := socks5.DecodeUDPPacket(buf)
 	if err != nil {
 		// Unresolved UDP packet, do nothing
 		return
 	}
-	conn := newfakeConn(c, target.String(), remoteAddr, payload)
+	conn := &fakeConn{
+		PacketConn: c,
+		remoteAddr: addr,
+		targetAddr: target,
+		buffer:     bytes.NewBuffer(payload),
+	}
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
 }

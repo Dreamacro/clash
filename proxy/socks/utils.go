@@ -14,16 +14,6 @@ type fakeConn struct {
 	buffer     *bytes.Buffer
 }
 
-func newfakeConn(conn net.PacketConn, target string, remoteAddr net.Addr, buf []byte) *fakeConn {
-	buffer := bytes.NewBuffer(buf)
-	return &fakeConn{
-		PacketConn: conn,
-		remoteAddr: remoteAddr,
-		targetAddr: socks5.ParseAddr(target),
-		buffer:     buffer,
-	}
-}
-
 func (c *fakeConn) Read(b []byte) (n int, err error) {
 	return c.buffer.Read(b)
 }

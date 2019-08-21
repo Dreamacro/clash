@@ -354,13 +354,15 @@ func DecodeUDPPacket(packet []byte) (addr Addr, payload []byte, err error) {
 		return
 	}
 
-	addr = SplitAddr(packet[3:])
+	buf := make([]byte, len(packet))
+	copy(buf, packet)
+
+	addr = SplitAddr(buf[3:])
 	if addr == nil {
 		err = errors.New("failed to read UDP header")
 	}
 
-	payload = make([]byte, len(packet[3+len(addr):]))
-	copy(payload, packet[3+len(addr):])
+	payload = buf[3+len(addr):]
 	return
 }
 
