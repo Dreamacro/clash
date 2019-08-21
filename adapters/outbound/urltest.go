@@ -73,6 +73,10 @@ func (u *URLTest) Destroy() {
 	u.done <- struct{}{}
 }
 
+func (u *URLTest) SpeedTest() {
+	u.speedTest()
+}
+
 func (u *URLTest) loop() {
 	tick := time.NewTicker(u.interval)
 	ctx, cancel := context.WithCancel(context.Background())
