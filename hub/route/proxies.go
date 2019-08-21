@@ -26,6 +26,7 @@ func proxyRouter() http.Handler {
 		r.Get("/", getProxy)
 		r.Get("/delay", getProxyDelay)
 		r.Put("/", updateProxy)
+		r.Post("/reelect", reelectProxy)
 	})
 	return r
 }
@@ -134,4 +135,15 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, render.M{
 		"delay": delay,
 	})
+}
+
+func reelectProxy(w http.ResponseWriter, r *http.Request) {
+	proxy := r.Context().Value(CtxKeyProxy).(*A.Proxy)
+	urlTest, ok := proxy.ProxyAdapter.(*A.URLTest)
+	if !ok {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, newError("Must be a Url-Test"))
+		return
+	}
+	urlTest.SpeedTest()
 }

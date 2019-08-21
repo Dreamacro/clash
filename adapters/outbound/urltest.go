@@ -71,6 +71,10 @@ func (u *URLTest) Destroy() {
 	u.done <- struct{}{}
 }
 
+func (u *URLTest) SpeedTest() {
+	u.speedTest()
+}
+
 func (u *URLTest) loop() {
 	tick := time.NewTicker(u.interval)
 	go u.speedTest()
