@@ -50,14 +50,14 @@ func (l *SockUDPListener) Address() string {
 	return l.address
 }
 
-func handleSocksUDP(c net.PacketConn, buf []byte, addr net.Addr) {
+func handleSocksUDP(pc net.PacketConn, buf []byte, addr net.Addr) {
 	target, payload, err := socks5.DecodeUDPPacket(buf)
 	if err != nil {
 		// Unresolved UDP packet, do nothing
 		return
 	}
 	conn := &fakeConn{
-		PacketConn: c,
+		PacketConn: pc,
 		remoteAddr: addr,
 		targetAddr: target,
 		buffer:     bytes.NewBuffer(payload),
