@@ -36,7 +36,7 @@ func (rt RuleType) String() string {
 	case MATCH:
 		return "MATCH"
 	default:
-		return "Unknow"
+		return "Unknown"
 	}
 }
 
