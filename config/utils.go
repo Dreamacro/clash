@@ -55,9 +55,6 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 
 	// Step 1.1 build dependency graph
 	for idx, mapping := range groupsConfig {
-		// record original order in config file.
-		// this field can be used determinate the display order in FrontEnd.
-		mapping["configIdx"] = idx
 		groupName, existName := mapping["name"].(string)
 		if !existName {
 			return fmt.Errorf("ProxyGroup %d: missing name", idx)

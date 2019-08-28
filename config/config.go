@@ -292,15 +292,26 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 		proxyList = append(proxyList, proxy.Name())
 	}
 
-	// parse proxy group
+	// keep the origional order of ProxyGroups in config file
+	for idx, mapping := range groupsConfig {
+		groupName, existName := mapping["name"].(string)
+		if !existName {
+			return nil, fmt.Errorf("ProxyGroup %d: missing name", idx)
+		}
+		proxyList = append(proxyList, groupName)
+	}
+
+	// check if any loop exists and sort the ProxyGroups
 	if err := proxyGroupsDagSort(groupsConfig); err != nil {
 		return nil, err
 	}
-	for idx, mapping := range groupsConfig {
+
+	// parse proxy group
+	for _, mapping := range groupsConfig {
 		groupType, existType := mapping["type"].(string)
-		groupName, existName := mapping["name"].(string)
-		if !(existType && existName) {
-			return nil, fmt.Errorf("ProxyGroup %d: missing type or name", idx)
+		groupName, _ := mapping["name"].(string)
+		if !existType {
+			return nil, fmt.Errorf("ProxyGroup %s: missing type", groupName)
 		}
 
 		if _, exist := proxies[groupName]; exist {
@@ -364,7 +375,6 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("Proxy %s: %s", groupName, err.Error())
 		}
 		proxies[groupName] = adapters.NewProxy(group)
-		proxyList = append(proxyList, groupName)
 	}
 
 	ps := []C.Proxy{}
