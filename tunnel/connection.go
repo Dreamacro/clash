@@ -16,41 +16,48 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 	conn := newTrafficTrack(outbound, t.traffic)
 	req := request.R
 	host := req.Host
+	brconn := bufio.NewReader(conn)
+	brreq := bufio.NewReader(request)
 
 	for {
-		keepAlive := strings.TrimSpace(strings.ToLower(req.Header.Get("Proxy-Connection"))) == "keep-alive"
-
-		req.Header.Set("Connection", "close")
+		proxyconn := req.Header.Get("Proxy-Connection")
+		keepAlive := len(proxyconn) > 0 && strings.ToLower(strings.TrimSpace(proxyconn)) == "keep-alive"
+		expect := req.Header.Get("Expect")
+		if len(expect) > 0 && strings.ToLower(strings.TrimSpace(expect)) == "100-continue" {
+			req.Header.Del("Expect")
+		}
 		req.RequestURI = ""
 		adapters.RemoveHopByHopHeaders(req.Header)
 		err := req.Write(conn)
 		if err != nil {
 			break
 		}
-		br := bufio.NewReader(conn)
-		resp, err := http.ReadResponse(br, req)
-		if err != nil {
-			break
-		}
-		adapters.RemoveHopByHopHeaders(resp.Header)
-		if resp.ContentLength >= 0 {
-			resp.Header.Set("Proxy-Connection", "keep-alive")
-			resp.Header.Set("Connection", "keep-alive")
-			resp.Header.Set("Keep-Alive", "timeout=4")
-			resp.Close = false
-		} else {
-			resp.Close = true
-		}
-		err = resp.Write(request)
-		if err != nil || resp.Close {
-			break
+		for {
+			resp, err := http.ReadResponse(brconn, req)
+			if err != nil {
+				return
+			}
+			adapters.RemoveHopByHopHeaders(resp.Header)
+			if keepAlive || resp.ContentLength >= 0 {
+				resp.Header.Set("Proxy-Connection", "keep-alive")
+				resp.Header.Set("Connection", "keep-alive")
+				resp.Header.Set("Keep-Alive", "timeout=4")
+				resp.Close = false
+				keepAlive = true
+			} else {
+				resp.Header.Set("Connection", "close")
+				resp.Close = true
+			}
+			err = resp.Write(request)
+			if err != nil || resp.Close {
+				return
+			}
+			if resp.StatusCode != 100 {
+				break
+			}
 		}
 
-		if !keepAlive {
-			break
-		}
-
-		req, err = http.ReadRequest(bufio.NewReader(request))
+		req, err = http.ReadRequest(brreq)
 		if err != nil {
 			break
 		}
