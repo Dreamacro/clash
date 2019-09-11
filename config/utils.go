@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Dreamacro/clash/common/structure"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -38,7 +39,7 @@ func or(pointers ...*int) *int {
 // Check if ProxyGroups form DAG(Directed Acyclic Graph), and sort all ProxyGroups by dependency order.
 // Meanwhile, record the original index in the config file.
 // If loop is detected, return an error with location of loop.
-func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
+func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structure.Decoder) error {
 
 	type Node struct {
 		indegree int
@@ -51,14 +52,27 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		from      []string
 	}
 
+	type ProxyGroupOption struct {
+		Name    string   `proxy:"name"`
+		Proxies []string `proxy:"proxies"`
+	}
+
 	graph := make(map[string]*Node)
 
 	// Step 1.1 build dependency graph
 	for idx, mapping := range groupsConfig {
+
 		groupName, existName := mapping["name"].(string)
 		if !existName {
 			return fmt.Errorf("ProxyGroup %d: missing name", idx)
 		}
+
+		option := &ProxyGroupOption{}
+		err := decoder.Decode(mapping, option)
+		if err != nil {
+			return fmt.Errorf("ProxyGroup %s: %s", groupName, err.Error())
+		}
+
 		if node, ok := graph[groupName]; ok {
 			if node.data != nil {
 				return fmt.Errorf("ProxyGroup %s: duplicate group name", groupName)
@@ -67,12 +81,8 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}) error {
 		} else {
 			graph[groupName] = &Node{0, -1, mapping, 0, nil}
 		}
-		proxies, existProxies := mapping["proxies"]
-		if !existProxies {
-			return fmt.Errorf("ProxyGroup %s: the `proxies` field is requried", groupName)
-		}
-		for _, proxy := range proxies.([]interface{}) {
-			proxy := proxy.(string)
+
+		for _, proxy := range option.Proxies {
 			if node, ex := graph[proxy]; ex {
 				node.indegree++
 			} else {

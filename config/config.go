@@ -302,7 +302,7 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 	}
 
 	// check if any loop exists and sort the ProxyGroups
-	if err := proxyGroupsDagSort(groupsConfig); err != nil {
+	if err := proxyGroupsDagSort(groupsConfig, decoder); err != nil {
 		return nil, err
 	}
 
