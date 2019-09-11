@@ -37,7 +37,16 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 			break
 		}
 		adapters.RemoveHopByHopHeaders(resp.Header)
-		if resp.ContentLength >= 0 {
+
+		if resp.StatusCode == http.StatusContinue {
+			err = resp.Write(request)
+			if err != nil {
+				break
+			}
+			goto handleResponse
+		}
+
+		if keepAlive || resp.ContentLength >= 0 {
 			resp.Header.Set("Proxy-Connection", "keep-alive")
 			resp.Header.Set("Connection", "keep-alive")
 			resp.Header.Set("Keep-Alive", "timeout=4")
@@ -48,14 +57,6 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		err = resp.Write(request)
 		if err != nil || resp.Close {
 			break
-		}
-
-		if !keepAlive {
-			break
-		}
-
-		if resp.StatusCode == http.StatusContinue {
-			goto handleResponse
 		}
 
 		req, err = http.ReadRequest(inboundReeder)
