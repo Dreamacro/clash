@@ -60,15 +60,11 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structur
 	graph := make(map[string]*Node)
 
 	// Step 1.1 build dependency graph
-	for idx, mapping := range groupsConfig {
-
-		groupName, existName := mapping["name"].(string)
-		if !existName {
-			return fmt.Errorf("ProxyGroup %d: missing name", idx)
-		}
+	for _, mapping := range groupsConfig {
 
 		option := &ProxyGroupOption{}
 		err := decoder.Decode(mapping, option)
+		groupName := option.Name
 		if err != nil {
 			return fmt.Errorf("ProxyGroup %s: %s", groupName, err.Error())
 		}
