@@ -14,7 +14,6 @@ type Selector struct {
 	proxies   map[string]C.Proxy
 	proxyList []string
 }
-
 type SelectorOption struct {
 	Name    string   `proxy:"name"`
 	Proxies []string `proxy:"proxies"`

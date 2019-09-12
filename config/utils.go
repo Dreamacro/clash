@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	adapters "github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/common/structure"
 	C "github.com/Dreamacro/clash/constant"
 )
@@ -52,17 +53,11 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structur
 		from      []string
 	}
 
-	type ProxyGroupOption struct {
-		Name    string   `proxy:"name"`
-		Proxies []string `proxy:"proxies"`
-	}
-
 	graph := make(map[string]*Node)
 
 	// Step 1.1 build dependency graph
 	for _, mapping := range groupsConfig {
-
-		option := &ProxyGroupOption{}
+		option := &adapters.ProxyGroupOption{}
 		err := decoder.Decode(mapping, option)
 		groupName := option.Name
 		if err != nil {
