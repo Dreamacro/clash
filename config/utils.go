@@ -42,7 +42,7 @@ func or(pointers ...*int) *int {
 // If loop is detected, return an error with location of loop.
 func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structure.Decoder) error {
 
-	type Node struct {
+	type graphNode struct {
 		indegree int
 		// topological order
 		topo int
@@ -53,7 +53,7 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structur
 		from      []string
 	}
 
-	graph := make(map[string]*Node)
+	graph := make(map[string]*graphNode)
 
 	// Step 1.1 build dependency graph
 	for _, mapping := range groupsConfig {
@@ -70,14 +70,14 @@ func proxyGroupsDagSort(groupsConfig []map[string]interface{}, decoder *structur
 			}
 			node.data = mapping
 		} else {
-			graph[groupName] = &Node{0, -1, mapping, 0, nil}
+			graph[groupName] = &graphNode{0, -1, mapping, 0, nil}
 		}
 
 		for _, proxy := range option.Proxies {
 			if node, ex := graph[proxy]; ex {
 				node.indegree++
 			} else {
-				graph[proxy] = &Node{1, -1, nil, 0, nil}
+				graph[proxy] = &graphNode{1, -1, nil, 0, nil}
 			}
 		}
 	}
