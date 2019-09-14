@@ -46,14 +46,15 @@ type result struct {
 }
 
 type Resolver struct {
-	ipv6     bool
-	mapping  bool
-	fakeip   bool
-	pool     *fakeip.Pool
-	fallback []resolver
-	main     []resolver
-	group    singleflight.Group
-	cache    *cache.Cache
+	ipv6            bool
+	mapping         bool
+	fakeip          bool
+	pool            *fakeip.Pool
+	main            []resolver
+	fallback        []resolver
+	fallbackFilters []fallbackFilter
+	group           singleflight.Group
+	cache           *cache.Cache
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeAAAA
@@ -92,6 +93,15 @@ func (r *Resolver) ResolveIPv4(host string) (ip net.IP, err error) {
 // ResolveIPv6 request with TypeAAAA
 func (r *Resolver) ResolveIPv6(host string) (ip net.IP, err error) {
 	return r.resolveIP(host, D.TypeAAAA)
+}
+
+func (r *Resolver) shouldFallback(ip net.IP) bool {
+	for _, filter := range r.fallbackFilters {
+		if filter.Match(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // Exchange a batch of dns request, and it use cache
@@ -195,13 +205,8 @@ func (r *Resolver) fallbackExchange(m *D.Msg) (msg *D.Msg, err error) {
 	fallbackMsg := r.asyncExchange(r.fallback, m)
 	res := <-msgCh
 	if res.Error == nil {
-		if mmdb == nil {
-			return nil, errors.New("GeoIP cannot use")
-		}
-
 		if ips := r.msgToIP(res.Msg); len(ips) != 0 {
-			if record, _ := mmdb.Country(ips[0]); record.Country.IsoCode == "CN" || record.Country.IsoCode == "" {
-				// release channel
+			if r.shouldFallback(ips[0]) {
 				go func() { <-fallbackMsg }()
 				msg = res.Msg
 				return msg, err
@@ -272,18 +277,20 @@ type NameServer struct {
 	Addr string
 }
 
+type FallbackFilter struct {
+	GeoIP  bool
+	IPCIDR []*net.IPNet
+}
+
 type Config struct {
 	Main, Fallback []NameServer
 	IPv6           bool
 	EnhancedMode   EnhancedMode
+	FallbackFilter FallbackFilter
 	Pool           *fakeip.Pool
 }
 
 func New(config Config) *Resolver {
-	once.Do(func() {
-		mmdb, _ = geoip2.Open(C.Path.MMDB())
-	})
-
 	r := &Resolver{
 		ipv6:    config.IPv6,
 		main:    transform(config.Main),
@@ -292,8 +299,23 @@ func New(config Config) *Resolver {
 		fakeip:  config.EnhancedMode == FAKEIP,
 		pool:    config.Pool,
 	}
+
 	if len(config.Fallback) != 0 {
 		r.fallback = transform(config.Fallback)
 	}
+
+	fallbackFilters := []fallbackFilter{}
+	if config.FallbackFilter.GeoIP {
+		once.Do(func() {
+			mmdb, _ = geoip2.Open(C.Path.MMDB())
+		})
+
+		fallbackFilters = append(fallbackFilters, &geoipFilter{})
+	}
+	for _, ipnet := range config.FallbackFilter.IPCIDR {
+		fallbackFilters = append(fallbackFilters, &ipnetFilter{ipnet: ipnet})
+	}
+	r.fallbackFilters = fallbackFilters
+
 	return r
 }

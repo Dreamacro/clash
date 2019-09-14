@@ -138,6 +138,10 @@ experimental:
   #   - https://1.1.1.1/dns-query # dns over https
   # fallback: # concurrent request with nameserver, fallback used when GEOIP country isn't CN
   #   - tcp://1.1.1.1
+  # fallback-filter:
+  #   geoip: true # default
+  #   ipcidr: # ips in these subnets will be considered polluted
+  #     - 240.0.0.0/4
 
 Proxy:
 

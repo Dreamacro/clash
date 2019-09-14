@@ -72,6 +72,10 @@ func updateDNS(c *config.DNS) {
 		IPv6:         c.IPv6,
 		EnhancedMode: c.EnhancedMode,
 		Pool:         c.FakeIPRange,
+		FallbackFilter: dns.FallbackFilter{
+			GeoIP:  c.FallbackFilter.GeoIP,
+			IPCIDR: c.FallbackFilter.IPCIDR,
+		},
 	})
 	dns.DefaultResolver = r
 	if err := dns.ReCreateServer(c.Listen, r); err != nil {

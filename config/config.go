@@ -40,13 +40,20 @@ type General struct {
 
 // DNS config
 type DNS struct {
-	Enable       bool             `yaml:"enable"`
-	IPv6         bool             `yaml:"ipv6"`
-	NameServer   []dns.NameServer `yaml:"nameserver"`
-	Fallback     []dns.NameServer `yaml:"fallback"`
-	Listen       string           `yaml:"listen"`
-	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
-	FakeIPRange  *fakeip.Pool
+	Enable         bool             `yaml:"enable"`
+	IPv6           bool             `yaml:"ipv6"`
+	NameServer     []dns.NameServer `yaml:"nameserver"`
+	Fallback       []dns.NameServer `yaml:"fallback"`
+	FallbackFilter FallbackFilter   `yaml:"fallback-filter"`
+	Listen         string           `yaml:"listen"`
+	EnhancedMode   dns.EnhancedMode `yaml:"enhanced-mode"`
+	FakeIPRange    *fakeip.Pool
+}
+
+// FallbackFilter config
+type FallbackFilter struct {
+	GeoIP  bool         `yaml:"geoip"`
+	IPCIDR []*net.IPNet `yaml:"ipcidr"`
 }
 
 // Experimental config
@@ -66,13 +73,19 @@ type Config struct {
 }
 
 type rawDNS struct {
-	Enable       bool             `yaml:"enable"`
-	IPv6         bool             `yaml:"ipv6"`
-	NameServer   []string         `yaml:"nameserver"`
-	Fallback     []string         `yaml:"fallback"`
-	Listen       string           `yaml:"listen"`
-	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
-	FakeIPRange  string           `yaml:"fake-ip-range"`
+	Enable         bool              `yaml:"enable"`
+	IPv6           bool              `yaml:"ipv6"`
+	NameServer     []string          `yaml:"nameserver"`
+	Fallback       []string          `yaml:"fallback"`
+	FallbackFilter rawFallbackFilter `yaml:"fallback-filter"`
+	Listen         string            `yaml:"listen"`
+	EnhancedMode   dns.EnhancedMode  `yaml:"enhanced-mode"`
+	FakeIPRange    string            `yaml:"fake-ip-range"`
+}
+
+type rawFallbackFilter struct {
+	GeoIP  bool     `yaml:"geoip"`
+	IPCIDR []string `yaml:"ipcidr"`
 }
 
 type rawConfig struct {
@@ -145,6 +158,10 @@ func readConfig(path string) (*rawConfig, error) {
 		DNS: rawDNS{
 			Enable:      false,
 			FakeIPRange: "198.18.0.1/16",
+			FallbackFilter: rawFallbackFilter{
+				GeoIP:  true,
+				IPCIDR: []string{},
+			},
 		},
 	}
 	err = yaml.Unmarshal([]byte(data), &rawConfig)
@@ -545,6 +562,20 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	return nameservers, nil
 }
 
+func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
+	ipNets := []*net.IPNet{}
+
+	for idx, ip := range ips {
+		_, ipnet, err := net.ParseCIDR(ip)
+		if err != nil {
+			return nil, fmt.Errorf("DNS FallbackIP[%d] format error: %s", idx, err.Error())
+		}
+		ipNets = append(ipNets, ipnet)
+	}
+
+	return ipNets, nil
+}
+
 func parseDNS(cfg rawDNS) (*DNS, error) {
 	if cfg.Enable && len(cfg.NameServer) == 0 {
 		return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
@@ -555,6 +586,9 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 		Listen:       cfg.Listen,
 		IPv6:         cfg.IPv6,
 		EnhancedMode: cfg.EnhancedMode,
+		FallbackFilter: FallbackFilter{
+			IPCIDR: []*net.IPNet{},
+		},
 	}
 	var err error
 	if dnsCfg.NameServer, err = parseNameServer(cfg.NameServer); err != nil {
@@ -576,6 +610,11 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 		}
 
 		dnsCfg.FakeIPRange = pool
+	}
+
+	dnsCfg.FallbackFilter.GeoIP = cfg.FallbackFilter.GeoIP
+	if fallbackip, err := parseFallbackIPCIDR(cfg.FallbackFilter.IPCIDR); err == nil {
+		dnsCfg.FallbackFilter.IPCIDR = fallbackip
 	}
 
 	return dnsCfg, nil
