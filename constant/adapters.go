@@ -103,6 +103,6 @@ func (at AdapterType) String() string {
 	case LoadBalance:
 		return "LoadBalance"
 	default:
-		return "Unknow"
+		return "Unknown"
 	}
 }

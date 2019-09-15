@@ -107,7 +107,7 @@ func (p *Proxy) DelayHistory() []C.DelayHistory {
 	return histories
 }
 
-// LastDelay return last history record. if proxy is not alive, return the max value of int16.
+// LastDelay return last history record. if proxy is not alive, return the max value of uint16.
 func (p *Proxy) LastDelay() (delay uint16) {
 	var max uint16 = 0xffff
 	if !p.alive {
@@ -192,4 +192,10 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 
 func NewProxy(adapter C.ProxyAdapter) *Proxy {
 	return &Proxy{adapter, queue.New(10), true}
+}
+
+// ProxyGroupOption contain the common options for all kind of ProxyGroup
+type ProxyGroupOption struct {
+	Name    string   `proxy:"name"`
+	Proxies []string `proxy:"proxies"`
 }

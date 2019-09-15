@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 	T "github.com/Dreamacro/clash/tunnel"
 
@@ -57,6 +58,7 @@ func Start(addr string, secret string) {
 
 		r.Get("/logs", getLogs)
 		r.Get("/traffic", traffic)
+		r.Get("/version", version)
 		r.Mount("/configs", configRouter())
 		r.Mount("/proxies", proxyRouter())
 		r.Mount("/rules", ruleRouter())
@@ -65,7 +67,7 @@ func Start(addr string, secret string) {
 	if uiPath != "" {
 		r.Group(func(r chi.Router) {
 			fs := http.StripPrefix("/ui", http.FileServer(http.Dir(uiPath)))
-			r.Get("/ui", http.RedirectHandler("/ui/", 301).ServeHTTP)
+			r.Get("/ui", http.RedirectHandler("/ui/", http.StatusTemporaryRedirect).ServeHTTP)
 			r.Get("/ui/*", func(w http.ResponseWriter, r *http.Request) {
 				fs.ServeHTTP(w, r)
 			})
@@ -208,4 +210,8 @@ func getLogs(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func version(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, render.M{"version": C.Version})
 }

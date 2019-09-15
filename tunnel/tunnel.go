@@ -268,6 +268,13 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	defer t.configMux.RUnlock()
 
 	var resolved bool
+
+	if node := dns.DefaultHosts.Search(metadata.Host); node != nil {
+		ip := node.Data.(net.IP)
+		metadata.DstIP = &ip
+		resolved = true
+	}
+
 	for _, rule := range t.rules {
 		if !resolved && t.shouldResolveIP(rule, metadata) {
 			ip, err := t.resolveIP(metadata.Host)

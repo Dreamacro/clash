@@ -26,6 +26,10 @@ func TestTrie_Basic(t *testing.T) {
 	if !node.Data.(net.IP).Equal(localIP) {
 		t.Error("should equal 127.0.0.1")
 	}
+
+	if tree.Insert("", localIP) == nil {
+		t.Error("should return error")
+	}
 }
 
 func TestTrie_Wildcard(t *testing.T) {

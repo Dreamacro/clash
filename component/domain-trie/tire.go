@@ -22,7 +22,7 @@ type Trie struct {
 }
 
 func isValidDomain(domain string) bool {
-	return domain[0] != '.' && domain[len(domain)-1] != '.'
+	return domain != "" && domain[0] != '.' && domain[len(domain)-1] != '.'
 }
 
 // Insert adds a node to the trie.

@@ -33,14 +33,16 @@ func (u *URLTest) Now() string {
 	return u.fast.Name()
 }
 
-func (u *URLTest) Dial(metadata *C.Metadata) (C.Conn, error) {
-	a, err := u.fast.Dial(metadata)
-	if err != nil {
+func (u *URLTest) Dial(metadata *C.Metadata) (c C.Conn, err error) {
+	for i := 0; i < 3; i++ {
+		c, err = u.fast.Dial(metadata)
+		if err == nil {
+			c.AppendToChains(u)
+			return
+		}
 		u.fallback()
-	} else {
-		a.AppendToChains(u)
 	}
-	return a, err
+	return
 }
 
 func (u *URLTest) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
@@ -125,8 +127,6 @@ func (u *URLTest) speedTest() {
 	if fast != nil {
 		u.fast = fast.(C.Proxy)
 	}
-
-	<-ctx.Done()
 }
 
 func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {

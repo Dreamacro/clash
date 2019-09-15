@@ -119,7 +119,7 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 
 	elm := picker.Wait()
 	if elm == nil {
-		render.Status(r, http.StatusRequestTimeout)
+		render.Status(r, http.StatusGatewayTimeout)
 		render.JSON(w, r, ErrRequestTimeout)
 		return
 	}

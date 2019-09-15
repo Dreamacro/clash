@@ -21,8 +21,11 @@ import (
 )
 
 var (
-	// DefaultResolver aim to resolve ip with host
+	// DefaultResolver aim to resolve ip
 	DefaultResolver *Resolver
+
+	// DefaultHosts aim to resolve hosts
+	DefaultHosts = trie.New()
 )
 
 var (
@@ -43,24 +46,19 @@ type result struct {
 }
 
 type Resolver struct {
-	ipv6     bool
-	mapping  bool
-	fakeip   bool
-	hosts    *trie.Trie
-	pool     *fakeip.Pool
-	fallback []resolver
-	main     []resolver
-	group    singleflight.Group
-	cache    *cache.Cache
+	ipv6            bool
+	mapping         bool
+	fakeip          bool
+	pool            *fakeip.Pool
+	main            []resolver
+	fallback        []resolver
+	fallbackFilters []fallbackFilter
+	group           singleflight.Group
+	cache           *cache.Cache
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeAAAA
 func (r *Resolver) ResolveIP(host string) (ip net.IP, err error) {
-	ip = net.ParseIP(host)
-	if ip != nil {
-		return ip, nil
-	}
-
 	ch := make(chan net.IP)
 	go func() {
 		defer close(ch)
@@ -89,26 +87,21 @@ func (r *Resolver) ResolveIP(host string) (ip net.IP, err error) {
 
 // ResolveIPv4 request with TypeA
 func (r *Resolver) ResolveIPv4(host string) (ip net.IP, err error) {
-	ip = net.ParseIP(host)
-	if ip != nil {
-		return ip, nil
+	return r.resolveIP(host, D.TypeA)
+}
+
+// ResolveIPv6 request with TypeAAAA
+func (r *Resolver) ResolveIPv6(host string) (ip net.IP, err error) {
+	return r.resolveIP(host, D.TypeAAAA)
+}
+
+func (r *Resolver) shouldFallback(ip net.IP) bool {
+	for _, filter := range r.fallbackFilters {
+		if filter.Match(ip) {
+			return true
+		}
 	}
-
-	query := &D.Msg{}
-	query.SetQuestion(D.Fqdn(host), D.TypeA)
-
-	msg, err := r.Exchange(query)
-	if err != nil {
-		return nil, err
-	}
-
-	ips := r.msgToIP(msg)
-	if len(ips) == 0 {
-		return nil, errIPNotFound
-	}
-
-	ip = ips[0]
-	return
+	return false
 }
 
 // Exchange a batch of dns request, and it use cache
@@ -212,13 +205,8 @@ func (r *Resolver) fallbackExchange(m *D.Msg) (msg *D.Msg, err error) {
 	fallbackMsg := r.asyncExchange(r.fallback, m)
 	res := <-msgCh
 	if res.Error == nil {
-		if mmdb == nil {
-			return nil, errors.New("GeoIP cannot use")
-		}
-
 		if ips := r.msgToIP(res.Msg); len(ips) != 0 {
-			if record, _ := mmdb.Country(ips[0]); record.Country.IsoCode == "CN" || record.Country.IsoCode == "" {
-				// release channel
+			if r.shouldFallback(ips[0]) {
 				go func() { <-fallbackMsg }()
 				msg = res.Msg
 				return msg, err
@@ -232,6 +220,17 @@ func (r *Resolver) fallbackExchange(m *D.Msg) (msg *D.Msg, err error) {
 }
 
 func (r *Resolver) resolveIP(host string, dnsType uint16) (ip net.IP, err error) {
+	ip = net.ParseIP(host)
+	if dnsType == D.TypeAAAA {
+		if ip6 := ip.To16(); ip6 != nil {
+			return ip6, nil
+		}
+	} else {
+		if ip4 := ip.To4(); ip4 != nil {
+			return ip4, nil
+		}
+	}
+
 	query := &D.Msg{}
 	query.SetQuestion(D.Fqdn(host), dnsType)
 
@@ -278,30 +277,45 @@ type NameServer struct {
 	Addr string
 }
 
+type FallbackFilter struct {
+	GeoIP  bool
+	IPCIDR []*net.IPNet
+}
+
 type Config struct {
 	Main, Fallback []NameServer
 	IPv6           bool
 	EnhancedMode   EnhancedMode
-	Hosts          *trie.Trie
+	FallbackFilter FallbackFilter
 	Pool           *fakeip.Pool
 }
 
 func New(config Config) *Resolver {
-	once.Do(func() {
-		mmdb, _ = geoip2.Open(C.Path.MMDB())
-	})
-
 	r := &Resolver{
 		ipv6:    config.IPv6,
 		main:    transform(config.Main),
 		cache:   cache.New(time.Second * 60),
 		mapping: config.EnhancedMode == MAPPING,
 		fakeip:  config.EnhancedMode == FAKEIP,
-		hosts:   config.Hosts,
 		pool:    config.Pool,
 	}
+
 	if len(config.Fallback) != 0 {
 		r.fallback = transform(config.Fallback)
 	}
+
+	fallbackFilters := []fallbackFilter{}
+	if config.FallbackFilter.GeoIP {
+		once.Do(func() {
+			mmdb, _ = geoip2.Open(C.Path.MMDB())
+		})
+
+		fallbackFilters = append(fallbackFilters, &geoipFilter{})
+	}
+	for _, ipnet := range config.FallbackFilter.IPCIDR {
+		fallbackFilters = append(fallbackFilters, &ipnetFilter{ipnet: ipnet})
+	}
+	r.fallbackFilters = fallbackFilters
+
 	return r
 }

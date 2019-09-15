@@ -36,7 +36,7 @@ go get -u -v github.com/Dreamacro/clash
 
 Pre-built binaries are available: [release](https://github.com/Dreamacro/clash/releases)
 
-Requires Go >= 1.12.
+Requires Go >= 1.13.
 
 Checkout Clash version:
 
@@ -120,24 +120,28 @@ experimental:
 #  - "user1:pass1"
 #  - "user2:pass2"
 
+# # experimental hosts, support wildcard (e.g. *.clash.dev Even *.foo.*.example.com)
+# # static domain has a higher priority than wildcard domain (foo.example.com > *.example.com)
+# hosts:
+#   '*.clash.dev': 127.0.0.1
+#   'alpha.clash.dev': '::1'
+
 # dns:
   # enable: true # set true to enable dns (default is false)
   # ipv6: false # default is false
   # listen: 0.0.0.0:53
   # enhanced-mode: redir-host # or fake-ip
   # # fake-ip-range: 198.18.0.1/16 # if you don't know what it is, don't change it
-  # # experimental hosts, support wildcard (e.g. *.clash.dev Even *.foo.*.example.com)
-  # # static domain has a higher priority than wildcard domain (foo.example.com > *.example.com)
-  # # NOTE: hosts don't work with `fake-ip`
-  # hosts:
-  #   '*.clash.dev': 127.0.0.1
-  #   'alpha.clash.dev': '::1'
   # nameserver:
   #   - 114.114.114.114
   #   - tls://dns.rubyfish.cn:853 # dns over tls
   #   - https://1.1.1.1/dns-query # dns over https
   # fallback: # concurrent request with nameserver, fallback used when GEOIP country isn't CN
   #   - tcp://1.1.1.1
+  # fallback-filter:
+  #   geoip: true # default
+  #   ipcidr: # ips in these subnets will be considered polluted
+  #     - 240.0.0.0/4
 
 Proxy:
 
