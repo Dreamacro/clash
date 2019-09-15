@@ -89,6 +89,7 @@ func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Ad
 func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, timeout time.Duration) {
 	buf := pool.BufPool.Get().([]byte)
 	defer pool.BufPool.Put(buf[:cap(buf)])
+	defer pc.Close()
 
 	for {
 		pc.SetReadDeadline(time.Now().Add(timeout))

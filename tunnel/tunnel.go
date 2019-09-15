@@ -27,7 +27,7 @@ var (
 type Tunnel struct {
 	tcpQueue  *channels.InfiniteChannel
 	udpQueue  *channels.InfiniteChannel
-	natQueue  *nat.Queue
+	natTable  *nat.Table
 	rules     []C.Rule
 	proxies   map[string]C.Proxy
 	configMux *sync.RWMutex
@@ -99,16 +99,14 @@ func (t *Tunnel) SetMode(mode Mode) {
 func (t *Tunnel) process() {
 	go func() {
 		queue := t.udpQueue.Out()
-		for {
-			elm := <-queue
+		for elm := range queue {
 			conn := elm.(C.ServerAdapter)
 			t.handleUDPConn(conn)
 		}
 	}()
 
 	queue := t.tcpQueue.Out()
-	for {
-		elm := <-queue
+	for elm := range queue {
 		conn := elm.(C.ServerAdapter)
 		go t.handleTCPConn(conn)
 	}
@@ -164,63 +162,33 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 	dst := metadata.RemoteAddress()
 	key := src + "-" + dst
 
-	var first bool
-	var queue *channels.InfiniteChannel
-	// Get from NAT Queue
-	queue, first = t.natQueue.Get(key)
-	if !first {
-		defer func() {
-			// in case channel is closed
-			recover()
-		}()
-
-		// add UDP conn to queue
-		queue.In() <- localConn
-		return
-	}
-
-	go func() {
-		var err error
-		defer func() {
-			if err != nil {
-				// delete when error occurred
-				if ch := t.natQueue.Del(key); ch != nil {
-					ch.Close()
-				}
-			}
-		}()
-
+	pc, addr := t.natTable.Get(key)
+	if pc == nil {
 		proxy, rule, err := t.resolveMetadata(metadata)
 		if err != nil {
-			log.Warnln("Parse metadata failed: %v", err)
+			log.Warnln("Parse metadata failed: %s", err.Error())
 			return
 		}
 
-		pc, addr, err := proxy.DialUDP(metadata)
+		rawPc, nAddr, err := proxy.DialUDP(metadata)
 		if err != nil {
 			log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
 			return
 		}
+		pc = rawPc
+		addr = nAddr
 
 		if rule != nil {
-			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), pc.Chains().String())
+			log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
 		} else {
 			log.Infoln("%s --> %v doesn't match any rule using DIRECT", metadata.SrcIP.String(), metadata.String())
 		}
 
-		queue.In() <- localConn
+		t.natTable.Set(key, pc, addr)
+		go t.handleUDPToLocal(localConn, pc, udpTimeout)
+	}
 
-		t.natQueue.Add(key, func() {
-			defer pc.Close()
-			t.handleUDPToLocal(localConn, pc, udpTimeout)
-		})
-
-		// read data from queue and send them to remote
-		for elm := range queue.Out() {
-			conn := elm.(C.ServerAdapter)
-			t.handleUDPToRemote(conn, pc, addr)
-		}
-	}()
+	t.handleUDPToRemote(localConn, pc, addr)
 }
 
 func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
@@ -310,7 +278,7 @@ func newTunnel() *Tunnel {
 	return &Tunnel{
 		tcpQueue:  channels.NewInfiniteChannel(),
 		udpQueue:  channels.NewInfiniteChannel(),
-		natQueue:  nat.NewQueue(),
+		natTable:  nat.New(),
 		proxies:   make(map[string]C.Proxy),
 		configMux: &sync.RWMutex{},
 		traffic:   C.NewTraffic(time.Second),

@@ -167,8 +167,10 @@ func (uc *socksUDPConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	if err != nil {
 		return 0, nil, err
 	}
+	// due to DecodeUDPPacket is mutable, record addr length
+	addrLength := len(addr)
 	copy(b, payload)
-	return n - len(addr) - 3, a, nil
+	return n - addrLength - 3, a, nil
 }
 
 func (uc *socksUDPConn) Close() error {

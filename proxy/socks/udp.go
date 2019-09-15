@@ -24,11 +24,11 @@ func NewSocksUDPProxy(addr string) (*SockUDPListener, error) {
 
 	sl := &SockUDPListener{l, addr, false}
 	go func() {
-		buf := pool.BufPool.Get().([]byte)
-		defer pool.BufPool.Put(buf[:cap(buf)])
 		for {
+			buf := pool.BufPool.Get().([]byte)
 			n, remoteAddr, err := l.ReadFrom(buf)
 			if err != nil {
+				pool.BufPool.Put(buf[:cap(buf)])
 				if sl.closed {
 					break
 				}
@@ -53,7 +53,8 @@ func (l *SockUDPListener) Address() string {
 func handleSocksUDP(pc net.PacketConn, buf []byte, addr net.Addr) {
 	target, payload, err := socks5.DecodeUDPPacket(buf)
 	if err != nil {
-		// Unresolved UDP packet, do nothing
+		// Unresolved UDP packet, return buffer to the pool
+		pool.BufPool.Put(buf[:cap(buf)])
 		return
 	}
 	conn := &fakeConn{
@@ -61,6 +62,7 @@ func handleSocksUDP(pc net.PacketConn, buf []byte, addr net.Addr) {
 		remoteAddr: addr,
 		targetAddr: target,
 		buffer:     bytes.NewBuffer(payload),
+		bufRef:     buf,
 	}
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
 }
