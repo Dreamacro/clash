@@ -176,12 +176,16 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 			proxy, rule, err := t.resolveMetadata(metadata)
 			if err != nil {
 				log.Warnln("Parse metadata failed: %s", err.Error())
+				t.natTable.Delete(lockKey)
+				wg.Done()
 				return
 			}
 
 			rawPc, nAddr, err := proxy.DialUDP(metadata)
 			if err != nil {
 				log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
+				t.natTable.Delete(lockKey)
+				wg.Done()
 				return
 			}
 			pc = rawPc
@@ -200,7 +204,10 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 		}
 
 		wg.Wait()
-		t.handleUDPToRemote(localConn, pc, addr)
+		pc, addr := t.natTable.Get(key)
+		if pc != nil {
+			t.handleUDPToRemote(localConn, pc, addr)
+		}
 	}()
 }
 
