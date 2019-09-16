@@ -31,6 +31,15 @@ func (t *Table) Get(key string) (net.PacketConn, net.Addr) {
 	return elm.RemoteConn, elm.RemoteAddr
 }
 
+func (t *Table) GetOrCreateLock(key string) (*sync.WaitGroup, bool) {
+	item, loaded := t.mapping.LoadOrStore(key, &sync.WaitGroup{})
+	return item.(*sync.WaitGroup), loaded
+}
+
+func (t *Table) Delete(key string) {
+	t.mapping.Delete(key)
+}
+
 // New return *Cache
 func New() *Table {
 	return &Table{}
