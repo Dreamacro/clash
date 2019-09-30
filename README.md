@@ -20,40 +20,39 @@
 
 ## Features
 
-- HTTP/HTTPS and SOCKS protocol
-- Surge like configuration
+- HTTP, HTTPS and SOCKS protocol
+- Surge-like configuration format
 - GeoIP rule support
-- Support Vmess/Shadowsocks/Socks5
-- Support for Netfilter TCP redirect
+- Supports Vmess, Shadowsocks and SOCKS5
+- Supports Netfilter TCP redirecting
+- Comprehensive API
 
 ## Install
 
-You can build from source:
+Clash Requires Go >= 1.12. You can build it from source:
 
 ```sh
-go get -u -v github.com/Dreamacro/clash
+$ go get -u -v github.com/Dreamacro/clash
 ```
 
-Pre-built binaries are available: [release](https://github.com/Dreamacro/clash/releases)
+Pre-built binaries are available here: [release](https://github.com/Dreamacro/clash/releases)
 
-Requires Go >= 1.12.
-
-Checkout Clash version:
+Check Clash version with:
 
 ```sh
-clash -v
+$ clash -v
 ```
 
 ## Daemon
 
-Unfortunately, there is no native elegant way to implement golang's daemon.
+Unfortunately, there is no native and elegant way to implement daemons on Golang.
 
-So we can use third-party daemon tools like pm2, supervisor, and so on.
+So we can use third-party daemon tools like PM2, Supervisor or the like.
 
 In the case of [pm2](https://github.com/Unitech/pm2), we can start the daemon this way:
 
 ```sh
-pm2 start clash
+$ pm2 start clash
 ```
 
 If you have Docker installed, you can run clash directly using `docker-compose`.
@@ -62,19 +61,19 @@ If you have Docker installed, you can run clash directly using `docker-compose`.
 
 ## Config
 
-The default configuration directory is `$HOME/.config/clash`
+The default configuration directory is `$HOME/.config/clash`.
 
-The name of the configuration file is `config.yaml`
+The name of the configuration file is `config.yaml`.
 
-If you want to use another directory, you can use `-d` to control the configuration directory
+If you want to use another directory, use `-d` to control the configuration directory.
 
-For example, you can use the current directory as the configuration directory
+For example, you can use the current directory as the configuration directory:
 
 ```sh
-clash -d .
+$ clash -d .
 ```
 
-Below is a simple demo configuration file:
+Below is an example configuration file:
 
 ```yml
 # port of HTTP
@@ -95,7 +94,7 @@ mode: Rule
 # info / warning / error / debug / silent
 log-level: info
 
-# A RESTful API for clash
+# RESTful API for clash
 external-controller: 127.0.0.1:9090
 
 # you can put the static web resource (such as clash-dashboard) to a directory, and clash would serve in `${API}/ui`
