@@ -29,7 +29,7 @@ func WithContext(ctx context.Context) (*Picker, context.Context) {
 // but it doesn't cancel when first element return.
 func WithTimeout(ctx context.Context, timeout time.Duration) (*Picker, context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
-	return &Picker{}, ctx, cancel
+	return &Picker{cancel: cancel}, ctx, cancel
 }
 
 // Wait blocks until all function calls from the Go method have returned,
