@@ -18,5 +18,9 @@ vendor
 # GoLand
 .idea/*
 
+# Gomobile
+*.aar
+*.jar
+
 # macOS file
 .DS_Store
