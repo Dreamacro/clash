@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -71,7 +72,7 @@ func ReCreateHTTP(port int) error {
 	return nil
 }
 
-func ReCreateSocks(port int) error {
+func ReCreateSocks(ctx context.Context, port int) error {
 	addr := genAddr(bindAddress, port, allowLan)
 
 	if socksListener != nil {
@@ -91,11 +92,18 @@ func ReCreateSocks(port int) error {
 	if err != nil {
 		return err
 	}
+	go func() {
+		select {
+		case <-ctx.Done():
+			socksListener.Close()
+			socksListener = nil
+		}
+	}()
 
-	return reCreateSocksUDP(addr)
+	return reCreateSocksUDP(ctx, addr)
 }
 
-func reCreateSocksUDP(addr string) error {
+func reCreateSocksUDP(ctx context.Context, addr string) error {
 	if socksUDPListener != nil {
 		if socksUDPListener.Address() == addr {
 			return nil
@@ -109,6 +117,14 @@ func reCreateSocksUDP(addr string) error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			socksUDPListener.Close()
+			socksUDPListener = nil
+		}
+	}()
 
 	return nil
 }

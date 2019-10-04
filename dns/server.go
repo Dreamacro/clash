@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"net"
 
 	D "github.com/miekg/dns"
@@ -31,7 +32,7 @@ func (s *Server) setHandler(handler handler) {
 	s.handler = handler
 }
 
-func ReCreateServer(addr string, resolver *Resolver) error {
+func ReCreateServer(ctx context.Context, addr string, resolver *Resolver) error {
 	if addr == address && resolver != nil {
 		handler := newHandler(resolver)
 		server.setHandler(handler)
@@ -65,6 +66,13 @@ func ReCreateServer(addr string, resolver *Resolver) error {
 
 	go func() {
 		server.ActivateAndServe()
+	}()
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Shutdown()
+			address = ""
+		}
 	}()
 	return nil
 }

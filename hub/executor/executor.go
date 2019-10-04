@@ -1,6 +1,8 @@
 package executor
 
 import (
+	"context"
+
 	"github.com/Dreamacro/clash/component/auth"
 	trie "github.com/Dreamacro/clash/component/domain-trie"
 	"github.com/Dreamacro/clash/config"
@@ -23,14 +25,14 @@ func ParseWithPath(path string) (*config.Config, error) {
 }
 
 // ApplyConfig dispatch configure to all parts
-func ApplyConfig(cfg *config.Config, force bool) {
+func ApplyConfig(ctx context.Context, cfg *config.Config, force bool) {
 	updateUsers(cfg.Users)
 	if force {
-		updateGeneral(cfg.General)
+		updateGeneral(ctx, cfg.General)
 	}
-	updateProxies(cfg.Proxies)
+	updateProxies(ctx, cfg.Proxies)
 	updateRules(cfg.Rules)
-	updateDNS(cfg.DNS)
+	updateDNS(ctx, cfg.DNS)
 	updateHosts(cfg.Hosts)
 	updateExperimental(cfg.Experimental)
 }
@@ -60,10 +62,10 @@ func updateExperimental(c *config.Experimental) {
 	T.Instance().UpdateExperimental(c.IgnoreResolveFail)
 }
 
-func updateDNS(c *config.DNS) {
+func updateDNS(ctx context.Context, c *config.DNS) {
 	if c.Enable == false {
 		dns.DefaultResolver = nil
-		dns.ReCreateServer("", nil)
+		dns.ReCreateServer(ctx, "", nil)
 		return
 	}
 	r := dns.New(dns.Config{
@@ -78,7 +80,7 @@ func updateDNS(c *config.DNS) {
 		},
 	})
 	dns.DefaultResolver = r
-	if err := dns.ReCreateServer(c.Listen, r); err != nil {
+	if err := dns.ReCreateServer(ctx, c.Listen, r); err != nil {
 		log.Errorln("Start DNS server error: %s", err.Error())
 		return
 	}
@@ -92,23 +94,32 @@ func updateHosts(tree *trie.Trie) {
 	dns.DefaultHosts = tree
 }
 
-func updateProxies(proxies map[string]C.Proxy) {
+func shutdownProxies() {
 	tunnel := T.Instance()
 	oldProxies := tunnel.Proxies()
-
 	// close proxy group goroutine
 	for _, proxy := range oldProxies {
 		proxy.Destroy()
 	}
+}
 
+func updateProxies(ctx context.Context, proxies map[string]C.Proxy) {
+	shutdownProxies()
+	tunnel := T.Instance()
 	tunnel.UpdateProxies(proxies)
+	go func() {
+		select {
+		case <-ctx.Done():
+			shutdownProxies()
+		}
+	}()
 }
 
 func updateRules(rules []C.Rule) {
 	T.Instance().UpdateRules(rules)
 }
 
-func updateGeneral(general *config.General) {
+func updateGeneral(ctx context.Context, general *config.General) {
 	log.SetLevel(general.LogLevel)
 	T.Instance().SetMode(general.Mode)
 
@@ -122,7 +133,7 @@ func updateGeneral(general *config.General) {
 		log.Errorln("Start HTTP server error: %s", err.Error())
 	}
 
-	if err := P.ReCreateSocks(general.SocksPort); err != nil {
+	if err := P.ReCreateSocks(ctx, general.SocksPort); err != nil {
 		log.Errorln("Start SOCKS5 server error: %s", err.Error())
 	}
 
