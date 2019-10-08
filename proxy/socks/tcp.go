@@ -1,6 +1,8 @@
 package socks
 
 import (
+	"io"
+	"io/ioutil"
 	"net"
 
 	adapters "github.com/Dreamacro/clash/adapters/inbound"
@@ -62,7 +64,8 @@ func handleSocks(conn net.Conn) {
 	}
 	conn.(*net.TCPConn).SetKeepAlive(true)
 	if command == socks5.CmdUDPAssociate {
-		tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.UDP))
+		defer conn.Close()
+		io.Copy(ioutil.Discard, conn)
 		return
 	}
 	tun.Add(adapters.NewSocket(target, conn, C.SOCKS, C.TCP))

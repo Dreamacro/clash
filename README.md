@@ -29,7 +29,7 @@
 
 ## Install
 
-Clash Requires Go >= 1.12. You can build it from source:
+Clash Requires Go >= 1.13. You can build it from source:
 
 ```sh
 $ go get -u -v github.com/Dreamacro/clash
@@ -87,6 +87,12 @@ socks-port: 7891
 
 allow-lan: false
 
+# Only applicable when setting allow-lan to true
+# "*": bind all IP addresses
+# 192.168.122.11: bind a single IPv4 address
+# "[aaaa::a8aa:ff:fe09:57d8]": bind a single IPv6 address
+bind-address: "*"
+
 # Rule / Global/ Direct (default is Rule)
 mode: Rule
 
@@ -113,6 +119,12 @@ experimental:
 #  - "user1:pass1"
 #  - "user2:pass2"
 
+# # experimental hosts, support wildcard (e.g. *.clash.dev Even *.foo.*.example.com)
+# # static domain has a higher priority than wildcard domain (foo.example.com > *.example.com)
+# hosts:
+#   '*.clash.dev': 127.0.0.1
+#   'alpha.clash.dev': '::1'
+
 # dns:
   # enable: true # set true to enable dns (default is false)
   # ipv6: false # default is false
@@ -125,21 +137,28 @@ experimental:
   #   - https://1.1.1.1/dns-query # dns over https
   # fallback: # concurrent request with nameserver, fallback used when GEOIP country isn't CN
   #   - tcp://1.1.1.1
+  # fallback-filter:
+  #   geoip: true # default
+  #   ipcidr: # ips in these subnets will be considered polluted
+  #     - 240.0.0.0/4
 
 Proxy:
 
 # shadowsocks
-# The types of cipher are consistent with go-shadowsocks2
-# support AEAD_AES_128_GCM AEAD_AES_192_GCM AEAD_AES_256_GCM AEAD_CHACHA20_POLY1305 AES-128-CTR AES-192-CTR AES-256-CTR AES-128-CFB AES-192-CFB AES-256-CFB CHACHA20-IETF XCHACHA20
-# In addition to what go-shadowsocks2 supports, it also supports chacha20 rc4-md5 xchacha20-ietf-poly1305
-- { name: "ss1", type: ss, server: server, port: 443, cipher: AEAD_CHACHA20_POLY1305, password: "password", udp: true }
+# The supported ciphers(encrypt methods):
+#   aes-128-gcm aes-192-gcm aes-256-gcm
+#   aes-128-cfb aes-192-cfb aes-256-cfb
+#   aes-128-ctr aes-192-ctr aes-256-ctr
+#   rc4-md5 chacha20 chacha20-ietf xchacha20
+#   chacha20-ietf-poly1305 xchacha20-ietf-poly1305
+- { name: "ss1", type: ss, server: server, port: 443, cipher: chacha20-ietf-poly1305, password: "password", udp: true }
 
 # old obfs configuration remove after prerelease
 - name: "ss2"
   type: ss
   server: server
   port: 443
-  cipher: AEAD_CHACHA20_POLY1305
+  cipher: chacha20-ietf-poly1305
   password: "password"
   plugin: obfs
   plugin-opts:
@@ -150,7 +169,7 @@ Proxy:
   type: ss
   server: server
   port: 443
-  cipher: AEAD_CHACHA20_POLY1305
+  cipher: chacha20-ietf-poly1305
   password: "password"
   plugin: v2ray-plugin
   plugin-opts:
@@ -159,6 +178,7 @@ Proxy:
     # skip-cert-verify: true
     # host: bing.com
     # path: "/"
+    # mux: true
     # headers:
     #   custom: value
 

@@ -62,6 +62,11 @@ func Subscribe() observable.Subscription {
 	return sub
 }
 
+func UnSubscribe(sub observable.Subscription) {
+	source.UnSubscribe(sub)
+	return
+}
+
 func Level() LogLevel {
 	return level
 }

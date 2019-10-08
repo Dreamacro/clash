@@ -2,6 +2,7 @@ package executor
 
 import (
 	"github.com/Dreamacro/clash/component/auth"
+	trie "github.com/Dreamacro/clash/component/domain-trie"
 	"github.com/Dreamacro/clash/config"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
@@ -30,6 +31,7 @@ func ApplyConfig(cfg *config.Config, force bool) {
 	updateProxies(cfg.Proxies)
 	updateRules(cfg.Rules)
 	updateDNS(cfg.DNS)
+	updateHosts(cfg.Hosts)
 	updateExperimental(cfg.Experimental)
 }
 
@@ -46,6 +48,7 @@ func GetGeneral() *config.General {
 		RedirPort:      ports.RedirPort,
 		Authentication: authenticator,
 		AllowLan:       P.AllowLan(),
+		BindAddress:    P.BindAddress(),
 		Mode:           T.Instance().Mode(),
 		LogLevel:       log.Level(),
 	}
@@ -69,6 +72,10 @@ func updateDNS(c *config.DNS) {
 		IPv6:         c.IPv6,
 		EnhancedMode: c.EnhancedMode,
 		Pool:         c.FakeIPRange,
+		FallbackFilter: dns.FallbackFilter{
+			GeoIP:  c.FallbackFilter.GeoIP,
+			IPCIDR: c.FallbackFilter.IPCIDR,
+		},
 	})
 	dns.DefaultResolver = r
 	if err := dns.ReCreateServer(c.Listen, r); err != nil {
@@ -79,6 +86,10 @@ func updateDNS(c *config.DNS) {
 	if c.Listen != "" {
 		log.Infoln("DNS server listening at: %s", c.Listen)
 	}
+}
+
+func updateHosts(tree *trie.Trie) {
+	dns.DefaultHosts = tree
 }
 
 func updateProxies(proxies map[string]C.Proxy) {
@@ -102,8 +113,10 @@ func updateGeneral(general *config.General) {
 	T.Instance().SetMode(general.Mode)
 
 	allowLan := general.AllowLan
-
 	P.SetAllowLan(allowLan)
+
+	bindAddress := general.BindAddress
+	P.SetBindAddress(bindAddress)
 
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())

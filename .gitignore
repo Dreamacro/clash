@@ -14,3 +14,9 @@ bin/*
 
 # dep
 vendor
+
+# GoLand
+.idea/*
+
+# macOS file
+.DS_Store

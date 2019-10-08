@@ -20,12 +20,20 @@ type SelectorOption struct {
 	Proxies []string `proxy:"proxies"`
 }
 
-func (s *Selector) Dial(metadata *C.Metadata) (net.Conn, error) {
-	return s.selected.Dial(metadata)
+func (s *Selector) Dial(metadata *C.Metadata) (C.Conn, error) {
+	c, err := s.selected.Dial(metadata)
+	if err == nil {
+		c.AppendToChains(s)
+	}
+	return c, err
 }
 
-func (s *Selector) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
-	return s.selected.DialUDP(metadata)
+func (s *Selector) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
+	pc, addr, err := s.selected.DialUDP(metadata)
+	if err == nil {
+		pc.AppendToChains(s)
+	}
+	return pc, addr, err
 }
 
 func (s *Selector) SupportUDP() bool {

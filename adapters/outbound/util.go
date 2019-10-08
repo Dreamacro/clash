@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -104,12 +105,80 @@ func dialTimeout(network, address string, timeout time.Duration) (net.Conn, erro
 		return nil, err
 	}
 
-	ip, err := dns.ResolveIP(host)
-	if err != nil {
-		return nil, err
+	dialer := net.Dialer{}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	returned := make(chan struct{})
+	defer close(returned)
+
+	type dialResult struct {
+		net.Conn
+		error
+		resolved bool
+		ipv6     bool
+		done     bool
+	}
+	results := make(chan dialResult)
+	var primary, fallback dialResult
+
+	startRacer := func(ctx context.Context, host string, ipv6 bool) {
+		result := dialResult{ipv6: ipv6, done: true}
+		defer func() {
+			select {
+			case results <- result:
+			case <-returned:
+				if result.Conn != nil {
+					result.Conn.Close()
+				}
+			}
+		}()
+
+		var ip net.IP
+		if ipv6 {
+			ip, result.error = dns.ResolveIPv6(host)
+		} else {
+			ip, result.error = dns.ResolveIPv4(host)
+		}
+		if result.error != nil {
+			return
+		}
+		result.resolved = true
+
+		if ipv6 {
+			result.Conn, result.error = dialer.DialContext(ctx, "tcp6", net.JoinHostPort(ip.String(), port))
+		} else {
+			result.Conn, result.error = dialer.DialContext(ctx, "tcp4", net.JoinHostPort(ip.String(), port))
+		}
 	}
 
-	return net.DialTimeout(network, net.JoinHostPort(ip.String(), port), timeout)
+	go startRacer(ctx, host, false)
+	go startRacer(ctx, host, true)
+
+	for {
+		select {
+		case res := <-results:
+			if res.error == nil {
+				return res.Conn, nil
+			}
+
+			if !res.ipv6 {
+				primary = res
+			} else {
+				fallback = res
+			}
+
+			if primary.done && fallback.done {
+				if primary.resolved {
+					return nil, primary.error
+				} else if fallback.resolved {
+					return nil, fallback.error
+				} else {
+					return nil, primary.error
+				}
+			}
+		}
+	}
 }
 
 func resolveUDPAddr(network, address string) (*net.UDPAddr, error) {

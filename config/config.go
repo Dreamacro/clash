@@ -12,6 +12,7 @@ import (
 	adapters "github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/common/structure"
 	"github.com/Dreamacro/clash/component/auth"
+	trie "github.com/Dreamacro/clash/component/domain-trie"
 	"github.com/Dreamacro/clash/component/fakeip"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
@@ -29,6 +30,7 @@ type General struct {
 	RedirPort          int          `json:"redir-port"`
 	Authentication     []string     `json:"authentication"`
 	AllowLan           bool         `json:"allow-lan"`
+	BindAddress        string       `json:"bind-address"`
 	Mode               T.Mode       `json:"mode"`
 	LogLevel           log.LogLevel `json:"log-level"`
 	ExternalController string       `json:"-"`
@@ -38,13 +40,20 @@ type General struct {
 
 // DNS config
 type DNS struct {
-	Enable       bool             `yaml:"enable"`
-	IPv6         bool             `yaml:"ipv6"`
-	NameServer   []dns.NameServer `yaml:"nameserver"`
-	Fallback     []dns.NameServer `yaml:"fallback"`
-	Listen       string           `yaml:"listen"`
-	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
-	FakeIPRange  *fakeip.Pool
+	Enable         bool             `yaml:"enable"`
+	IPv6           bool             `yaml:"ipv6"`
+	NameServer     []dns.NameServer `yaml:"nameserver"`
+	Fallback       []dns.NameServer `yaml:"fallback"`
+	FallbackFilter FallbackFilter   `yaml:"fallback-filter"`
+	Listen         string           `yaml:"listen"`
+	EnhancedMode   dns.EnhancedMode `yaml:"enhanced-mode"`
+	FakeIPRange    *fakeip.Pool
+}
+
+// FallbackFilter config
+type FallbackFilter struct {
+	GeoIP  bool         `yaml:"geoip"`
+	IPCIDR []*net.IPNet `yaml:"ipcidr"`
 }
 
 // Experimental config
@@ -57,19 +66,26 @@ type Config struct {
 	General      *General
 	DNS          *DNS
 	Experimental *Experimental
+	Hosts        *trie.Trie
 	Rules        []C.Rule
 	Users        []auth.AuthUser
 	Proxies      map[string]C.Proxy
 }
 
 type rawDNS struct {
-	Enable       bool             `yaml:"enable"`
-	IPv6         bool             `yaml:"ipv6"`
-	NameServer   []string         `yaml:"nameserver"`
-	Fallback     []string         `yaml:"fallback"`
-	Listen       string           `yaml:"listen"`
-	EnhancedMode dns.EnhancedMode `yaml:"enhanced-mode"`
-	FakeIPRange  string           `yaml:"fake-ip-range"`
+	Enable         bool              `yaml:"enable"`
+	IPv6           bool              `yaml:"ipv6"`
+	NameServer     []string          `yaml:"nameserver"`
+	Fallback       []string          `yaml:"fallback"`
+	FallbackFilter rawFallbackFilter `yaml:"fallback-filter"`
+	Listen         string            `yaml:"listen"`
+	EnhancedMode   dns.EnhancedMode  `yaml:"enhanced-mode"`
+	FakeIPRange    string            `yaml:"fake-ip-range"`
+}
+
+type rawFallbackFilter struct {
+	GeoIP  bool     `yaml:"geoip"`
+	IPCIDR []string `yaml:"ipcidr"`
 }
 
 type rawConfig struct {
@@ -78,12 +94,14 @@ type rawConfig struct {
 	RedirPort          int          `yaml:"redir-port"`
 	Authentication     []string     `yaml:"authentication"`
 	AllowLan           bool         `yaml:"allow-lan"`
+	BindAddress        string       `yaml:"bind-address"`
 	Mode               T.Mode       `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
 	ExternalController string       `yaml:"external-controller"`
 	ExternalUI         string       `yaml:"external-ui"`
 	Secret             string       `yaml:"secret"`
 
+	Hosts        map[string]string        `yaml:"hosts"`
 	DNS          rawDNS                   `yaml:"dns"`
 	Experimental Experimental             `yaml:"experimental"`
 	Proxy        []map[string]interface{} `yaml:"Proxy"`
@@ -103,7 +121,11 @@ func readRawConfig(path string) ([]byte, error) {
 	}
 
 	path = path[:len(path)-5] + ".yml"
-	return ioutil.ReadFile(path)
+	if _, err = os.Stat(path); err == nil {
+		return ioutil.ReadFile(path)
+	}
+
+	return data, nil
 }
 
 func readConfig(path string) (*rawConfig, error) {
@@ -122,9 +144,11 @@ func readConfig(path string) (*rawConfig, error) {
 	// config with some default value
 	rawConfig := &rawConfig{
 		AllowLan:       false,
+		BindAddress:    "*",
 		Mode:           T.Rule,
 		Authentication: []string{},
 		LogLevel:       log.INFO,
+		Hosts:          map[string]string{},
 		Rule:           []string{},
 		Proxy:          []map[string]interface{}{},
 		ProxyGroup:     []map[string]interface{}{},
@@ -134,6 +158,10 @@ func readConfig(path string) (*rawConfig, error) {
 		DNS: rawDNS{
 			Enable:      false,
 			FakeIPRange: "198.18.0.1/16",
+			FallbackFilter: rawFallbackFilter{
+				GeoIP:  true,
+				IPCIDR: []string{},
+			},
 		},
 	}
 	err = yaml.Unmarshal([]byte(data), &rawConfig)
@@ -174,6 +202,12 @@ func Parse(path string) (*Config, error) {
 	}
 	config.DNS = dnsCfg
 
+	hosts, err := parseHosts(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+	config.Hosts = hosts
+
 	config.Users = parseAuthentication(rawCfg.Authentication)
 
 	return config, nil
@@ -184,6 +218,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
 	allowLan := cfg.AllowLan
+	bindAddress := cfg.BindAddress
 	externalController := cfg.ExternalController
 	externalUI := cfg.ExternalUI
 	secret := cfg.Secret
@@ -205,6 +240,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
 		AllowLan:           allowLan,
+		BindAddress:        bindAddress,
 		Mode:               mode,
 		LogLevel:           logLevel,
 		ExternalController: externalController,
@@ -279,12 +315,26 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 		proxyList = append(proxyList, proxy.Name())
 	}
 
-	// parse proxy group
+	// keep the origional order of ProxyGroups in config file
 	for idx, mapping := range groupsConfig {
-		groupType, existType := mapping["type"].(string)
 		groupName, existName := mapping["name"].(string)
-		if !existType && existName {
-			return nil, fmt.Errorf("ProxyGroup %d: missing type or name", idx)
+		if !existName {
+			return nil, fmt.Errorf("ProxyGroup %d: missing name", idx)
+		}
+		proxyList = append(proxyList, groupName)
+	}
+
+	// check if any loop exists and sort the ProxyGroups
+	if err := proxyGroupsDagSort(groupsConfig, decoder); err != nil {
+		return nil, err
+	}
+
+	// parse proxy group
+	for _, mapping := range groupsConfig {
+		groupType, existType := mapping["type"].(string)
+		groupName, _ := mapping["name"].(string)
+		if !existType {
+			return nil, fmt.Errorf("ProxyGroup %s: missing type", groupName)
 		}
 
 		if _, exist := proxies[groupName]; exist {
@@ -348,7 +398,6 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 			return nil, fmt.Errorf("Proxy %s: %s", groupName, err.Error())
 		}
 		proxies[groupName] = adapters.NewProxy(group)
-		proxyList = append(proxyList, groupName)
 	}
 
 	ps := []C.Proxy{}
@@ -434,6 +483,21 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 	return rules, nil
 }
 
+func parseHosts(cfg *rawConfig) (*trie.Trie, error) {
+	tree := trie.New()
+	if len(cfg.Hosts) != 0 {
+		for domain, ipStr := range cfg.Hosts {
+			ip := net.ParseIP(ipStr)
+			if ip == nil {
+				return nil, fmt.Errorf("%s is not a valid IP", ipStr)
+			}
+			tree.Insert(domain, ip)
+		}
+	}
+
+	return tree, nil
+}
+
 func hostWithDefaultPort(host string, defPort string) (string, error) {
 	if !strings.Contains(host, ":") {
 		host += ":"
@@ -498,6 +562,20 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	return nameservers, nil
 }
 
+func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
+	ipNets := []*net.IPNet{}
+
+	for idx, ip := range ips {
+		_, ipnet, err := net.ParseCIDR(ip)
+		if err != nil {
+			return nil, fmt.Errorf("DNS FallbackIP[%d] format error: %s", idx, err.Error())
+		}
+		ipNets = append(ipNets, ipnet)
+	}
+
+	return ipNets, nil
+}
+
 func parseDNS(cfg rawDNS) (*DNS, error) {
 	if cfg.Enable && len(cfg.NameServer) == 0 {
 		return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
@@ -508,6 +586,9 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 		Listen:       cfg.Listen,
 		IPv6:         cfg.IPv6,
 		EnhancedMode: cfg.EnhancedMode,
+		FallbackFilter: FallbackFilter{
+			IPCIDR: []*net.IPNet{},
+		},
 	}
 	var err error
 	if dnsCfg.NameServer, err = parseNameServer(cfg.NameServer); err != nil {
@@ -523,12 +604,17 @@ func parseDNS(cfg rawDNS) (*DNS, error) {
 		if err != nil {
 			return nil, err
 		}
-		pool, err := fakeip.New(ipnet)
+		pool, err := fakeip.New(ipnet, 1000)
 		if err != nil {
 			return nil, err
 		}
 
 		dnsCfg.FakeIPRange = pool
+	}
+
+	dnsCfg.FallbackFilter.GeoIP = cfg.FallbackFilter.GeoIP
+	if fallbackip, err := parseFallbackIPCIDR(cfg.FallbackFilter.IPCIDR); err == nil {
+		dnsCfg.FallbackFilter.IPCIDR = fallbackip
 	}
 
 	return dnsCfg, nil

@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -53,21 +54,34 @@ func jumpHash(key uint64, buckets int32) int32 {
 	return int32(b)
 }
 
-func (lb *LoadBalance) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (lb *LoadBalance) Dial(metadata *C.Metadata) (c C.Conn, err error) {
+	defer func() {
+		if err == nil {
+			c.AppendToChains(lb)
+		}
+	}()
+
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	buckets := int32(len(lb.proxies))
 	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {
 		idx := jumpHash(key, buckets)
 		proxy := lb.proxies[idx]
 		if proxy.Alive() {
-			return proxy.Dial(metadata)
+			c, err = proxy.Dial(metadata)
+			return
 		}
 	}
-
-	return lb.proxies[0].Dial(metadata)
+	c, err = lb.proxies[0].Dial(metadata)
+	return
 }
 
-func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (pc C.PacketConn, addr net.Addr, err error) {
+	defer func() {
+		if err == nil {
+			pc.AppendToChains(lb)
+		}
+	}()
+
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	buckets := int32(len(lb.proxies))
 	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {
@@ -95,7 +109,7 @@ func (lb *LoadBalance) validTest() {
 
 	for _, p := range lb.proxies {
 		go func(p C.Proxy) {
-			p.URLTest(lb.rawURL)
+			p.URLTest(context.Background(), lb.rawURL)
 			wg.Done()
 		}(p)
 	}

@@ -60,6 +60,6 @@ func (m Mode) String() string {
 	case Direct:
 		return "Direct"
 	default:
-		return "Unknow"
+		return "Unknown"
 	}
 }

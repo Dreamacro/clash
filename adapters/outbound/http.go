@@ -35,7 +35,7 @@ type HttpOption struct {
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
-func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (h *Http) Dial(metadata *C.Metadata) (C.Conn, error) {
 	c, err := dialTimeout("tcp", h.addr, tcpTimeout)
 	if err == nil && h.tls {
 		cc := tls.Client(c, h.tlsConfig)
@@ -51,7 +51,7 @@ func (h *Http) Dial(metadata *C.Metadata) (net.Conn, error) {
 		return nil, err
 	}
 
-	return c, nil
+	return newConn(c, h), nil
 }
 
 func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
@@ -81,16 +81,20 @@ func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 		return err
 	}
 
-	if resp.StatusCode == 200 {
+	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
-	if resp.StatusCode == 407 {
+	if resp.StatusCode == http.StatusProxyAuthRequired {
 		return errors.New("HTTP need auth")
 	}
 
-	if resp.StatusCode == 405 {
+	if resp.StatusCode == http.StatusMethodNotAllowed {
 		return errors.New("CONNECT method not allowed by proxy")
+	}
+
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return errors.New(resp.Status)
 	}
 	return fmt.Errorf("can not connect remote err code: %d", resp.StatusCode)
 }

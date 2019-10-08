@@ -34,16 +34,16 @@ func (q *Queue) Pop() interface{} {
 	return head
 }
 
-// First returns the head of items without deleting.
-func (q *Queue) First() interface{} {
+// Last returns the last of item.
+func (q *Queue) Last() interface{} {
 	if len(q.items) == 0 {
 		return nil
 	}
 
 	q.lock.RLock()
-	head := q.items[0]
+	last := q.items[len(q.items)-1]
 	q.lock.RUnlock()
-	return head
+	return last
 }
 
 // Copy get the copy of queue.

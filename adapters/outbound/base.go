@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net"
@@ -9,6 +10,10 @@ import (
 
 	"github.com/Dreamacro/clash/common/queue"
 	C "github.com/Dreamacro/clash/constant"
+)
+
+var (
+	defaultURLTestTimeout = time.Second * 5
 )
 
 type Base struct {
@@ -25,7 +30,7 @@ func (b *Base) Type() C.AdapterType {
 	return b.tp
 }
 
-func (b *Base) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (b *Base) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	return nil, nil, errors.New("no support")
 }
 
@@ -41,6 +46,40 @@ func (b *Base) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type conn struct {
+	net.Conn
+	chain C.Chain
+}
+
+func (c *conn) Chains() C.Chain {
+	return c.chain
+}
+
+func (c *conn) AppendToChains(a C.ProxyAdapter) {
+	c.chain = append(c.chain, a.Name())
+}
+
+func newConn(c net.Conn, a C.ProxyAdapter) C.Conn {
+	return &conn{c, []string{a.Name()}}
+}
+
+type packetConn struct {
+	net.PacketConn
+	chain C.Chain
+}
+
+func (c *packetConn) Chains() C.Chain {
+	return c.chain
+}
+
+func (c *packetConn) AppendToChains(a C.ProxyAdapter) {
+	c.chain = append(c.chain, a.Name())
+}
+
+func newPacketConn(c net.PacketConn, a C.ProxyAdapter) C.PacketConn {
+	return &packetConn{c, []string{a.Name()}}
+}
+
 type Proxy struct {
 	C.ProxyAdapter
 	history *queue.Queue
@@ -51,7 +90,7 @@ func (p *Proxy) Alive() bool {
 	return p.alive
 }
 
-func (p *Proxy) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
 	conn, err := p.ProxyAdapter.Dial(metadata)
 	if err != nil {
 		p.alive = false
@@ -68,18 +107,18 @@ func (p *Proxy) DelayHistory() []C.DelayHistory {
 	return histories
 }
 
-// LastDelay return last history record. if proxy is not alive, return the max value of int16.
+// LastDelay return last history record. if proxy is not alive, return the max value of uint16.
 func (p *Proxy) LastDelay() (delay uint16) {
 	var max uint16 = 0xffff
 	if !p.alive {
 		return max
 	}
 
-	head := p.history.First()
-	if head == nil {
+	last := p.history.Last()
+	if last == nil {
 		return max
 	}
-	history := head.(C.DelayHistory)
+	history := last.(C.DelayHistory)
 	if history.Delay == 0 {
 		return max
 	}
@@ -99,7 +138,7 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
 }
 
 // URLTest get the delay for the specified URL
-func (p *Proxy) URLTest(url string) (t uint16, err error) {
+func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	defer func() {
 		p.alive = err == nil
 		record := C.DelayHistory{Time: time.Now()}
@@ -123,6 +162,13 @@ func (p *Proxy) URLTest(url string) (t uint16, err error) {
 		return
 	}
 	defer instance.Close()
+
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return
+	}
+	req = req.WithContext(ctx)
+
 	transport := &http.Transport{
 		Dial: func(string, string) (net.Conn, error) {
 			return instance, nil
@@ -133,8 +179,9 @@ func (p *Proxy) URLTest(url string) (t uint16, err error) {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
+
 	client := http.Client{Transport: transport}
-	resp, err := client.Get(url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
@@ -145,4 +192,10 @@ func (p *Proxy) URLTest(url string) (t uint16, err error) {
 
 func NewProxy(adapter C.ProxyAdapter) *Proxy {
 	return &Proxy{adapter, queue.New(10), true}
+}
+
+// ProxyGroupOption contain the common options for all kind of ProxyGroup
+type ProxyGroupOption struct {
+	Name    string   `proxy:"name"`
+	Proxies []string `proxy:"proxies"`
 }

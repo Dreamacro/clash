@@ -31,24 +31,27 @@ type VmessOption struct {
 	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
 }
 
-func (v *Vmess) Dial(metadata *C.Metadata) (net.Conn, error) {
+func (v *Vmess) Dial(metadata *C.Metadata) (C.Conn, error) {
 	c, err := dialTimeout("tcp", v.server, tcpTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error", v.server)
 	}
 	tcpKeepAlive(c)
 	c, err = v.client.New(c, parseVmessAddr(metadata))
-	return c, err
+	return newConn(c, v), err
 }
 
-func (v *Vmess) DialUDP(metadata *C.Metadata) (net.PacketConn, net.Addr, error) {
+func (v *Vmess) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	c, err := dialTimeout("tcp", v.server, tcpTimeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s connect error", v.server)
 	}
 	tcpKeepAlive(c)
 	c, err = v.client.New(c, parseVmessAddr(metadata))
-	return &fakeUDPConn{Conn: c}, c.LocalAddr(), err
+	if err != nil {
+		return nil, nil, fmt.Errorf("new vmess client error: %v", err)
+	}
+	return newPacketConn(&fakeUDPConn{Conn: c}, v), c.RemoteAddr(), nil
 }
 
 func NewVmess(option VmessOption) (*Vmess, error) {
@@ -64,7 +67,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 		WebSocketPath:    option.WSPath,
 		WebSocketHeaders: option.WSHeaders,
 		SkipCertVerify:   option.SkipCertVerify,
-		SessionCacahe:    getClientSessionCache(),
+		SessionCache:     getClientSessionCache(),
 	})
 	if err != nil {
 		return nil, err
@@ -74,7 +77,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 		Base: &Base{
 			name: option.Name,
 			tp:   C.Vmess,
-			udp:  option.UDP,
+			udp:  true,
 		},
 		server: net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
 		client: client,

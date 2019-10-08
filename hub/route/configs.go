@@ -22,12 +22,13 @@ func configRouter() http.Handler {
 }
 
 type configSchema struct {
-	Port      *int          `json:"port"`
-	SocksPort *int          `json:"socks-port"`
-	RedirPort *int          `json:"redir-port"`
-	AllowLan  *bool         `json:"allow-lan"`
-	Mode      *T.Mode       `json:"mode"`
-	LogLevel  *log.LogLevel `json:"log-level"`
+	Port        *int          `json:"port"`
+	SocksPort   *int          `json:"socks-port"`
+	RedirPort   *int          `json:"redir-port"`
+	AllowLan    *bool         `json:"allow-lan"`
+	BindAddress *string       `json:"bind-address"`
+	Mode        *T.Mode       `json:"mode"`
+	LogLevel    *log.LogLevel `json:"log-level"`
 }
 
 func getConfigs(w http.ResponseWriter, r *http.Request) {
@@ -53,6 +54,10 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if general.AllowLan != nil {
 		P.SetAllowLan(*general.AllowLan)
+	}
+
+	if general.BindAddress != nil {
+		P.SetBindAddress(*general.BindAddress)
 	}
 
 	ports := P.GetPorts()

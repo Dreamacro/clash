@@ -4,22 +4,72 @@ import (
 	"errors"
 	"net"
 	"sync"
+
+	"github.com/Dreamacro/clash/common/cache"
 )
 
 // Pool is a implementation about fake ip generator without storage
 type Pool struct {
-	max    uint32
-	min    uint32
-	offset uint32
-	mux    *sync.Mutex
+	max     uint32
+	min     uint32
+	gateway uint32
+	offset  uint32
+	mux     *sync.Mutex
+	cache   *cache.LruCache
 }
 
-// Get return a new fake ip
-func (p *Pool) Get() net.IP {
+// Lookup return a fake ip with host
+func (p *Pool) Lookup(host string) net.IP {
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	ip := uintToIP(p.min + p.offset)
-	p.offset = (p.offset + 1) % (p.max - p.min)
+	if ip, exist := p.cache.Get(host); exist {
+		return ip.(net.IP)
+	}
+
+	ip := p.get(host)
+	p.cache.Set(host, ip)
+	return ip
+}
+
+// LookBack return host with the fake ip
+func (p *Pool) LookBack(ip net.IP) (string, bool) {
+	p.mux.Lock()
+	defer p.mux.Unlock()
+
+	if ip = ip.To4(); ip == nil {
+		return "", false
+	}
+
+	n := ipToUint(ip.To4())
+	offset := n - p.min + 1
+
+	if host, exist := p.cache.Get(offset); exist {
+		return host.(string), true
+	}
+
+	return "", false
+}
+
+// Gateway return gateway ip
+func (p *Pool) Gateway() net.IP {
+	return uintToIP(p.gateway)
+}
+
+func (p *Pool) get(host string) net.IP {
+	current := p.offset
+	for {
+		p.offset = (p.offset + 1) % (p.max - p.min)
+		// Avoid infinite loops
+		if p.offset == current {
+			break
+		}
+
+		if _, exist := p.cache.Get(p.offset); !exist {
+			break
+		}
+	}
+	ip := uintToIP(p.min + p.offset - 1)
+	p.cache.Set(p.offset, host)
 	return ip
 }
 
@@ -36,8 +86,8 @@ func uintToIP(v uint32) net.IP {
 }
 
 // New return Pool instance
-func New(ipnet *net.IPNet) (*Pool, error) {
-	min := ipToUint(ipnet.IP) + 1
+func New(ipnet *net.IPNet, size int) (*Pool, error) {
+	min := ipToUint(ipnet.IP) + 2
 
 	ones, bits := ipnet.Mask.Size()
 	total := 1<<uint(bits-ones) - 2
@@ -46,10 +96,12 @@ func New(ipnet *net.IPNet) (*Pool, error) {
 		return nil, errors.New("ipnet don't have valid ip")
 	}
 
-	max := min + uint32(total)
+	max := min + uint32(total) - 1
 	return &Pool{
-		min: min,
-		max: max,
-		mux: &sync.Mutex{},
+		min:     min,
+		max:     max,
+		gateway: min - 1,
+		mux:     &sync.Mutex{},
+		cache:   cache.NewLRUCache(cache.WithSize(size * 2)),
 	}, nil
 }

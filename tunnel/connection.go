@@ -17,6 +17,9 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 	req := request.R
 	host := req.Host
 
+	inboundReeder := bufio.NewReader(request)
+	outboundReeder := bufio.NewReader(conn)
+
 	for {
 		keepAlive := strings.TrimSpace(strings.ToLower(req.Header.Get("Proxy-Connection"))) == "keep-alive"
 
@@ -27,13 +30,23 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		if err != nil {
 			break
 		}
-		br := bufio.NewReader(conn)
-		resp, err := http.ReadResponse(br, req)
+
+	handleResponse:
+		resp, err := http.ReadResponse(outboundReeder, req)
 		if err != nil {
 			break
 		}
 		adapters.RemoveHopByHopHeaders(resp.Header)
-		if resp.ContentLength >= 0 {
+
+		if resp.StatusCode == http.StatusContinue {
+			err = resp.Write(request)
+			if err != nil {
+				break
+			}
+			goto handleResponse
+		}
+
+		if keepAlive || resp.ContentLength >= 0 {
 			resp.Header.Set("Proxy-Connection", "keep-alive")
 			resp.Header.Set("Connection", "keep-alive")
 			resp.Header.Set("Keep-Alive", "timeout=4")
@@ -46,11 +59,7 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 			break
 		}
 
-		if !keepAlive {
-			break
-		}
-
-		req, err = http.ReadRequest(bufio.NewReader(request))
+		req, err = http.ReadRequest(inboundReeder)
 		if err != nil {
 			break
 		}
@@ -63,52 +72,41 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 	}
 }
 
+func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Addr) {
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	if _, err = pc.WriteTo(buf[:n], addr); err != nil {
+		return
+	}
+	t.traffic.Up() <- int64(n)
+}
+
+func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn) {
+	buf := pool.BufPool.Get().([]byte)
+	defer pool.BufPool.Put(buf[:cap(buf)])
+
+	for {
+		n, _, err := pc.ReadFrom(buf)
+		if err != nil {
+			return
+		}
+
+		n, err = conn.Write(buf[:n])
+		if err != nil {
+			return
+		}
+		t.traffic.Down() <- int64(n)
+	}
+}
+
 func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn) {
 	conn := newTrafficTrack(outbound, t.traffic)
 	relay(request, conn)
-}
-
-func (t *Tunnel) handleUDPOverTCP(conn net.Conn, pc net.PacketConn, addr net.Addr) error {
-	ch := make(chan error, 1)
-
-	go func() {
-		buf := pool.BufPool.Get().([]byte)
-		defer pool.BufPool.Put(buf)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				ch <- err
-				return
-			}
-			pc.SetReadDeadline(time.Now().Add(120 * time.Second))
-			if _, err = pc.WriteTo(buf[:n], addr); err != nil {
-				ch <- err
-				return
-			}
-			t.traffic.Up() <- int64(n)
-			ch <- nil
-		}
-	}()
-
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf)
-
-	for {
-		pc.SetReadDeadline(time.Now().Add(120 * time.Second))
-		n, _, err := pc.ReadFrom(buf)
-		if err != nil {
-			break
-		}
-
-		if _, err := conn.Write(buf[:n]); err != nil {
-			break
-		}
-
-		t.traffic.Down() <- int64(n)
-	}
-
-	<-ch
-	return nil
 }
 
 // relay copies between left and right bidirectionally.
