@@ -20,12 +20,12 @@
 
 ## Features
 
-- HTTP, HTTPS and SOCKS protocol
+- Local HTTP/HTTPS/SOCKS server
 - Surge-like configuration format
 - GeoIP rule support
-- Supports Vmess, Shadowsocks and SOCKS5
+- Supports Vmess, Shadowsocks, Snell and SOCKS5 protocol
 - Supports Netfilter TCP redirecting
-- Comprehensive API
+- Comprehensive HTTP API
 
 ## Install
 
