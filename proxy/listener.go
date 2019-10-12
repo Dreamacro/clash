@@ -74,6 +74,8 @@ func ReCreateHTTP(port int) error {
 func ReCreateSocks(port int) error {
 	addr := genAddr(bindAddress, port, allowLan)
 
+	udpErr := reCreateSocksUDP(addr)
+
 	if socksListener != nil {
 		if socksListener.Address() == addr {
 			return nil
@@ -92,7 +94,7 @@ func ReCreateSocks(port int) error {
 		return err
 	}
 
-	return reCreateSocksUDP(addr)
+	return udpErr
 }
 
 func reCreateSocksUDP(addr string) error {
@@ -102,6 +104,10 @@ func reCreateSocksUDP(addr string) error {
 		}
 		socksUDPListener.Close()
 		socksUDPListener = nil
+	}
+
+	if portIsZero(addr) {
+		return nil
 	}
 
 	var err error
