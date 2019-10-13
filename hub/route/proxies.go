@@ -153,6 +153,6 @@ func reelectProxy(w http.ResponseWriter, r *http.Request) {
 
 	fast := urlTest.SpeedTest(ctx)
 	render.JSON(w, r, render.M{
-		"fast": fast,
+		"now": fast,
 	})
 }
