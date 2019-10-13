@@ -26,6 +26,7 @@ func proxyRouter() http.Handler {
 		r.Get("/delay", getProxyDelay)
 		r.Get("/reelect", reelectProxy)
 		r.Put("/", updateProxy)
+		r.Post("/reelect", reelectProxy)
 	})
 	return r
 }
