@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Dreamacro/clash/common/picker"
+	P "github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -73,8 +73,9 @@ func (u *URLTest) Destroy() {
 	u.done <- struct{}{}
 }
 
-func (u *URLTest) SpeedTest() {
-	u.speedTest()
+func (u *URLTest) SpeedTest(ctx context.Context) string {
+	u.speedTest(ctx, false)
+	return u.fast.Name()
 }
 
 func (u *URLTest) loop() {
@@ -82,12 +83,12 @@ func (u *URLTest) loop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go u.speedTest(ctx)
+	go u.speedTest(ctx, true)
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go u.speedTest(ctx)
+			go u.speedTest(ctx, true)
 		case <-u.done:
 			break Loop
 		}
@@ -111,15 +112,20 @@ func (u *URLTest) fallback() {
 	u.fast = fast
 }
 
-func (u *URLTest) speedTest(ctx context.Context) {
+func (u *URLTest) speedTest(ctx context.Context, testAllInGroup bool) {
 	if !atomic.CompareAndSwapInt32(&u.once, 0, 1) {
 		return
 	}
 	defer atomic.StoreInt32(&u.once, 0)
+	var picker *P.Picker
+	if testAllInGroup {
+		ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
+		defer cancel()
+		picker = P.WithoutAutoCancel(ctx)
+	} else {
+		picker, ctx = P.WithContext(ctx)
+	}
 
-	ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
-	defer cancel()
-	picker := picker.WithoutAutoCancel(ctx)
 	for _, p := range u.proxies {
 		proxy := p
 		picker.Go(func() (interface{}, error) {
@@ -135,8 +141,9 @@ func (u *URLTest) speedTest(ctx context.Context) {
 	if fast != nil {
 		u.fast = fast.(C.Proxy)
 	}
-
-	picker.Wait()
+	if testAllInGroup {
+		picker.Wait()
+	}
 }
 
 func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {
