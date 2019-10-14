@@ -19,10 +19,12 @@ import (
 var (
 	version bool
 	homedir string
+	cfgfile string
 )
 
 func init() {
 	flag.StringVar(&homedir, "d", "", "set configuration directory")
+	flag.StringVar(&cfgfile, "c", "", "specify configuration file")
 	flag.BoolVar(&version, "v", false, "show current version of clash")
 	flag.Parse()
 }
@@ -39,6 +41,10 @@ func main() {
 			homedir = filepath.Join(currentDir, homedir)
 		}
 		C.SetHomeDir(homedir)
+	}
+
+	if cfgfile != "" {
+		C.SetConfig(cfgfile)
 	}
 
 	if err := config.Init(C.Path.HomeDir()); err != nil {

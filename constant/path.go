@@ -12,6 +12,7 @@ var Path *path
 
 type path struct {
 	homedir string
+	cfgfile string
 }
 
 func init() {
@@ -21,12 +22,17 @@ func init() {
 	}
 
 	homedir = P.Join(homedir, ".config", Name)
-	Path = &path{homedir: homedir}
+	Path = &path{homedir: homedir, cfgfile: "config.yaml"}
 }
 
 // SetHomeDir is used to set the configuration path
 func SetHomeDir(root string) {
-	Path = &path{homedir: root}
+	Path = &path{homedir: root, cfgfile: "config.yaml"}
+}
+
+// SetConfig is used to set the configuration file
+func SetConfig(filename string) {
+	Path.cfgfile = filename
 }
 
 func (p *path) HomeDir() string {
@@ -34,7 +40,7 @@ func (p *path) HomeDir() string {
 }
 
 func (p *path) Config() string {
-	return P.Join(p.homedir, "config.yaml")
+	return P.Join(p.homedir, p.cfgfile)
 }
 
 func (p *path) MMDB() string {
