@@ -28,7 +28,7 @@ func TestObservable(t *testing.T) {
 	}
 	count := 0
 	for range data {
-		count = count + 1
+		count++
 	}
 	if count != 5 {
 		t.Error("Revc number error")
@@ -46,7 +46,7 @@ func TestObservable_MutilSubscribe(t *testing.T) {
 	wg.Add(2)
 	waitCh := func(ch <-chan interface{}) {
 		for range ch {
-			count = count + 1
+			count++
 		}
 		wg.Done()
 	}
