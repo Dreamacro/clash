@@ -114,7 +114,8 @@ func reCreateSocksUDP(addr string) error {
 }
 
 func ReCreateRedir(port int) error {
-	addr := genAddr(bindAddress, port, allowLan)
+	// Redirection always need to listen at 0.0.0.0 and [::0] to work.
+	addr := fmt.Sprintf(":%d", port)
 
 	if redirListener != nil {
 		if redirListener.Address() == addr {
