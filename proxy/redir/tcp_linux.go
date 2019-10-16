@@ -28,31 +28,18 @@ func parserPacket(conn net.Conn) (socks5.Addr, error) {
 	var addr socks5.Addr
 
 	rc.Control(func(fd uintptr) {
-		addr, err = getorigdst(fd)
+		if (conn.LocalAddr().(*net.TCPAddr)).IP.To4() != nil {
+			addr, err = getorigdst(fd, false)
+		} else {
+			addr, err = getorigdst(fd, true)
+		}
 	})
 
 	return addr, err
 }
 
-func isIPv6socket(fd uintptr) (bool, error) {
-	peer, err := syscall.Getpeername(int(fd))
-	switch t := peer.(type) {
-	case *syscall.SockaddrInet4:
-		return false, err
-	case *syscall.SockaddrInet6:
-		ip := net.IP(t.Addr[:])
-		if ip.To4() != nil {
-			return false, nil
-		} else {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // Call getorigdst() from linux/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
-func getorigdst(fd uintptr) (socks5.Addr, error) {
-	isIPv6, _ := isIPv6socket(fd)
+func getorigdst(fd uintptr, isIPv6 bool) (socks5.Addr, error) {
 	var level uintptr = syscall.IPPROTO_IP
 	var optname uintptr = SO_ORIGINAL_DST
 	optval := syscall.RawSockaddrAny{}
