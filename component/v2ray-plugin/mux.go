@@ -52,7 +52,7 @@ func (m *Mux) Read(b []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		m.remain = m.remain - n
+		m.remain -= n
 		return n, nil
 	}
 

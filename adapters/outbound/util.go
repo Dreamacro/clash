@@ -33,11 +33,12 @@ func urlToMetadata(rawURL string) (addr C.Metadata, err error) {
 
 	port := u.Port()
 	if port == "" {
-		if u.Scheme == "https" {
+		switch u.Scheme {
+		case "https":
 			port = "443"
-		} else if u.Scheme == "http" {
+		case "http":
 			port = "80"
-		} else {
+		default:
 			err = fmt.Errorf("%s scheme not Support", rawURL)
 			return
 		}

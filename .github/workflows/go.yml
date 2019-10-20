@@ -6,12 +6,10 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-
-      - name: Set up Go 1.13
+      - name: Setup Go
         uses: actions/setup-go@v1
         with:
-          go-version: 1.13
-        id: go
+          go-version: 1.13.x
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v1
@@ -19,3 +17,20 @@ jobs:
       - name: Get dependencies
         run: |
           go test ./...
+
+      - name: Build
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          NAME: clash
+          BINDIR: bin
+        run: make -j releases
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: bin/*
+          draft: true
+          prerelease: true

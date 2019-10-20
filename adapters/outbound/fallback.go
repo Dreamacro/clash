@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -17,6 +18,7 @@ type Fallback struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
+	once     int32
 }
 
 type FallbackOption struct {
@@ -72,12 +74,15 @@ func (f *Fallback) Destroy() {
 
 func (f *Fallback) loop() {
 	tick := time.NewTicker(f.interval)
-	go f.validTest()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go f.validTest(ctx)
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go f.validTest()
+			go f.validTest(ctx)
 		case <-f.done:
 			break Loop
 		}
@@ -93,18 +98,24 @@ func (f *Fallback) findAliveProxy() C.Proxy {
 	return f.proxies[0]
 }
 
-func (f *Fallback) validTest() {
-	wg := sync.WaitGroup{}
-	wg.Add(len(f.proxies))
+func (f *Fallback) validTest(ctx context.Context) {
+	if !atomic.CompareAndSwapInt32(&f.once, 0, 1) {
+		return
+	}
+	defer atomic.StoreInt32(&f.once, 0)
+
+	ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
+	defer cancel()
+	picker := picker.WithoutAutoCancel(ctx)
 
 	for _, p := range f.proxies {
-		go func(p C.Proxy) {
-			p.URLTest(context.Background(), f.rawURL)
-			wg.Done()
-		}(p)
+		proxy := p
+		picker.Go(func() (interface{}, error) {
+			return proxy.URLTest(ctx, f.rawURL)
+		})
 	}
 
-	wg.Wait()
+	picker.Wait()
 }
 
 func NewFallback(option FallbackOption, proxies []C.Proxy) (*Fallback, error) {
@@ -128,6 +139,7 @@ func NewFallback(option FallbackOption, proxies []C.Proxy) (*Fallback, error) {
 		rawURL:   option.URL,
 		interval: interval,
 		done:     make(chan struct{}),
+		once:     0,
 	}
 	go Fallback.loop()
 	return Fallback, nil

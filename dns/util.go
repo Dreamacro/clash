@@ -81,13 +81,14 @@ func (e EnhancedMode) String() string {
 
 func putMsgToCache(c *cache.Cache, key string, msg *D.Msg) {
 	var ttl time.Duration
-	if len(msg.Answer) != 0 {
+	switch {
+	case len(msg.Answer) != 0:
 		ttl = time.Duration(msg.Answer[0].Header().Ttl) * time.Second
-	} else if len(msg.Ns) != 0 {
+	case len(msg.Ns) != 0:
 		ttl = time.Duration(msg.Ns[0].Header().Ttl) * time.Second
-	} else if len(msg.Extra) != 0 {
+	case len(msg.Extra) != 0:
 		ttl = time.Duration(msg.Extra[0].Header().Ttl) * time.Second
-	} else {
+	default:
 		log.Debugln("[DNS] response msg error: %#v", msg)
 		return
 	}

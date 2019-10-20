@@ -11,32 +11,38 @@ const Name = "clash"
 var Path *path
 
 type path struct {
-	homedir string
+	homeDir    string
+	configFile string
 }
 
 func init() {
-	homedir, err := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		homedir, _ = os.Getwd()
+		homeDir, _ = os.Getwd()
 	}
 
-	homedir = P.Join(homedir, ".config", Name)
-	Path = &path{homedir: homedir}
+	homeDir = P.Join(homeDir, ".config", Name)
+	Path = &path{homeDir: homeDir, configFile: "config.yaml"}
 }
 
 // SetHomeDir is used to set the configuration path
 func SetHomeDir(root string) {
-	Path = &path{homedir: root}
+	Path.homeDir = root
+}
+
+// SetConfig is used to set the configuration file
+func SetConfig(file string) {
+	Path.configFile = file
 }
 
 func (p *path) HomeDir() string {
-	return p.homedir
+	return p.homeDir
 }
 
 func (p *path) Config() string {
-	return P.Join(p.homedir, "config.yaml")
+	return p.configFile
 }
 
 func (p *path) MMDB() string {
-	return P.Join(p.homedir, "Country.mmdb")
+	return P.Join(p.homeDir, "Country.mmdb")
 }

@@ -74,10 +74,15 @@ func ReCreateHTTP(port int) error {
 func ReCreateSocks(port int) error {
 	addr := genAddr(bindAddress, port, allowLan)
 
+	shouldTCPIgnore := false
+	shouldUDPIgnore := false
+
 	if socksListener != nil {
 		if socksListener.Address() != addr {
 			socksListener.Close()
 			socksListener = nil
+		} else {
+			shouldTCPIgnore = true
 		}
 	}
 
@@ -85,7 +90,13 @@ func ReCreateSocks(port int) error {
 		if socksUDPListener.Address() != addr {
 			socksUDPListener.Close()
 			socksUDPListener = nil
+		} else {
+			shouldUDPIgnore = true
 		}
+	}
+
+	if shouldTCPIgnore && shouldUDPIgnore {
+		return nil
 	}
 
 	if portIsZero(addr) {
