@@ -146,11 +146,9 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
 // URLTest get the delay for the specified URL
 func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	defer func() {
-		if t == 0 {
-			if deadline, ok := ctx.Deadline(); ok && deadline.After(time.Now()) {
-				// canceled by fastest peer early, skip this failed record
-				return
-			}
+		if ctx.Err() == context.Canceled {
+			// canceled by fastest peer early, skip this record
+			return
 		}
 		p.alive = err == nil
 		record := C.DelayHistory{Time: time.Now()}
