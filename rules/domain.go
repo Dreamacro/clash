@@ -30,6 +30,10 @@ func (d *Domain) Payload() string {
 	return d.domain
 }
 
+func (d *Domain) NeedIP() bool {
+	return false
+}
+
 func NewDomain(domain string, adapter string) *Domain {
 	return &Domain{
 		domain:  strings.ToLower(domain),

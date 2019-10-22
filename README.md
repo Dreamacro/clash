@@ -283,6 +283,7 @@ Rule:
 # rename SOURCE-IP-CIDR and would remove after prerelease
 - SRC-IP-CIDR,192.168.1.201/32,DIRECT
 - GEOIP,CN,DIRECT
+# optional param "no-resolve" for IP rules
 - DST-PORT,80,DIRECT
 - SRC-PORT,7777,DIRECT
 # FINAL would remove after prerelease

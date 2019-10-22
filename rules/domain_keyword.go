@@ -31,6 +31,10 @@ func (dk *DomainKeyword) Payload() string {
 	return dk.keyword
 }
 
+func (dk *DomainKeyword) NeedIP() bool {
+	return false
+}
+
 func NewDomainKeyword(keyword string, adapter string) *DomainKeyword {
 	return &DomainKeyword{
 		keyword: strings.ToLower(keyword),

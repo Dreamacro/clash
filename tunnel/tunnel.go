@@ -248,7 +248,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
 }
 
 func (t *Tunnel) shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
-	return (rule.RuleType() == C.GEOIP || rule.RuleType() == C.IPCIDR) && metadata.Host != "" && metadata.DstIP == nil
+	return rule.NeedIP() && metadata.Host != "" && metadata.DstIP == nil
 }
 
 func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {

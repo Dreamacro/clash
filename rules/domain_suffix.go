@@ -31,6 +31,10 @@ func (ds *DomainSuffix) Payload() string {
 	return ds.suffix
 }
 
+func (ds *DomainSuffix) NeedIP() bool {
+	return false
+}
+
 func NewDomainSuffix(suffix string, adapter string) *DomainSuffix {
 	return &DomainSuffix{
 		suffix:  strings.ToLower(suffix),

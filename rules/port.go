@@ -34,6 +34,10 @@ func (p *Port) Payload() string {
 	return p.port
 }
 
+func (p *Port) NeedIP() bool {
+	return false
+}
+
 func NewPort(port string, adapter string, isSource bool) *Port {
 	_, err := strconv.Atoi(port)
 	if err != nil {
