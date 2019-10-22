@@ -2,6 +2,8 @@ package constant
 
 // Rule Type
 const (
+	NoResolve = "no-resolve"
+
 	Domain RuleType = iota
 	DomainSuffix
 	DomainKeyword

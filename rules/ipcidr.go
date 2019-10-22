@@ -52,6 +52,6 @@ func NewIPCIDR(s string, adapter string, params []string, isSourceIP bool) *IPCI
 		ipnet:      ipnet,
 		adapter:    adapter,
 		isSourceIP: isSourceIP,
-		needIP: !HasParam(params, "no-resolve"),
+		needIP: !HasParam(params, C.NoResolve),
 	}
 }

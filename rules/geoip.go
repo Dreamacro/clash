@@ -59,6 +59,6 @@ func NewGEOIP(country string, adapter string, params []string) *GEOIP {
 	return &GEOIP{
 		country: country,
 		adapter: adapter,
-		needIP: !HasParam(params, "no-resolve"),
+		needIP:  !HasParam(params, C.NoResolve),
 	}
 }
