@@ -131,14 +131,20 @@ func (lb *LoadBalance) healthCheck(ctx context.Context, url string, checkAllInGr
 
 func (lb *LoadBalance) loop() {
 	tick := time.NewTicker(lb.interval)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go lb.healthCheck(ctx, lb.rawURL, true)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		defer cancel()
+		lb.healthCheck(ctx, lb.rawURL, true)
+	}()
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go lb.healthCheck(ctx, lb.rawURL, true)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				defer cancel()
+				lb.healthCheck(ctx, lb.rawURL, true)
+			}()
 		case <-lb.done:
 			break Loop
 		}

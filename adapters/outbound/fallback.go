@@ -73,15 +73,20 @@ func (f *Fallback) Destroy() {
 
 func (f *Fallback) loop() {
 	tick := time.NewTicker(f.interval)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go f.healthCheck(ctx, f.rawURL, false)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		defer cancel()
+		f.healthCheck(ctx, f.rawURL, false)
+	}()
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go f.healthCheck(ctx, f.rawURL, false)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				defer cancel()
+				f.healthCheck(ctx, f.rawURL, false)
+			}()
 		case <-f.done:
 			break Loop
 		}

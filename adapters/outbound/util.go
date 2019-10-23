@@ -228,8 +228,6 @@ func groupHealthCheck(ctx context.Context, proxies []C.Proxy, url string, checkA
 	checkSingle func(ctx context.Context, proxy C.Proxy) (interface{}, error)) (interface{}, error) {
 	var picker *P.Picker
 	if checkAllInGroup {
-		ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
-		defer cancel()
 		picker = P.WithoutAutoCancel(ctx)
 	} else {
 		picker, ctx = P.WithContext(ctx)

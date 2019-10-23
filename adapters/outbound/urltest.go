@@ -106,15 +106,20 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 
 func (u *URLTest) loop() {
 	tick := time.NewTicker(u.interval)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go u.healthCheck(ctx, u.rawURL, false)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		defer cancel()
+		u.healthCheck(ctx, u.rawURL, false)
+	}()
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go u.healthCheck(ctx, u.rawURL, false)
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				defer cancel()
+				u.healthCheck(ctx, u.rawURL, false)
+			}()
 		case <-u.done:
 			break Loop
 		}
