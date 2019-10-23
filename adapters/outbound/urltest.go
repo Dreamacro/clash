@@ -98,6 +98,7 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 	result, err := groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
 	if err == nil {
 		fast, _ := result.(C.Proxy)
+		u.fast = fast
 		return fast, nil
 	}
 	return nil, err
