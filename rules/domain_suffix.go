@@ -31,7 +31,7 @@ func (ds *DomainSuffix) Payload() string {
 	return ds.suffix
 }
 
-func (ds *DomainSuffix) NeedIP() bool {
+func (ds *DomainSuffix) IsNeedIP() bool {
 	return false
 }
 

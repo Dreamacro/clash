@@ -31,7 +31,7 @@ func (dk *DomainKeyword) Payload() string {
 	return dk.keyword
 }
 
-func (dk *DomainKeyword) NeedIP() bool {
+func (dk *DomainKeyword) IsNeedIP() bool {
 	return false
 }
 

@@ -10,7 +10,26 @@ type IPCIDR struct {
 	ipnet      *net.IPNet
 	adapter    string
 	isSourceIP bool
-	needIP		 bool
+	isNeedIP   bool
+}
+
+var defaultIPCIDR = IPCIDR{
+	isSourceIP: false,
+	isNeedIP:   true,
+}
+
+type IPCIDROption func(*IPCIDR)
+
+func WithIPCIDRIsSourceIP(b bool) IPCIDROption {
+	return func(i *IPCIDR) {
+		i.isSourceIP = b
+	}
+}
+
+func WithIPCIDRIsNeedIP(b bool) IPCIDROption {
+	return func(i *IPCIDR) {
+		i.isNeedIP = b
+	}
 }
 
 func (i *IPCIDR) RuleType() C.RuleType {
@@ -22,7 +41,7 @@ func (i *IPCIDR) RuleType() C.RuleType {
 
 func (i *IPCIDR) IsMatch(metadata *C.Metadata) bool {
 	ip := metadata.DstIP
-	if !i.needIP {
+	if !i.isNeedIP {
 		ip = HostToIP(metadata.Host)
 	}
 	if i.isSourceIP {
@@ -39,19 +58,20 @@ func (i *IPCIDR) Payload() string {
 	return i.ipnet.String()
 }
 
-func (i *IPCIDR) NeedIP() bool {
-	return i.needIP
+func (i *IPCIDR) IsNeedIP() bool {
+	return i.isNeedIP
 }
 
-func NewIPCIDR(s string, adapter string, params []string, isSourceIP bool) *IPCIDR {
+func NewIPCIDR(s string, adapter string, opts ...IPCIDROption) *IPCIDR {
 	_, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
 		return nil
 	}
-	return &IPCIDR{
-		ipnet:      ipnet,
-		adapter:    adapter,
-		isSourceIP: isSourceIP,
-		needIP: !HasParam(params, C.NoResolve),
+	ipcidr := defaultIPCIDR
+	for _, o := range opts {
+		o(&ipcidr)
 	}
+	ipcidr.ipnet = ipnet
+	ipcidr.adapter = adapter
+	return &ipcidr
 }

@@ -30,7 +30,7 @@ func (d *Domain) Payload() string {
 	return d.domain
 }
 
-func (d *Domain) NeedIP() bool {
+func (d *Domain) IsNeedIP() bool {
 	return false
 }
 

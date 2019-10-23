@@ -47,5 +47,5 @@ type Rule interface {
 	IsMatch(metadata *Metadata) bool
 	Adapter() string
 	Payload() string
-	NeedIP() bool
+	IsNeedIP() bool
 }

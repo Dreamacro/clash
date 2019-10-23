@@ -427,7 +427,7 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		var (
 			payload string
 			target  string
-			params 	[]string
+			params  []string
 		)
 
 		switch l := len(rule); {
@@ -448,6 +448,8 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
 		}
 
+		noResolve := R.HasParam(params, C.NoResolve)
+
 		rule = trimArr(rule)
 		var parsed C.Rule
 		switch rule[0] {
@@ -458,16 +460,16 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		case "DOMAIN-KEYWORD":
 			parsed = R.NewDomainKeyword(payload, target)
 		case "GEOIP":
-			parsed = R.NewGEOIP(payload, target, params)
+			parsed = R.NewGEOIP(payload, target, R.WithGEOIPIsNeedIP(!noResolve))
 		case "IP-CIDR", "IP-CIDR6":
-			if rule := R.NewIPCIDR(payload, target, params, false); rule != nil {
+			if rule := R.NewIPCIDR(payload, target, R.WithIPCIDRIsNeedIP(!noResolve)); rule != nil {
 				parsed = rule
 			}
 		// deprecated when bump to 1.0
 		case "SOURCE-IP-CIDR":
 			fallthrough
 		case "SRC-IP-CIDR":
-			if rule := R.NewIPCIDR(payload, target, params, true); rule != nil {
+			if rule := R.NewIPCIDR(payload, target, R.WithIPCIDRIsSourceIP(true), R.WithIPCIDRIsNeedIP(!noResolve)); rule != nil {
 				parsed = rule
 			}
 		case "SRC-PORT":

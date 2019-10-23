@@ -15,9 +15,21 @@ var (
 )
 
 type GEOIP struct {
-	country string
-	adapter string
-	needIP  bool
+	country  string
+	adapter  string
+	isNeedIP bool
+}
+
+var defaultGEOIP = GEOIP{
+	isNeedIP: true,
+}
+
+type GEOIPOption func(*GEOIP)
+
+func WithGEOIPIsNeedIP(b bool) GEOIPOption {
+	return func(g *GEOIP) {
+		g.isNeedIP = b
+	}
 }
 
 func (g *GEOIP) RuleType() C.RuleType {
@@ -26,7 +38,7 @@ func (g *GEOIP) RuleType() C.RuleType {
 
 func (g *GEOIP) IsMatch(metadata *C.Metadata) bool {
 	ip := metadata.DstIP
-	if !g.needIP {
+	if !g.isNeedIP {
 		ip = HostToIP(metadata.Host)
 	}
 	if ip == nil {
@@ -44,11 +56,11 @@ func (g *GEOIP) Payload() string {
 	return g.country
 }
 
-func (g *GEOIP) NeedIP() bool {
-	return g.needIP
+func (g *GEOIP) IsNeedIP() bool {
+	return g.isNeedIP
 }
 
-func NewGEOIP(country string, adapter string, params []string) *GEOIP {
+func NewGEOIP(country string, adapter string, opts ...GEOIPOption) *GEOIP {
 	once.Do(func() {
 		var err error
 		mmdb, err = geoip2.Open(C.Path.MMDB())
@@ -56,9 +68,11 @@ func NewGEOIP(country string, adapter string, params []string) *GEOIP {
 			log.Fatalf("Can't load mmdb: %s", err.Error())
 		}
 	})
-	return &GEOIP{
-		country: country,
-		adapter: adapter,
-		needIP:  !HasParam(params, C.NoResolve),
+	geoip := defaultGEOIP
+	for _, o := range opts {
+		o(&geoip)
 	}
+	geoip.country = country
+	geoip.adapter = adapter
+	return &geoip
 }

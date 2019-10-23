@@ -24,7 +24,7 @@ func (f *Match) Payload() string {
 	return ""
 }
 
-func (f *Match) NeedIP() bool {
+func (f *Match) IsNeedIP() bool {
 	return false
 }
 

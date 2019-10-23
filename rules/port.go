@@ -34,7 +34,7 @@ func (p *Port) Payload() string {
 	return p.port
 }
 
-func (p *Port) NeedIP() bool {
+func (p *Port) IsNeedIP() bool {
 	return false
 }
 
