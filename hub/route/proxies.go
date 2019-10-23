@@ -24,7 +24,7 @@ func proxyRouter() http.Handler {
 		r.Use(parseProxyName, findProxyByName)
 		r.Get("/", getProxy)
 		r.Get("/delay", getProxyDelay)
-		r.Get("/reelect", reelectProxy)
+		r.Get("/healthcheck", checkProxyHealth)
 		r.Put("/", updateProxy)
 	})
 	return r
@@ -132,7 +132,7 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func reelectProxy(w http.ResponseWriter, r *http.Request) {
+func checkProxyHealth(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	timeout, err := strconv.ParseInt(query.Get("timeout"), 10, 16)
 	if err != nil {
