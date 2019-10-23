@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/Dreamacro/clash/common/queue"
@@ -14,6 +13,7 @@ import (
 
 var (
 	defaultURLTestTimeout = time.Second * 5
+	errAgain              = errors.New("try again")
 )
 
 type Base struct {
@@ -143,8 +143,7 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(mapping)
 }
 
-// URLTest get the delay for the specified URL
-func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
+func (p *Proxy) HealthCheck(ctx context.Context, url string) (t uint16, err error) {
 	defer func() {
 		if ctx.Err() == context.Canceled {
 			// canceled by fastest peer early, skip this record
@@ -161,42 +160,7 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 		}
 	}()
 
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return
-	}
-
-	start := time.Now()
-	instance, err := p.DialContext(ctx, &addr)
-	if err != nil {
-		return
-	}
-	defer instance.Close()
-
-	req, err := http.NewRequest(http.MethodHead, url, nil)
-	if err != nil {
-		return
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		Dial: func(string, string) (net.Conn, error) {
-			return instance, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{Transport: transport}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
-	t = uint16(time.Since(start) / time.Millisecond)
+	t, err = p.ProxyAdapter.HealthCheck(ctx, url)
 	return
 }
 

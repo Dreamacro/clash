@@ -102,6 +102,10 @@ func (ss *ShadowSocks) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, er
 	return newPacketConn(&ssUDPConn{PacketConn: pc, rAddr: targetAddr}, ss), addr, nil
 }
 
+func (ss *ShadowSocks) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, ss, url)
+}
+
 func (ss *ShadowSocks) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string{
 		"type": ss.Type().String(),

@@ -46,6 +46,10 @@ func (s *Snell) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, 
 	return newConn(c, s), err
 }
 
+func (s *Snell) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, s, url)
+}
+
 func NewSnell(option SnellOption) (*Snell, error) {
 	server := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
 	psk := []byte(option.Psk)

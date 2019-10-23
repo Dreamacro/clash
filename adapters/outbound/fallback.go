@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -77,12 +76,12 @@ func (f *Fallback) loop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go f.validTest(ctx)
+	go f.healthCheck(ctx, f.rawURL, false)
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go f.validTest(ctx)
+			go f.healthCheck(ctx, f.rawURL, false)
 		case <-f.done:
 			break Loop
 		}
@@ -98,24 +97,31 @@ func (f *Fallback) findAliveProxy() C.Proxy {
 	return f.proxies[0]
 }
 
-func (f *Fallback) validTest(ctx context.Context) {
+func (f *Fallback) HealthCheck(ctx context.Context, url string) (delay uint16, err error) {
+	if url == "" {
+		url = f.rawURL
+	}
+	return f.healthCheck(ctx, url, false)
+}
+
+func (f *Fallback) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (delay uint16, err error) {
 	if !atomic.CompareAndSwapInt32(&f.once, 0, 1) {
-		return
+		return 0, errAgain
 	}
 	defer atomic.StoreInt32(&f.once, 0)
-
-	ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
-	defer cancel()
-	picker := picker.WithoutAutoCancel(ctx)
-
-	for _, p := range f.proxies {
-		proxy := p
-		picker.Go(func() (interface{}, error) {
-			return proxy.URLTest(ctx, f.rawURL)
-		})
+	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
+		_, err := proxy.HealthCheck(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		return proxy, nil
 	}
-
-	picker.Wait()
+	if result, err := groupHealthCheck(ctx, f.proxies, url, checkAllInGroup, checkSingle); err == nil {
+		if fast, ok := result.(C.Proxy); ok {
+			return fast.LastDelay(), nil
+		}
+	}
+	return 0, err
 }
 
 func NewFallback(option FallbackOption, proxies []C.Proxy) (*Fallback, error) {

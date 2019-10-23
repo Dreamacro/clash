@@ -57,6 +57,10 @@ func (v *Vmess) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	return newPacketConn(&vmessUDPConn{Conn: c}, v), c.RemoteAddr(), nil
 }
 
+func (v *Vmess) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, v, url)
+}
+
 func NewVmess(option VmessOption) (*Vmess, error) {
 	security := strings.ToLower(option.Cipher)
 	client, err := vmess.NewClient(vmess.Config{

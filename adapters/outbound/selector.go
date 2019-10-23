@@ -62,6 +62,10 @@ func (s *Selector) Set(name string) error {
 	return nil
 }
 
+func (s *Selector) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return s.selected.HealthCheck(ctx, url)
+}
+
 func NewSelector(name string, proxies []C.Proxy) (*Selector, error) {
 	if len(proxies) == 0 {
 		return nil, errors.New("Provide at least one proxy")

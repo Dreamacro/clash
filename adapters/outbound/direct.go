@@ -38,6 +38,10 @@ func (d *Direct) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
 	return newPacketConn(pc, d), addr, nil
 }
 
+func (d *Direct) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, d, url)
+}
+
 func NewDirect() *Direct {
 	return &Direct{
 		Base: &Base{

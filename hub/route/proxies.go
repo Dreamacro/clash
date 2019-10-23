@@ -114,7 +114,7 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
 	defer cancel()
 
-	delay, err := proxy.URLTest(ctx, url)
+	delay, err := proxy.HealthCheck(ctx, url)
 	if ctx.Err() != nil {
 		render.Status(r, http.StatusGatewayTimeout)
 		render.JSON(w, r, ErrRequestTimeout)
@@ -133,26 +133,32 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 }
 
 func reelectProxy(w http.ResponseWriter, r *http.Request) {
-	timeout, err := strconv.ParseInt(r.URL.Query().Get("timeout"), 10, 16)
+	query := r.URL.Query()
+	timeout, err := strconv.ParseInt(query.Get("timeout"), 10, 16)
 	if err != nil {
 		render.Status(r, http.StatusBadRequest)
 		render.JSON(w, r, ErrBadRequest)
 		return
 	}
 
+	url := query.Get("url")
+
 	proxy := r.Context().Value(CtxKeyProxy).(*A.Proxy)
-	urlTest, ok := proxy.ProxyAdapter.(*A.URLTest)
-	if !ok {
-		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, newError("Must be a Url-Test"))
-		return
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
 	defer cancel()
 
-	fast := urlTest.SpeedTest(ctx)
-	render.JSON(w, r, render.M{
-		"now": fast,
-	})
+	t, err := proxy.HealthCheck(ctx, url)
+	if err != nil {
+		render.JSON(w, r, render.M{
+			"health": false,
+			"err":    err.Error(),
+		})
+	} else {
+		render.JSON(w, r, render.M{
+			"health": true,
+			"delay":  t,
+		})
+	}
+
 }

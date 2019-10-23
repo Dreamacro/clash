@@ -55,6 +55,10 @@ func (h *Http) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, e
 	return newConn(c, h), nil
 }
 
+func (h *Http) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, h, url)
+}
+
 func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
 	var buf bytes.Buffer
 	var err error

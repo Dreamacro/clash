@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	P "github.com/Dreamacro/clash/common/picker"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -73,9 +72,35 @@ func (u *URLTest) Destroy() {
 	u.done <- struct{}{}
 }
 
-func (u *URLTest) SpeedTest(ctx context.Context) string {
-	u.speedTest(ctx, false)
-	return u.fast.Name()
+func (u *URLTest) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	if url == "" {
+		url = u.rawURL
+	}
+	fast, err := u.healthCheck(ctx, url, false)
+	if err != nil {
+		return 0, err
+	}
+	return fast.LastDelay(), nil
+}
+
+func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (C.Proxy, error) {
+	if !atomic.CompareAndSwapInt32(&u.once, 0, 1) {
+		return nil, errAgain
+	}
+	defer atomic.StoreInt32(&u.once, 0)
+	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
+		_, err := proxy.HealthCheck(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		return proxy, nil
+	}
+	result, err := groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
+	if err == nil {
+		fast, _ := result.(C.Proxy)
+		return fast, nil
+	}
+	return nil, err
 }
 
 func (u *URLTest) loop() {
@@ -83,12 +108,12 @@ func (u *URLTest) loop() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go u.speedTest(ctx, true)
+	go u.healthCheck(ctx, u.rawURL, false)
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go u.speedTest(ctx, true)
+			go u.healthCheck(ctx, u.rawURL, false)
 		case <-u.done:
 			break Loop
 		}
@@ -110,40 +135,6 @@ func (u *URLTest) fallback() {
 		}
 	}
 	u.fast = fast
-}
-
-func (u *URLTest) speedTest(ctx context.Context, testAllInGroup bool) {
-	if !atomic.CompareAndSwapInt32(&u.once, 0, 1) {
-		return
-	}
-	defer atomic.StoreInt32(&u.once, 0)
-	var picker *P.Picker
-	if testAllInGroup {
-		ctx, cancel := context.WithTimeout(ctx, defaultURLTestTimeout)
-		defer cancel()
-		picker = P.WithoutAutoCancel(ctx)
-	} else {
-		picker, ctx = P.WithContext(ctx)
-	}
-
-	for _, p := range u.proxies {
-		proxy := p
-		picker.Go(func() (interface{}, error) {
-			_, err := proxy.URLTest(ctx, u.rawURL)
-			if err != nil {
-				return nil, err
-			}
-			return proxy, nil
-		})
-	}
-
-	fast := picker.WaitWithoutCancel()
-	if fast != nil {
-		u.fast = fast.(C.Proxy)
-	}
-	if testAllInGroup {
-		picker.Wait()
-	}
 }
 
 func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {

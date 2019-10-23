@@ -122,6 +122,10 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, _ net.Addr, err
 	return newPacketConn(&socksUDPConn{PacketConn: pc, rAddr: targetAddr, tcpConn: c}, ss), addr, nil
 }
 
+func (ss *Socks5) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return urlTest(ctx, ss, url)
+}
+
 func NewSocks5(option Socks5Option) *Socks5 {
 	var tlsConfig *tls.Config
 	if option.TLS {

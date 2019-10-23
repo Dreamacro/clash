@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Dreamacro/clash/common/murmur3"
@@ -21,6 +21,7 @@ type LoadBalance struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
+	once     int32
 }
 
 func getKey(metadata *C.Metadata) string {
@@ -103,28 +104,41 @@ func (lb *LoadBalance) Destroy() {
 	lb.done <- struct{}{}
 }
 
-func (lb *LoadBalance) validTest() {
-	wg := sync.WaitGroup{}
-	wg.Add(len(lb.proxies))
+func (lb *LoadBalance) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	if url == "" {
+		url = lb.rawURL
+	}
+	return lb.healthCheck(ctx, url, false)
+}
 
-	for _, p := range lb.proxies {
-		go func(p C.Proxy) {
-			p.URLTest(context.Background(), lb.rawURL)
-			wg.Done()
-		}(p)
+func (lb *LoadBalance) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (uint16, error) {
+	if !atomic.CompareAndSwapInt32(&lb.once, 0, 1) {
+		return 0, errAgain
+	}
+	defer atomic.StoreInt32(&lb.once, 0)
+	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
+		return proxy.HealthCheck(ctx, url)
 	}
 
-	wg.Wait()
+	result, err := groupHealthCheck(ctx, lb.proxies, url, checkAllInGroup, checkSingle)
+	if err == nil {
+		if delay, ok := result.(uint16); ok {
+			return delay, nil
+		}
+	}
+	return 0, err
 }
 
 func (lb *LoadBalance) loop() {
 	tick := time.NewTicker(lb.interval)
-	go lb.validTest()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go lb.healthCheck(ctx, lb.rawURL, true)
 Loop:
 	for {
 		select {
 		case <-tick.C:
-			go lb.validTest()
+			go lb.healthCheck(ctx, lb.rawURL, true)
 		case <-lb.done:
 			break Loop
 		}

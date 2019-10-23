@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -15,6 +16,10 @@ type Reject struct {
 
 func (r *Reject) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
 	return newConn(&NopConn{}, r), nil
+}
+
+func (r *Reject) HealthCheck(ctx context.Context, url string) (uint16, error) {
+	return 0, errors.New("not supported")
 }
 
 func NewReject() *Reject {

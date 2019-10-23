@@ -61,6 +61,7 @@ type ProxyAdapter interface {
 	DialContext(ctx context.Context, metadata *Metadata) (Conn, error)
 	DialUDP(metadata *Metadata) (PacketConn, net.Addr, error)
 	SupportUDP() bool
+	HealthCheck(ctx context.Context, url string) (uint16, error)
 	Destroy()
 	MarshalJSON() ([]byte, error)
 }
@@ -76,7 +77,6 @@ type Proxy interface {
 	DelayHistory() []DelayHistory
 	Dial(metadata *Metadata) (Conn, error)
 	LastDelay() uint16
-	URLTest(ctx context.Context, url string) (uint16, error)
 }
 
 // AdapterType is enum of adapter type
