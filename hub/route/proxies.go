@@ -154,18 +154,18 @@ func checkProxyHealth(w http.ResponseWriter, r *http.Request) {
 			"health": false,
 			"err":    err.Error(),
 		})
-	} else {
-		resp := render.M{
-			"health": true,
-			"delay":  t,
-		}
-
-		// additional info.
-		switch p := proxy.ProxyAdapter.(type) {
-		case *A.URLTest:
-			resp["now"] = p.Now()
-		}
-		render.JSON(w, r, resp)
+		return
 	}
 
+	resp := render.M{
+		"health": true,
+		"delay":  t,
+	}
+
+	// additional info.
+	switch p := proxy.ProxyAdapter.(type) {
+	case *A.URLTest:
+		resp["now"] = p.Now()
+	}
+	render.JSON(w, r, resp)
 }

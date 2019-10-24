@@ -8,7 +8,7 @@ import (
 	"time"
 
 	C "github.com/Dreamacro/clash/constant"
-	
+
 	"golang.org/x/sync/singleflight"
 )
 
