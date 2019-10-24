@@ -112,7 +112,7 @@ func (u *URLTest) loop() {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
 		defer cancel()
-		u.healthCheck(ctx, u.rawURL, false)
+		u.healthCheck(ctx, u.rawURL, true)
 	}()
 Loop:
 	for {
@@ -121,7 +121,7 @@ Loop:
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
 				defer cancel()
-				u.healthCheck(ctx, u.rawURL, false)
+				u.healthCheck(ctx, u.rawURL, true)
 			}()
 		case <-u.done:
 			break Loop

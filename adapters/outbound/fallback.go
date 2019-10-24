@@ -76,7 +76,7 @@ func (f *Fallback) loop() {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
 		defer cancel()
-		f.healthCheck(ctx, f.rawURL, false)
+		f.healthCheck(ctx, f.rawURL, true)
 	}()
 Loop:
 	for {
@@ -85,7 +85,7 @@ Loop:
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
 				defer cancel()
-				f.healthCheck(ctx, f.rawURL, false)
+				f.healthCheck(ctx, f.rawURL, true)
 			}()
 		case <-f.done:
 			break Loop
