@@ -13,7 +13,7 @@ import (
 
 var (
 	defaultURLTestTimeout = time.Second * 5
-	errAgain              = errors.New("try again")
+	errTimeout            = errors.New("timeout")
 )
 
 type Base struct {

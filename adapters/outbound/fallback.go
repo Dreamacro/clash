@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 
 	C "github.com/Dreamacro/clash/constant"
+	"golang.org/x/sync/singleflight"
 )
 
 type Fallback struct {
@@ -17,7 +17,7 @@ type Fallback struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
-	once     int32
+	group    singleflight.Group
 }
 
 type FallbackOption struct {
@@ -110,10 +110,6 @@ func (f *Fallback) HealthCheck(ctx context.Context, url string) (delay uint16, e
 }
 
 func (f *Fallback) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (delay uint16, err error) {
-	if !atomic.CompareAndSwapInt32(&f.once, 0, 1) {
-		return 0, errAgain
-	}
-	defer atomic.StoreInt32(&f.once, 0)
 	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
 		_, err := proxy.HealthCheck(ctx, url)
 		if err != nil {
@@ -121,12 +117,18 @@ func (f *Fallback) healthCheck(ctx context.Context, url string, checkAllInGroup 
 		}
 		return proxy, nil
 	}
-	if result, err := groupHealthCheck(ctx, f.proxies, url, checkAllInGroup, checkSingle); err == nil {
-		if fast, ok := result.(C.Proxy); ok {
+	select {
+	case <-ctx.Done():
+		return 0, errTimeout
+	case result := <-f.group.DoChan("healthcheck", func() (interface{}, error) {
+		return groupHealthCheck(ctx, f.proxies, url, checkAllInGroup, checkSingle)
+	}):
+		if result.Err == nil {
+			fast := result.Val.(C.Proxy)
 			return fast.LastDelay(), nil
 		}
+		return 0, result.Err
 	}
-	return 0, err
 }
 
 func NewFallback(option FallbackOption, proxies []C.Proxy) (*Fallback, error) {
@@ -150,7 +152,6 @@ func NewFallback(option FallbackOption, proxies []C.Proxy) (*Fallback, error) {
 		rawURL:   option.URL,
 		interval: interval,
 		done:     make(chan struct{}),
-		once:     0,
 	}
 	go Fallback.loop()
 	return Fallback, nil

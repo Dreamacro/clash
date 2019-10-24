@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 
 	C "github.com/Dreamacro/clash/constant"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type URLTest struct {
@@ -18,7 +19,7 @@ type URLTest struct {
 	fast     C.Proxy
 	interval time.Duration
 	done     chan struct{}
-	once     int32
+	group    singleflight.Group
 }
 
 type URLTestOption struct {
@@ -84,10 +85,6 @@ func (u *URLTest) HealthCheck(ctx context.Context, url string) (uint16, error) {
 }
 
 func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (C.Proxy, error) {
-	if !atomic.CompareAndSwapInt32(&u.once, 0, 1) {
-		return nil, errAgain
-	}
-	defer atomic.StoreInt32(&u.once, 0)
 	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
 		_, err := proxy.HealthCheck(ctx, url)
 		if err != nil {
@@ -95,13 +92,19 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 		}
 		return proxy, nil
 	}
-	result, err := groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
-	if err == nil {
-		fast, _ := result.(C.Proxy)
-		u.fast = fast
-		return fast, nil
+	select {
+	case <-ctx.Done():
+		return nil, errTimeout
+	case result := <-u.group.DoChan("healthcheck", func() (interface{}, error) {
+		return groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
+	}):
+		if result.Err == nil {
+			fast := result.Val.(C.Proxy)
+			u.fast = fast
+			return fast, nil
+		}
+		return nil, result.Err
 	}
-	return nil, err
 }
 
 func (u *URLTest) loop() {
@@ -163,7 +166,6 @@ func NewURLTest(option URLTestOption, proxies []C.Proxy) (*URLTest, error) {
 		fast:     proxies[0],
 		interval: interval,
 		done:     make(chan struct{}),
-		once:     0,
 	}
 	go urlTest.loop()
 	return urlTest, nil

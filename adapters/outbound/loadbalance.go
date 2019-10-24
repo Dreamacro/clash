@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/Dreamacro/clash/common/murmur3"
 	C "github.com/Dreamacro/clash/constant"
 
 	"golang.org/x/net/publicsuffix"
+	"golang.org/x/sync/singleflight"
 )
 
 type LoadBalance struct {
@@ -21,7 +21,7 @@ type LoadBalance struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
-	once     int32
+	group    singleflight.Group
 }
 
 func getKey(metadata *C.Metadata) string {
@@ -112,21 +112,20 @@ func (lb *LoadBalance) HealthCheck(ctx context.Context, url string) (uint16, err
 }
 
 func (lb *LoadBalance) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (uint16, error) {
-	if !atomic.CompareAndSwapInt32(&lb.once, 0, 1) {
-		return 0, errAgain
-	}
-	defer atomic.StoreInt32(&lb.once, 0)
 	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
 		return proxy.HealthCheck(ctx, url)
 	}
-
-	result, err := groupHealthCheck(ctx, lb.proxies, url, checkAllInGroup, checkSingle)
-	if err == nil {
-		if delay, ok := result.(uint16); ok {
-			return delay, nil
+	select {
+	case <-ctx.Done():
+		return 0, errTimeout
+	case result := <-lb.group.DoChan("healthcheck", func() (interface{}, error) {
+		return groupHealthCheck(ctx, lb.proxies, url, checkAllInGroup, checkSingle)
+	}):
+		if result.Err == nil {
+			return result.Val.(uint16), nil
 		}
+		return 0, result.Err
 	}
-	return 0, err
 }
 
 func (lb *LoadBalance) loop() {

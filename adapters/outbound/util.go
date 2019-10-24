@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -246,7 +245,7 @@ func groupHealthCheck(ctx context.Context, proxies []C.Proxy, url string, checkA
 	}
 
 	if result == nil {
-		return nil, errors.New("timeout")
+		return nil, errTimeout
 	}
 	return result, nil
 }
