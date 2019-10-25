@@ -77,14 +77,14 @@ func (u *URLTest) HealthCheck(ctx context.Context, url string) (uint16, error) {
 	if url == "" {
 		url = u.rawURL
 	}
-	fast, err := u.healthCheck(ctx, url, false)
+	delay, err := u.healthCheck(ctx, url, false)
 	if err != nil {
 		return 0, err
 	}
-	return fast.LastDelay(), nil
+	return delay, nil
 }
 
-func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (C.Proxy, error) {
+func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup bool) (uint16, error) {
 	checkSingle := func(ctx context.Context, proxy C.Proxy) (interface{}, error) {
 		_, err := proxy.HealthCheck(ctx, url)
 		if err != nil {
@@ -94,16 +94,16 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 	}
 	select {
 	case <-ctx.Done():
-		return nil, errTimeout
+		return 0, errTimeout
 	case result := <-u.group.DoChan("healthcheck", func() (interface{}, error) {
 		return groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
 	}):
 		if result.Err == nil {
 			fast := result.Val.(C.Proxy)
 			u.fast = fast
-			return fast, nil
+			return fast.LastDelay(), nil
 		}
-		return nil, result.Err
+		return 0, result.Err
 	}
 }
 
