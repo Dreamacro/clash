@@ -8,8 +8,6 @@ import (
 	"time"
 
 	C "github.com/Dreamacro/clash/constant"
-
-	"golang.org/x/sync/singleflight"
 )
 
 type URLTest struct {
@@ -19,7 +17,6 @@ type URLTest struct {
 	fast     C.Proxy
 	interval time.Duration
 	done     chan struct{}
-	group    singleflight.Group
 }
 
 type URLTestOption struct {
@@ -95,7 +92,7 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 	select {
 	case <-ctx.Done():
 		return 0, errTimeout
-	case result := <-u.group.DoChan("healthcheck", func() (interface{}, error) {
+	case result := <-healthCheckGroup.DoChan(getGroupKey(ctx), func() (interface{}, error) {
 		return groupHealthCheck(ctx, u.proxies, url, checkAllInGroup, checkSingle)
 	}):
 		if result.Err == nil {
@@ -109,8 +106,9 @@ func (u *URLTest) healthCheck(ctx context.Context, url string, checkAllInGroup b
 
 func (u *URLTest) loop() {
 	tick := time.NewTicker(u.interval)
+	back := WithGroupKey(context.Background(), MakeGroupKey(u.Name(), u.rawURL, defaultURLTestTimeout.Nanoseconds()))
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 		defer cancel()
 		u.healthCheck(ctx, u.rawURL, true)
 	}()
@@ -119,7 +117,7 @@ Loop:
 		select {
 		case <-tick.C:
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 				defer cancel()
 				u.healthCheck(ctx, u.rawURL, true)
 			}()

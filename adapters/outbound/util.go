@@ -184,43 +184,54 @@ func resolveUDPAddr(network, address string) (*net.UDPAddr, error) {
 
 // urlTest get the delay to the specified URL of the Proxy
 func urlTest(ctx context.Context, p C.ProxyAdapter, url string) (t uint16, err error) {
-	addr, err := urlToMetadata(url)
-	if err != nil {
+	test := func() (t interface{}, err error) {
+		addr, err := urlToMetadata(url)
+		if err != nil {
+			return
+		}
+
+		start := time.Now()
+		instance, err := p.DialContext(ctx, &addr)
+		if err != nil {
+			return
+		}
+		defer instance.Close()
+
+		req, err := http.NewRequest(http.MethodHead, url, nil)
+		if err != nil {
+			return
+		}
+		req = req.WithContext(ctx)
+
+		transport := &http.Transport{
+			Dial: func(string, string) (net.Conn, error) {
+				return instance, nil
+			},
+			// from http.DefaultTransport
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+
+		client := http.Client{Transport: transport}
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		resp.Body.Close()
+		t = uint16(time.Since(start) / time.Millisecond)
 		return
 	}
-
-	start := time.Now()
-	instance, err := p.DialContext(ctx, &addr)
-	if err != nil {
-		return
+	select {
+	case <-ctx.Done():
+		return 0, errTimeout
+	case result := <-healthCheckGroup.DoChan(getGroupKey(ctx), test):
+		if result.Err == nil {
+			return result.Val.(uint16), nil
+		}
+		return 0, result.Err
 	}
-	defer instance.Close()
-
-	req, err := http.NewRequest(http.MethodHead, url, nil)
-	if err != nil {
-		return
-	}
-	req = req.WithContext(ctx)
-
-	transport := &http.Transport{
-		Dial: func(string, string) (net.Conn, error) {
-			return instance, nil
-		},
-		// from http.DefaultTransport
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
-	client := http.Client{Transport: transport}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
-	t = uint16(time.Since(start) / time.Millisecond)
-	return
 }
 
 func groupHealthCheck(ctx context.Context, proxies []C.Proxy, url string, checkAllInGroup bool,
@@ -235,7 +246,11 @@ func groupHealthCheck(ctx context.Context, proxies []C.Proxy, url string, checkA
 	for _, p := range proxies {
 		proxy := p
 		picker.Go(func() (interface{}, error) {
-			return checkSingle(ctx, proxy)
+			// since healthcheck of single proxy triggered in this method may get canceled by fast peer,
+			// we should user a different group key(<group name><url><timeout><proxy name> used here)
+			// to distinguish it from user-requested healthcheck(key <proxy name><url><timeout> used)
+			newCtx := WithGroupKey(ctx, getGroupKey(ctx)+proxy.Name())
+			return checkSingle(newCtx, proxy)
 		})
 	}
 
@@ -248,4 +263,23 @@ func groupHealthCheck(ctx context.Context, proxies []C.Proxy, url string, checkA
 		return nil, errTimeout
 	}
 	return result, nil
+}
+
+type contextKeyType string
+
+// MakeGroupKey makes a key for singleflight group of healthcheck
+func MakeGroupKey(name, url string, timeout int64) string {
+	return name + url + strconv.FormatInt(timeout, 10)
+}
+
+// WithGroupKey encapsulate a group key of healthCheckGroup into parent context
+func WithGroupKey(parent context.Context, key string) context.Context {
+	return context.WithValue(parent, contextKeyType("HealthCheckGroupKey"), key)
+}
+
+func getGroupKey(ctx context.Context) string {
+	if key, ok := ctx.Value(contextKeyType("HealthCheckGroupKey")).(string); ok {
+		return key
+	}
+	return ""
 }

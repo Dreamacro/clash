@@ -11,7 +11,6 @@ import (
 	C "github.com/Dreamacro/clash/constant"
 
 	"golang.org/x/net/publicsuffix"
-	"golang.org/x/sync/singleflight"
 )
 
 type LoadBalance struct {
@@ -21,7 +20,6 @@ type LoadBalance struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
-	group    singleflight.Group
 }
 
 func getKey(metadata *C.Metadata) string {
@@ -118,7 +116,7 @@ func (lb *LoadBalance) healthCheck(ctx context.Context, url string, checkAllInGr
 	select {
 	case <-ctx.Done():
 		return 0, errTimeout
-	case result := <-lb.group.DoChan("healthcheck", func() (interface{}, error) {
+	case result := <-healthCheckGroup.DoChan(getGroupKey(ctx), func() (interface{}, error) {
 		return groupHealthCheck(ctx, lb.proxies, url, checkAllInGroup, checkSingle)
 	}):
 		if result.Err == nil {
@@ -130,8 +128,9 @@ func (lb *LoadBalance) healthCheck(ctx context.Context, url string, checkAllInGr
 
 func (lb *LoadBalance) loop() {
 	tick := time.NewTicker(lb.interval)
+	back := WithGroupKey(context.Background(), MakeGroupKey(lb.Name(), lb.rawURL, defaultURLTestTimeout.Nanoseconds()))
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 		defer cancel()
 		lb.healthCheck(ctx, lb.rawURL, true)
 	}()
@@ -140,7 +139,7 @@ Loop:
 		select {
 		case <-tick.C:
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 				defer cancel()
 				lb.healthCheck(ctx, lb.rawURL, true)
 			}()

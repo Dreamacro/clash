@@ -111,7 +111,8 @@ func getProxyDelay(w http.ResponseWriter, r *http.Request) {
 
 	proxy := r.Context().Value(CtxKeyProxy).(C.Proxy)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+	back := A.WithGroupKey(context.Background(), A.MakeGroupKey(proxy.Name(), url, timeout*time.Millisecond.Nanoseconds()))
+	ctx, cancel := context.WithTimeout(back, time.Millisecond*time.Duration(timeout))
 	defer cancel()
 
 	delay, err := proxy.HealthCheck(ctx, url)
@@ -145,7 +146,8 @@ func checkProxyHealth(w http.ResponseWriter, r *http.Request) {
 
 	proxy := r.Context().Value(CtxKeyProxy).(*A.Proxy)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
+	back := A.WithGroupKey(context.Background(), A.MakeGroupKey(proxy.Name(), url, timeout*time.Millisecond.Nanoseconds()))
+	ctx, cancel := context.WithTimeout(back, time.Millisecond*time.Duration(timeout))
 	defer cancel()
 
 	t, err := proxy.HealthCheck(ctx, url)

@@ -8,8 +8,6 @@ import (
 	"time"
 
 	C "github.com/Dreamacro/clash/constant"
-
-	"golang.org/x/sync/singleflight"
 )
 
 type Fallback struct {
@@ -18,7 +16,6 @@ type Fallback struct {
 	rawURL   string
 	interval time.Duration
 	done     chan struct{}
-	group    singleflight.Group
 }
 
 type FallbackOption struct {
@@ -74,8 +71,9 @@ func (f *Fallback) Destroy() {
 
 func (f *Fallback) loop() {
 	tick := time.NewTicker(f.interval)
+	back := WithGroupKey(context.Background(), MakeGroupKey(f.Name(), f.rawURL, defaultURLTestTimeout.Nanoseconds()))
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+		ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 		defer cancel()
 		f.healthCheck(ctx, f.rawURL, true)
 	}()
@@ -84,7 +82,7 @@ Loop:
 		select {
 		case <-tick.C:
 			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), defaultURLTestTimeout)
+				ctx, cancel := context.WithTimeout(back, defaultURLTestTimeout)
 				defer cancel()
 				f.healthCheck(ctx, f.rawURL, true)
 			}()
@@ -121,7 +119,7 @@ func (f *Fallback) healthCheck(ctx context.Context, url string, checkAllInGroup 
 	select {
 	case <-ctx.Done():
 		return 0, errTimeout
-	case result := <-f.group.DoChan("healthcheck", func() (interface{}, error) {
+	case result := <-healthCheckGroup.DoChan(getGroupKey(ctx), func() (interface{}, error) {
 		return groupHealthCheck(ctx, f.proxies, url, checkAllInGroup, checkSingle)
 	}):
 		if result.Err == nil {

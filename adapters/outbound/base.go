@@ -9,11 +9,14 @@ import (
 
 	"github.com/Dreamacro/clash/common/queue"
 	C "github.com/Dreamacro/clash/constant"
+
+	"golang.org/x/sync/singleflight"
 )
 
 var (
 	defaultURLTestTimeout = time.Second * 5
 	errTimeout            = errors.New("timeout")
+	healthCheckGroup      = &singleflight.Group{}
 )
 
 type Base struct {
