@@ -14,7 +14,7 @@ type Pool struct {
 	min     uint32
 	gateway uint32
 	offset  uint32
-	mux     *sync.Mutex
+	mux     sync.Mutex
 	cache   *cache.LruCache
 }
 
@@ -111,7 +111,6 @@ func New(ipnet *net.IPNet, size int) (*Pool, error) {
 		min:     min,
 		max:     max,
 		gateway: min - 1,
-		mux:     &sync.Mutex{},
 		cache:   cache.NewLRUCache(cache.WithSize(size * 2)),
 	}, nil
 }

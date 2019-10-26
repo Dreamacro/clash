@@ -20,11 +20,11 @@ func parseSocksAddr(target socks5.Addr) *C.Metadata {
 		metadata.DstPort = strconv.Itoa((int(target[2+target[1]]) << 8) | int(target[2+target[1]+1]))
 	case socks5.AtypIPv4:
 		ip := net.IP(target[1 : 1+net.IPv4len])
-		metadata.DstIP = &ip
+		metadata.DstIP = ip
 		metadata.DstPort = strconv.Itoa((int(target[1+net.IPv4len]) << 8) | int(target[1+net.IPv4len+1]))
 	case socks5.AtypIPv6:
 		ip := net.IP(target[1 : 1+net.IPv6len])
-		metadata.DstIP = &ip
+		metadata.DstIP = ip
 		metadata.DstPort = strconv.Itoa((int(target[1+net.IPv6len]) << 8) | int(target[1+net.IPv6len+1]))
 	}
 
@@ -55,18 +55,18 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 		default:
 			metadata.AddrType = C.AtypIPv4
 		}
-		metadata.DstIP = &ip
+		metadata.DstIP = ip
 	}
 
 	return metadata
 }
 
-func parseAddr(addr string) (*net.IP, string, error) {
+func parseAddr(addr string) (net.IP, string, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, "", err
 	}
 
 	ip := net.ParseIP(host)
-	return &ip, port, nil
+	return ip, port, nil
 }

@@ -15,7 +15,7 @@ func (dk *DomainKeyword) RuleType() C.RuleType {
 	return C.DomainKeyword
 }
 
-func (dk *DomainKeyword) IsMatch(metadata *C.Metadata) bool {
+func (dk *DomainKeyword) Match(metadata *C.Metadata) bool {
 	if metadata.AddrType != C.AtypDomainName {
 		return false
 	}
@@ -31,7 +31,7 @@ func (dk *DomainKeyword) Payload() string {
 	return dk.keyword
 }
 
-func (dk *DomainKeyword) IsNeedIP() bool {
+func (dk *DomainKeyword) NoResolveIP() bool {
 	return false
 }
 

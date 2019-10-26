@@ -427,7 +427,7 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		var (
 			payload string
 			target  string
-			params  []string
+			params  = []string{}
 		)
 
 		switch l := len(rule); {
@@ -448,10 +448,13 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
 		}
 
-		noResolve := R.HasParam(params, C.NoResolve)
-
 		rule = trimArr(rule)
-		var parsed C.Rule
+		params = trimArr(params)
+		var (
+			parseErr error
+			parsed   C.Rule
+		)
+
 		switch rule[0] {
 		case "DOMAIN":
 			parsed = R.NewDomain(payload, target)
@@ -460,26 +463,20 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		case "DOMAIN-KEYWORD":
 			parsed = R.NewDomainKeyword(payload, target)
 		case "GEOIP":
-			parsed = R.NewGEOIP(payload, target, R.WithGEOIPIsNeedIP(!noResolve))
+			noResolve := R.HasNoResolve(params)
+			parsed = R.NewGEOIP(payload, target, noResolve)
 		case "IP-CIDR", "IP-CIDR6":
-			if rule := R.NewIPCIDR(payload, target, R.WithIPCIDRIsNeedIP(!noResolve)); rule != nil {
-				parsed = rule
-			}
+			noResolve := R.HasNoResolve(params)
+			parsed, parseErr = R.NewIPCIDR(payload, target, R.WithIPCIDRNoResolve(noResolve))
 		// deprecated when bump to 1.0
 		case "SOURCE-IP-CIDR":
 			fallthrough
 		case "SRC-IP-CIDR":
-			if rule := R.NewIPCIDR(payload, target, R.WithIPCIDRIsSourceIP(true), R.WithIPCIDRIsNeedIP(!noResolve)); rule != nil {
-				parsed = rule
-			}
+			parsed, parseErr = R.NewIPCIDR(payload, target, R.WithIPCIDRSourceIP(true))
 		case "SRC-PORT":
-			if rule := R.NewPort(payload, target, true); rule != nil {
-				parsed = rule
-			}
+			parsed, parseErr = R.NewPort(payload, target, true)
 		case "DST-PORT":
-			if rule := R.NewPort(payload, target, false); rule != nil {
-				parsed = rule
-			}
+			parsed, parseErr = R.NewPort(payload, target, false)
 		case "MATCH":
 			fallthrough
 		// deprecated when bump to 1.0
@@ -487,8 +484,8 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 			parsed = R.NewMatch(target)
 		}
 
-		if parsed == nil {
-			return nil, fmt.Errorf("Rules[%d] [%s] error: payload invalid", idx, line)
+		if parseErr != nil {
+			return nil, fmt.Errorf("Rules[%d] [%s] error: %s", idx, line, parseErr.Error())
 		}
 
 		rules = append(rules, parsed)

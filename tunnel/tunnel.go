@@ -30,7 +30,7 @@ type Tunnel struct {
 	natTable  *nat.Table
 	rules     []C.Rule
 	proxies   map[string]C.Proxy
-	configMux *sync.RWMutex
+	configMux sync.RWMutex
 	traffic   *C.Traffic
 
 	// experimental features
@@ -121,9 +121,14 @@ func (t *Tunnel) needLookupIP(metadata *C.Metadata) bool {
 }
 
 func (t *Tunnel) resolveMetadata(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
+	// handle host equal IP string
+	if ip := net.ParseIP(metadata.Host); ip != nil {
+		metadata.DstIP = ip
+	}
+
 	// preprocess enhanced-mode metadata
 	if t.needLookupIP(metadata) {
-		host, exist := dns.DefaultResolver.IPToHost(*metadata.DstIP)
+		host, exist := dns.DefaultResolver.IPToHost(metadata.DstIP)
 		if exist {
 			metadata.Host = host
 			metadata.AddrType = C.AtypDomainName
@@ -248,7 +253,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
 }
 
 func (t *Tunnel) shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
-	return rule.IsNeedIP() && metadata.Host != "" && metadata.DstIP == nil
+	return !rule.NoResolveIP() && metadata.Host != "" && metadata.DstIP == nil
 }
 
 func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
@@ -259,7 +264,7 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 
 	if node := dns.DefaultHosts.Search(metadata.Host); node != nil {
 		ip := node.Data.(net.IP)
-		metadata.DstIP = &ip
+		metadata.DstIP = ip
 		resolved = true
 	}
 
@@ -273,12 +278,12 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 				log.Debugln("[DNS] resolve %s error: %s", metadata.Host, err.Error())
 			} else {
 				log.Debugln("[DNS] %s --> %s", metadata.Host, ip.String())
-				metadata.DstIP = &ip
+				metadata.DstIP = ip
 			}
 			resolved = true
 		}
 
-		if rule.IsMatch(metadata) {
+		if rule.Match(metadata) {
 			adapter, ok := t.proxies[rule.Adapter()]
 			if !ok {
 				continue
@@ -296,13 +301,12 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 
 func newTunnel() *Tunnel {
 	return &Tunnel{
-		tcpQueue:  channels.NewInfiniteChannel(),
-		udpQueue:  channels.NewInfiniteChannel(),
-		natTable:  nat.New(),
-		proxies:   make(map[string]C.Proxy),
-		configMux: &sync.RWMutex{},
-		traffic:   C.NewTraffic(time.Second),
-		mode:      Rule,
+		tcpQueue: channels.NewInfiniteChannel(),
+		udpQueue: channels.NewInfiniteChannel(),
+		natTable: nat.New(),
+		proxies:  make(map[string]C.Proxy),
+		traffic:  C.NewTraffic(time.Second),
+		mode:     Rule,
 	}
 }
 

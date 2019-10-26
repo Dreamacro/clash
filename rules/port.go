@@ -19,7 +19,7 @@ func (p *Port) RuleType() C.RuleType {
 	return C.DstPort
 }
 
-func (p *Port) IsMatch(metadata *C.Metadata) bool {
+func (p *Port) Match(metadata *C.Metadata) bool {
 	if p.isSource {
 		return metadata.SrcPort == p.port
 	}
@@ -34,18 +34,18 @@ func (p *Port) Payload() string {
 	return p.port
 }
 
-func (p *Port) IsNeedIP() bool {
+func (p *Port) NoResolveIP() bool {
 	return false
 }
 
-func NewPort(port string, adapter string, isSource bool) *Port {
+func NewPort(port string, adapter string, isSource bool) (*Port, error) {
 	_, err := strconv.Atoi(port)
 	if err != nil {
-		return nil
+		return nil, errPayload
 	}
 	return &Port{
 		adapter:  adapter,
 		port:     port,
 		isSource: isSource,
-	}
+	}, nil
 }

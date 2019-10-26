@@ -6,30 +6,25 @@ import (
 	C "github.com/Dreamacro/clash/constant"
 )
 
-type IPCIDR struct {
-	ipnet      *net.IPNet
-	adapter    string
-	isSourceIP bool
-	isNeedIP   bool
-}
-
-var defaultIPCIDR = IPCIDR{
-	isSourceIP: false,
-	isNeedIP:   true,
-}
-
 type IPCIDROption func(*IPCIDR)
 
-func WithIPCIDRIsSourceIP(b bool) IPCIDROption {
+func WithIPCIDRSourceIP(b bool) IPCIDROption {
 	return func(i *IPCIDR) {
 		i.isSourceIP = b
 	}
 }
 
-func WithIPCIDRIsNeedIP(b bool) IPCIDROption {
+func WithIPCIDRNoResolve(noResolve bool) IPCIDROption {
 	return func(i *IPCIDR) {
-		i.isNeedIP = b
+		i.noResolveIP = !noResolve
 	}
+}
+
+type IPCIDR struct {
+	ipnet       *net.IPNet
+	adapter     string
+	isSourceIP  bool
+	noResolveIP bool
 }
 
 func (i *IPCIDR) RuleType() C.RuleType {
@@ -39,15 +34,12 @@ func (i *IPCIDR) RuleType() C.RuleType {
 	return C.IPCIDR
 }
 
-func (i *IPCIDR) IsMatch(metadata *C.Metadata) bool {
+func (i *IPCIDR) Match(metadata *C.Metadata) bool {
 	ip := metadata.DstIP
-	if !i.isNeedIP {
-		ip = HostToIP(metadata.Host)
-	}
 	if i.isSourceIP {
 		ip = metadata.SrcIP
 	}
-	return ip != nil && i.ipnet.Contains(*ip)
+	return ip != nil && i.ipnet.Contains(ip)
 }
 
 func (i *IPCIDR) Adapter() string {
@@ -58,20 +50,24 @@ func (i *IPCIDR) Payload() string {
 	return i.ipnet.String()
 }
 
-func (i *IPCIDR) IsNeedIP() bool {
-	return i.isNeedIP
+func (i *IPCIDR) NoResolveIP() bool {
+	return i.noResolveIP
 }
 
-func NewIPCIDR(s string, adapter string, opts ...IPCIDROption) *IPCIDR {
+func NewIPCIDR(s string, adapter string, opts ...IPCIDROption) (*IPCIDR, error) {
 	_, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
-		return nil
+		return nil, errPayload
 	}
-	ipcidr := defaultIPCIDR
+
+	ipcidr := &IPCIDR{
+		ipnet:   ipnet,
+		adapter: adapter,
+	}
+
 	for _, o := range opts {
-		o(&ipcidr)
+		o(ipcidr)
 	}
-	ipcidr.ipnet = ipnet
-	ipcidr.adapter = adapter
-	return &ipcidr
+
+	return ipcidr, nil
 }

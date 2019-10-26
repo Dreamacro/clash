@@ -2,8 +2,6 @@ package constant
 
 // Rule Type
 const (
-	NoResolve = "no-resolve"
-
 	Domain RuleType = iota
 	DomainSuffix
 	DomainKeyword
@@ -44,8 +42,8 @@ func (rt RuleType) String() string {
 
 type Rule interface {
 	RuleType() RuleType
-	IsMatch(metadata *Metadata) bool
+	Match(metadata *Metadata) bool
 	Adapter() string
 	Payload() string
-	IsNeedIP() bool
+	NoResolveIP() bool
 }

@@ -33,8 +33,8 @@ type Type int
 type Metadata struct {
 	NetWork  NetWork
 	Type     Type
-	SrcIP    *net.IP
-	DstIP    *net.IP
+	SrcIP    net.IP
+	DstIP    net.IP
 	SrcPort  string
 	DstPort  string
 	AddrType int
