@@ -56,7 +56,7 @@ func (t Type) MarshalJSON() ([]byte, error) {
 
 // Metadata is used to store connection address
 type Metadata struct {
-  NetWork  NetWork `json:"network"`
+	NetWork  NetWork `json:"network"`
 	Type     Type    `json:"type"`
 	SrcIP    net.IP  `json:"sourceIP"`
 	DstIP    net.IP  `json:"destinationIP"`
