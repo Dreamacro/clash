@@ -1,6 +1,7 @@
 package constant
 
 import (
+	"encoding/json"
 	"net"
 )
 
@@ -14,6 +15,7 @@ const (
 	UDP
 
 	HTTP Type = iota
+	HTTPCONNECT
 	SOCKS
 	REDIR
 )
@@ -27,18 +29,41 @@ func (n *NetWork) String() string {
 	return "udp"
 }
 
+func (n NetWork) MarshalJSON() ([]byte, error) {
+	return json.Marshal(n.String())
+}
+
 type Type int
+
+func (t Type) String() string {
+	switch t {
+	case HTTP:
+		return "HTTP"
+	case HTTPCONNECT:
+		return "HTTP Connect"
+	case SOCKS:
+		return "Socks5"
+	case REDIR:
+		return "Redir"
+	default:
+		return "Unknown"
+	}
+}
+
+func (t Type) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
+}
 
 // Metadata is used to store connection address
 type Metadata struct {
-	NetWork  NetWork
-	Type     Type
-	SrcIP    net.IP
-	DstIP    net.IP
-	SrcPort  string
-	DstPort  string
-	AddrType int
-	Host     string
+  NetWork  NetWork `json:"network"`
+	Type     Type    `json:"type"`
+	SrcIP    net.IP  `json:"sourceIP"`
+	DstIP    net.IP  `json:"destinationIP"`
+	SrcPort  string  `json:"sourcePort"`
+	DstPort  string  `json:"destinationPort"`
+	AddrType int     `json:"-"`
+	Host     string  `json:"host"`
 }
 
 func (m *Metadata) RemoteAddress() string {

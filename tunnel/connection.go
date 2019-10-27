@@ -13,12 +13,11 @@ import (
 )
 
 func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
-	conn := newTrafficTrack(outbound, t.traffic)
 	req := request.R
 	host := req.Host
 
 	inboundReeder := bufio.NewReader(request)
-	outboundReeder := bufio.NewReader(conn)
+	outboundReeder := bufio.NewReader(outbound)
 
 	for {
 		keepAlive := strings.TrimSpace(strings.ToLower(req.Header.Get("Proxy-Connection"))) == "keep-alive"
@@ -26,7 +25,7 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		req.Header.Set("Connection", "close")
 		req.RequestURI = ""
 		adapters.RemoveHopByHopHeaders(req.Header)
-		err := req.Write(conn)
+		err := req.Write(outbound)
 		if err != nil {
 			break
 		}
@@ -36,6 +35,7 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		if err != nil {
 			break
 		}
+		defer resp.Body.Close()
 		adapters.RemoveHopByHopHeaders(resp.Header)
 
 		if resp.StatusCode == http.StatusContinue {
@@ -56,6 +56,13 @@ func (t *Tunnel) handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		}
 		err = resp.Write(request)
 		if err != nil || resp.Close {
+			break
+		}
+
+		buf := pool.BufPool.Get().([]byte)
+		_, err = io.CopyBuffer(request, resp.Body, buf)
+		pool.BufPool.Put(buf[:cap(buf)])
+		if err != nil && err != io.EOF {
 			break
 		}
 
@@ -83,7 +90,7 @@ func (t *Tunnel) handleUDPToRemote(conn net.Conn, pc net.PacketConn, addr net.Ad
 	if _, err = pc.WriteTo(buf[:n], addr); err != nil {
 		return
 	}
-	t.traffic.Up() <- int64(n)
+	DefaultManager.Upload() <- int64(n)
 }
 
 func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, key string, timeout time.Duration) {
@@ -103,13 +110,12 @@ func (t *Tunnel) handleUDPToLocal(conn net.Conn, pc net.PacketConn, key string, 
 		if err != nil {
 			return
 		}
-		t.traffic.Down() <- int64(n)
+		DefaultManager.Download() <- int64(n)
 	}
 }
 
 func (t *Tunnel) handleSocket(request *adapters.SocketAdapter, outbound net.Conn) {
-	conn := newTrafficTrack(outbound, t.traffic)
-	relay(request, conn)
+	relay(request, outbound)
 }
 
 // relay copies between left and right bidirectionally.

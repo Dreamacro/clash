@@ -40,7 +40,6 @@ func parseHTTPAddr(request *http.Request) *C.Metadata {
 
 	metadata := &C.Metadata{
 		NetWork:  C.TCP,
-		Type:     C.HTTP,
 		AddrType: C.AtypDomainName,
 		Host:     host,
 		DstIP:    nil,

@@ -93,8 +93,6 @@ func dialContext(ctx context.Context, network, address string) (net.Conn, error)
 		return nil, err
 	}
 
-	dialer := net.Dialer{}
-
 	returned := make(chan struct{})
 	defer close(returned)
 
@@ -109,6 +107,7 @@ func dialContext(ctx context.Context, network, address string) (net.Conn, error)
 	var primary, fallback dialResult
 
 	startRacer := func(ctx context.Context, host string, ipv6 bool) {
+		dialer := net.Dialer{}
 		result := dialResult{ipv6: ipv6, done: true}
 		defer func() {
 			select {

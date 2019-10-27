@@ -29,7 +29,7 @@ func (g *GEOIP) Match(metadata *C.Metadata) bool {
 	if ip == nil {
 		return false
 	}
-	record, _ := mmdb.Country(ip)
+  record, _ := mmdb.Country(ip)
 	return record.Country.IsoCode == g.country
 }
 

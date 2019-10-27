@@ -31,7 +31,6 @@ type Tunnel struct {
 	rules     []C.Rule
 	proxies   map[string]C.Proxy
 	configMux sync.RWMutex
-	traffic   *C.Traffic
 
 	// experimental features
 	ignoreResolveFail bool
@@ -48,11 +47,6 @@ func (t *Tunnel) Add(req C.ServerAdapter) {
 	case C.UDP:
 		t.udpQueue.In() <- req
 	}
-}
-
-// Traffic return traffic of all connections
-func (t *Tunnel) Traffic() *C.Traffic {
-	return t.traffic
 }
 
 // Rules return all rules
@@ -193,8 +187,8 @@ func (t *Tunnel) handleUDPConn(localConn C.ServerAdapter) {
 				wg.Done()
 				return
 			}
-			pc = rawPc
 			addr = nAddr
+			pc = newUDPTracker(rawPc, DefaultManager, metadata, rule)
 
 			if rule != nil {
 				log.Infoln("%s --> %v match %s using %s", metadata.SrcIP.String(), metadata.String(), rule.RuleType().String(), rawPc.Chains().String())
@@ -236,6 +230,7 @@ func (t *Tunnel) handleTCPConn(localConn C.ServerAdapter) {
 		log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
 		return
 	}
+	remoteConn = newTCPTracker(remoteConn, DefaultManager, metadata, rule)
 	defer remoteConn.Close()
 
 	if rule != nil {
@@ -305,7 +300,6 @@ func newTunnel() *Tunnel {
 		udpQueue: channels.NewInfiniteChannel(),
 		natTable: nat.New(),
 		proxies:  make(map[string]C.Proxy),
-		traffic:  C.NewTraffic(time.Second),
 		mode:     Rule,
 	}
 }

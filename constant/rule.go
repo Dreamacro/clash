@@ -24,7 +24,7 @@ func (rt RuleType) String() string {
 	case DomainKeyword:
 		return "DomainKeyword"
 	case GEOIP:
-		return "GEOIP"
+		return "GeoIP"
 	case IPCIDR:
 		return "IPCIDR"
 	case SrcIPCIDR:
@@ -34,7 +34,7 @@ func (rt RuleType) String() string {
 	case DstPort:
 		return "DstPort"
 	case MATCH:
-		return "MATCH"
+		return "Match"
 	default:
 		return "Unknown"
 	}
