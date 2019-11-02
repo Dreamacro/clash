@@ -13,6 +13,7 @@ import (
 var (
 	allowLan    = false
 	bindAddress = "*"
+	redirBindAddress = "*"
 
 	socksListener    *socks.SockListener
 	socksUDPListener *socks.SockUDPListener
@@ -39,12 +40,20 @@ func BindAddress() string {
 	return bindAddress
 }
 
+func RedirBindAddress() string {
+	return redirBindAddress
+}
+
 func SetAllowLan(al bool) {
 	allowLan = al
 }
 
 func SetBindAddress(host string) {
 	bindAddress = host
+}
+
+func SetRedirBindAddress(host string) {
+	redirBindAddress = host
 }
 
 func ReCreateHTTP(port int) error {
@@ -114,8 +123,7 @@ func reCreateSocksUDP(addr string) error {
 }
 
 func ReCreateRedir(port int) error {
-	// Redirection always need to listen at 0.0.0.0 and [::0] to work.
-	addr := fmt.Sprintf(":%d", port)
+	addr := genAddr(redirBindAddress, port, allowLan)
 
 	if redirListener != nil {
 		if redirListener.Address() == addr {
@@ -180,5 +188,5 @@ func genAddr(host string, port int, allowLan bool) string {
 		}
 	}
 
-	return fmt.Sprintf("127.0.0.1:%d", port)
+	return fmt.Sprintf("[::1]:%d", port)
 }

@@ -43,14 +43,15 @@ func GetGeneral() *config.General {
 	}
 
 	general := &config.General{
-		Port:           ports.Port,
-		SocksPort:      ports.SocksPort,
-		RedirPort:      ports.RedirPort,
-		Authentication: authenticator,
-		AllowLan:       P.AllowLan(),
-		BindAddress:    P.BindAddress(),
-		Mode:           T.Instance().Mode(),
-		LogLevel:       log.Level(),
+		Port:             ports.Port,
+		SocksPort:        ports.SocksPort,
+		RedirPort:        ports.RedirPort,
+		RedirBindAddress: P.RedirBindAddress(),
+		Authentication:   authenticator,
+		AllowLan:         P.AllowLan(),
+		BindAddress:      P.BindAddress(),
+		Mode:             T.Instance().Mode(),
+		LogLevel:         log.Level(),
 	}
 
 	return general
@@ -117,6 +118,9 @@ func updateGeneral(general *config.General) {
 
 	bindAddress := general.BindAddress
 	P.SetBindAddress(bindAddress)
+
+	redirBindAddress := general.RedirBindAddress
+	P.SetRedirBindAddress(redirBindAddress)
 
 	if err := P.ReCreateHTTP(general.Port); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())
