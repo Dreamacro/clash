@@ -61,9 +61,8 @@ func NewIPCIDR(s string, adapter string, opts ...IPCIDROption) (*IPCIDR, error) 
 	}
 
 	ipcidr := &IPCIDR{
-		ipnet:       ipnet,
-		adapter:     adapter,
-		noResolveIP: true,
+		ipnet:   ipnet,
+		adapter: adapter,
 	}
 
 	for _, o := range opts {

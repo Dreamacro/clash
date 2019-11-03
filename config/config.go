@@ -472,7 +472,7 @@ func parseRules(cfg *rawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 		case "SOURCE-IP-CIDR":
 			fallthrough
 		case "SRC-IP-CIDR":
-			parsed, parseErr = R.NewIPCIDR(payload, target, R.WithIPCIDRSourceIP(true))
+			parsed, parseErr = R.NewIPCIDR(payload, target, R.WithIPCIDRSourceIP(true), R.WithIPCIDRNoResolve(true))
 		case "SRC-PORT":
 			parsed, parseErr = R.NewPort(payload, target, true)
 		case "DST-PORT":
