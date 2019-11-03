@@ -35,7 +35,7 @@ func (p *Port) Payload() string {
 }
 
 func (p *Port) NoResolveIP() bool {
-	return false
+	return true
 }
 
 func NewPort(port string, adapter string, isSource bool) (*Port, error) {

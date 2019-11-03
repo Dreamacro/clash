@@ -25,7 +25,7 @@ func (f *Match) Payload() string {
 }
 
 func (f *Match) NoResolveIP() bool {
-	return false
+	return true
 }
 
 func NewMatch(adapter string) *Match {

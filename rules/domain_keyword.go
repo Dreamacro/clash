@@ -32,7 +32,7 @@ func (dk *DomainKeyword) Payload() string {
 }
 
 func (dk *DomainKeyword) NoResolveIP() bool {
-	return false
+	return true
 }
 
 func NewDomainKeyword(keyword string, adapter string) *DomainKeyword {

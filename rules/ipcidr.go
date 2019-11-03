@@ -16,7 +16,7 @@ func WithIPCIDRSourceIP(b bool) IPCIDROption {
 
 func WithIPCIDRNoResolve(noResolve bool) IPCIDROption {
 	return func(i *IPCIDR) {
-		i.noResolveIP = !noResolve
+		i.noResolveIP = noResolve
 	}
 }
 

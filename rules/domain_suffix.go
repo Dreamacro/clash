@@ -32,7 +32,7 @@ func (ds *DomainSuffix) Payload() string {
 }
 
 func (ds *DomainSuffix) NoResolveIP() bool {
-	return false
+	return true
 }
 
 func NewDomainSuffix(suffix string, adapter string) *DomainSuffix {

@@ -31,7 +31,7 @@ func (d *Domain) Payload() string {
 }
 
 func (d *Domain) NoResolveIP() bool {
-	return false
+	return true
 }
 
 func NewDomain(domain string, adapter string) *Domain {
