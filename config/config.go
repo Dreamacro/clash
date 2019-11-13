@@ -28,6 +28,7 @@ type General struct {
 	Port               int          `json:"port"`
 	SocksPort          int          `json:"socks-port"`
 	RedirPort          int          `json:"redir-port"`
+	RedirBindAddress   string       `json:"redir-bind-address"`
 	Authentication     []string     `json:"authentication"`
 	AllowLan           bool         `json:"allow-lan"`
 	BindAddress        string       `json:"bind-address"`
@@ -92,6 +93,7 @@ type rawConfig struct {
 	Port               int          `yaml:"port"`
 	SocksPort          int          `yaml:"socks-port"`
 	RedirPort          int          `yaml:"redir-port"`
+	RedirBindAddress   string       `yaml:"redir-bind-address"`
 	Authentication     []string     `yaml:"authentication"`
 	AllowLan           bool         `yaml:"allow-lan"`
 	BindAddress        string       `yaml:"bind-address"`
@@ -143,15 +145,16 @@ func readConfig(path string) (*rawConfig, error) {
 
 	// config with some default value
 	rawConfig := &rawConfig{
-		AllowLan:       false,
-		BindAddress:    "*",
-		Mode:           T.Rule,
-		Authentication: []string{},
-		LogLevel:       log.INFO,
-		Hosts:          map[string]string{},
-		Rule:           []string{},
-		Proxy:          []map[string]interface{}{},
-		ProxyGroup:     []map[string]interface{}{},
+		AllowLan:         false,
+		BindAddress:      "*",
+		RedirBindAddress: "*",
+		Mode:             T.Rule,
+		Authentication:   []string{},
+		LogLevel:         log.INFO,
+		Hosts:            map[string]string{},
+		Rule:             []string{},
+		Proxy:            []map[string]interface{}{},
+		ProxyGroup:       []map[string]interface{}{},
 		Experimental: Experimental{
 			IgnoreResolveFail: true,
 		},
@@ -217,6 +220,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 	port := cfg.Port
 	socksPort := cfg.SocksPort
 	redirPort := cfg.RedirPort
+	redirBindAddress := cfg.RedirBindAddress
 	allowLan := cfg.AllowLan
 	bindAddress := cfg.BindAddress
 	externalController := cfg.ExternalController
@@ -239,6 +243,7 @@ func parseGeneral(cfg *rawConfig) (*General, error) {
 		Port:               port,
 		SocksPort:          socksPort,
 		RedirPort:          redirPort,
+		RedirBindAddress:   redirBindAddress,
 		AllowLan:           allowLan,
 		BindAddress:        bindAddress,
 		Mode:               mode,
