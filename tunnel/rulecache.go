@@ -71,7 +71,8 @@ func (ruleCache *RuleMatchLruCache) newRuleMatchCacheKey(metadata C.Metadata) ru
 
 // Put put result into cache
 func (ruleCache *RuleMatchLruCache) Put(metadata C.Metadata, proxy C.Proxy, rule C.Rule) {
-	log.Debugln("[RULE] put into cache metadata %s match rule %s hit in cache", metadata, rule)
+	log.Debugln("[RULE] put into cache metadata host %s, dst ip %s, match rule %s %s, proxy %s",
+		metadata.Host, metadata.DstIP, rule.RuleType(), rule.Payload(), proxy.Name())
 	key := ruleCache.newRuleMatchCacheKey(metadata)
 	value := ruleMatchCacheValue{proxy: proxy, rule: rule}
 	ruleCache.cache.Set(key, value)
@@ -83,7 +84,9 @@ func (ruleCache *RuleMatchLruCache) Get(metadata C.Metadata) (C.Proxy, C.Rule, b
 	elem, exist := ruleCache.cache.Get(key)
 	if exist {
 		value := elem.(ruleMatchCacheValue)
-		log.Debugln("[RULE] metadata %s match rule %s hit in cache", value.proxy, value.rule)
+		log.Debugln("[RULE] metadata host %s, dst ip %s, match rule %s %s, proxy %s hit in cache",
+			metadata.Host, metadata.DstIP, value.rule.RuleType(), value.rule.Payload(),
+			value.proxy.Name())
 		return value.proxy, value.rule, exist
 	}
 	return nil, nil, exist
