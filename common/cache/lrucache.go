@@ -164,6 +164,14 @@ func (c *LruCache) deleteElement(le *list.Element) {
 	}
 }
 
+// Clear delete all the items
+func (c *LruCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.cache = make(map[interface{}]*list.Element)
+}
+
 type entry struct {
 	key     interface{}
 	value   interface{}

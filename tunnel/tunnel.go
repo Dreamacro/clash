@@ -26,13 +26,14 @@ var (
 
 // Tunnel handle relay inbound proxy and outbound proxy
 type Tunnel struct {
-	tcpQueue  *channels.InfiniteChannel
-	udpQueue  *channels.InfiniteChannel
-	natTable  *nat.Table
-	rules     []C.Rule
-	proxies   map[string]C.Proxy
-	providers map[string]provider.ProxyProvider
-	configMux sync.RWMutex
+	tcpQueue       *channels.InfiniteChannel
+	udpQueue       *channels.InfiniteChannel
+	natTable       *nat.Table
+	rules          []C.Rule
+	proxies        map[string]C.Proxy
+	providers      map[string]provider.ProxyProvider
+	ruleMatchCache *RuleMatchLruCache
+	configMux      sync.RWMutex
 
 	// experimental features
 	ignoreResolveFail bool
@@ -59,7 +60,14 @@ func (t *Tunnel) Rules() []C.Rule {
 // UpdateRules handle update rules
 func (t *Tunnel) UpdateRules(rules []C.Rule) {
 	t.configMux.Lock()
+	t.ruleMatchCache.Clear(true)
 	t.rules = rules
+	for _, rule := range rules {
+		if rule.RuleType() == C.SrcPort {
+			port := rule.Payload()
+			t.ruleMatchCache.AddSrcPort(port)
+		}
+	}
 	t.configMux.Unlock()
 }
 
@@ -76,6 +84,7 @@ func (t *Tunnel) Providers() map[string]provider.ProxyProvider {
 // UpdateProxies handle update proxies
 func (t *Tunnel) UpdateProxies(proxies map[string]C.Proxy, providers map[string]provider.ProxyProvider) {
 	t.configMux.Lock()
+	t.ruleMatchCache.Clear(false)
 	t.proxies = proxies
 	t.providers = providers
 	t.configMux.Unlock()
@@ -263,6 +272,13 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	t.configMux.RLock()
 	defer t.configMux.RUnlock()
 
+	if proxy, rule, exist := t.ruleMatchCache.Get(*metadata); exist {
+		return proxy, rule, nil
+	}
+
+	// metadata may be changed, for example dst ip. original metadata is used as cache key
+	originMetadata := metadata.DeepCopy()
+
 	var resolved bool
 
 	if node := dns.DefaultHosts.Search(metadata.Host); node != nil {
@@ -296,19 +312,22 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 				log.Debugln("%v UDP is not supported", adapter.Name())
 				continue
 			}
+			t.ruleMatchCache.Put(originMetadata, adapter, rule)
 			return adapter, rule, nil
 		}
 	}
+	t.ruleMatchCache.Put(originMetadata, t.proxies["DIRECT"], nil)
 	return t.proxies["DIRECT"], nil, nil
 }
 
 func newTunnel() *Tunnel {
 	return &Tunnel{
-		tcpQueue: channels.NewInfiniteChannel(),
-		udpQueue: channels.NewInfiniteChannel(),
-		natTable: nat.New(),
-		proxies:  make(map[string]C.Proxy),
-		mode:     Rule,
+		tcpQueue:       channels.NewInfiniteChannel(),
+		udpQueue:       channels.NewInfiniteChannel(),
+		natTable:       nat.New(),
+		proxies:        make(map[string]C.Proxy),
+		ruleMatchCache: NewRuleMatchLruCache(),
+		mode:           Rule,
 	}
 }
 

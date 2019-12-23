@@ -83,3 +83,20 @@ func (m *Metadata) String() string {
 func (m *Metadata) Valid() bool {
 	return m.Host != "" || m.DstIP != nil
 }
+
+func (m *Metadata) DeepCopy() Metadata {
+	result := *m
+	if (m.SrcIP) != nil {
+		result.SrcIP = copyIP(m.SrcIP)
+	}
+	if (m.DstIP) != nil {
+		result.SrcIP = copyIP(m.DstIP)
+	}
+	return result
+}
+
+func copyIP(ip net.IP) net.IP {
+	dup := make(net.IP, len(ip))
+	copy(dup, ip)
+	return dup
+}
