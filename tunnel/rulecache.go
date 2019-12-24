@@ -1,6 +1,8 @@
 package tunnel
 
 import (
+	"fmt"
+
 	"github.com/Dreamacro/clash/common/cache"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
@@ -17,18 +19,6 @@ var (
 type RuleMatchLruCache struct {
 	srcPorts map[string]bool // key is src port
 	cache    *cache.LruCache
-}
-
-// ruleMatchCacheKey match lru cache key, change Metadata field to primitive type, so it can be used as map key
-type ruleMatchCacheKey struct {
-	NetWork  C.NetWork
-	Type     C.Type
-	SrcIP    string
-	DstIP    string
-	SrcPort  string
-	DstPort  string
-	AddrType int
-	Host     string
 }
 
 // ruleMatchCacheValue match lru cache value
@@ -48,45 +38,33 @@ func (ruleCache *RuleMatchLruCache) withSrcPortKey(port string) bool {
 	return exist
 }
 
-func (ruleCache *RuleMatchLruCache) newRuleMatchCacheKey(metadata C.Metadata) ruleMatchCacheKey {
-	key := ruleMatchCacheKey{
-		NetWork:  metadata.NetWork,
-		Type:     metadata.Type,
-		DstPort:  metadata.DstPort,
-		AddrType: metadata.AddrType,
-		Host:     metadata.Host,
-	}
-	if metadata.SrcIP != nil {
-		key.SrcIP = metadata.SrcIP.String()
-	}
-	if metadata.DstIP != nil {
-		key.DstIP = metadata.DstIP.String()
-	}
+// NewRuleMatchCacheKey create unique key
+func (ruleCache *RuleMatchLruCache) NewRuleMatchCacheKey(metadata C.Metadata) string {
+	srcPort := ""
 	if len(metadata.SrcPort) > 0 && ruleCache.withSrcPortKey(metadata.SrcPort) {
-		key.SrcPort = metadata.SrcPort
+		srcPort = metadata.SrcPort
 	}
-
-	return key
+	format := "%s-%s-%s-%s-%s-%s-%d-%s"
+	return fmt.Sprintf(format, metadata.NetWork.String(), metadata.Type.String(),
+		metadata.SrcIP, metadata.DstIP, srcPort, metadata.DstPort,
+		metadata.AddrType, metadata.Host)
 }
 
 // Put put result into cache
-func (ruleCache *RuleMatchLruCache) Put(metadata C.Metadata, proxy C.Proxy, rule C.Rule) {
-	log.Debugln("[RULE] put into cache metadata host %s, dst ip %s, match rule %s %s, proxy %s",
-		metadata.Host, metadata.DstIP, rule.RuleType(), rule.Payload(), proxy.Name())
-	key := ruleCache.newRuleMatchCacheKey(metadata)
+func (ruleCache *RuleMatchLruCache) Put(key string, proxy C.Proxy, rule C.Rule) {
+	log.Debugln("[RULE] put into cache, metadata %s, match rule %s %s, proxy %s",
+		key, rule.RuleType(), rule.Payload(), proxy.Name())
 	value := ruleMatchCacheValue{proxy: proxy, rule: rule}
 	ruleCache.cache.Set(key, value)
 }
 
 // Get get proxy from cache
-func (ruleCache *RuleMatchLruCache) Get(metadata C.Metadata) (C.Proxy, C.Rule, bool) {
-	key := ruleCache.newRuleMatchCacheKey(metadata)
+func (ruleCache *RuleMatchLruCache) Get(key string) (C.Proxy, C.Rule, bool) {
 	elem, exist := ruleCache.cache.Get(key)
 	if exist {
 		value := elem.(ruleMatchCacheValue)
-		log.Debugln("[RULE] metadata host %s, dst ip %s, match rule %s %s, proxy %s hit in cache",
-			metadata.Host, metadata.DstIP, value.rule.RuleType(), value.rule.Payload(),
-			value.proxy.Name())
+		log.Debugln("[RULE] hit in cache, metadata %s, match rule %s %s, proxy %s ",
+			key, value.rule.RuleType(), value.rule.Payload(), value.proxy.Name())
 		return value.proxy, value.rule, exist
 	}
 	return nil, nil, exist
@@ -102,8 +80,9 @@ func (ruleCache *RuleMatchLruCache) Clear(ruleUpdate bool) {
 
 // NewRuleMatchLruCache create new RuleMatchLruCache
 func NewRuleMatchLruCache() *RuleMatchLruCache {
+	lru := cache.NewLRUCache(cache.WithSize(1000), cache.WithAge(60*2))
 	return &RuleMatchLruCache{
 		srcPorts: make(map[string]bool),
-		cache:    cache.NewLRUCache(cache.WithSize(1000)),
+		cache:    lru,
 	}
 }

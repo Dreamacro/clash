@@ -272,12 +272,12 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	t.configMux.RLock()
 	defer t.configMux.RUnlock()
 
-	if proxy, rule, exist := t.ruleMatchCache.Get(*metadata); exist {
+	key := t.ruleMatchCache.NewRuleMatchCacheKey(*metadata)
+	if proxy, rule, exist := t.ruleMatchCache.Get(key); exist {
 		return proxy, rule, nil
 	}
 
 	// metadata may be changed, for example dst ip. original metadata is used as cache key
-	originMetadata := metadata.DeepCopy()
 
 	var resolved bool
 
@@ -312,11 +312,11 @@ func (t *Tunnel) match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 				log.Debugln("%v UDP is not supported", adapter.Name())
 				continue
 			}
-			t.ruleMatchCache.Put(originMetadata, adapter, rule)
+			t.ruleMatchCache.Put(key, adapter, rule)
 			return adapter, rule, nil
 		}
 	}
-	t.ruleMatchCache.Put(originMetadata, t.proxies["DIRECT"], nil)
+	t.ruleMatchCache.Put(key, t.proxies["DIRECT"], nil)
 	return t.proxies["DIRECT"], nil, nil
 }
 
