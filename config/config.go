@@ -314,7 +314,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 		proxies[groupName] = outbound.NewProxy(group)
 	}
 
-	// initial compatible provier
+	// initial compatible provider
 	for _, pd := range providersMap {
 		if pd.VehicleType() != provider.Compatible {
 			continue
@@ -331,7 +331,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 		ps = append(ps, proxies[v])
 	}
 	hc := provider.NewHealthCheck(ps, "", 0)
-	pd, _ := provider.NewCompatibleProvier(provider.ReservedName, ps, hc)
+	pd, _ := provider.NewCompatibleProvider(provider.ReservedName, ps, hc)
 	providersMap[provider.ReservedName] = pd
 
 	global := outboundgroup.NewSelector("GLOBAL", []provider.ProxyProvider{pd})

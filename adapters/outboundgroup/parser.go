@@ -56,7 +56,7 @@ func ParseProxyGroup(config map[string]interface{}, proxyMap map[string]C.Proxy,
 		// if Use not empty, drop health check options
 		if len(groupOption.Use) != 0 {
 			hc := provider.NewHealthCheck(ps, "", 0)
-			pd, err := provider.NewCompatibleProvier(groupName, ps, hc)
+			pd, err := provider.NewCompatibleProvider(groupName, ps, hc)
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +66,7 @@ func ParseProxyGroup(config map[string]interface{}, proxyMap map[string]C.Proxy,
 			// select don't need health check
 			if groupOption.Type == "select" {
 				hc := provider.NewHealthCheck(ps, "", 0)
-				pd, err := provider.NewCompatibleProvier(groupName, ps, hc)
+				pd, err := provider.NewCompatibleProvider(groupName, ps, hc)
 				if err != nil {
 					return nil, err
 				}
@@ -79,7 +79,7 @@ func ParseProxyGroup(config map[string]interface{}, proxyMap map[string]C.Proxy,
 				}
 
 				hc := provider.NewHealthCheck(ps, groupOption.URL, uint(groupOption.Interval))
-				pd, err := provider.NewCompatibleProvier(groupName, ps, hc)
+				pd, err := provider.NewCompatibleProvider(groupName, ps, hc)
 				if err != nil {
 					return nil, err
 				}
