@@ -5,12 +5,12 @@ RUN apk add --no-cache make git && \
 WORKDIR /clash-src
 COPY . /clash-src
 RUN go mod download && \
-    make linux-amd64 && \
-    mv ./bin/clash-linux-amd64 /clash
+    make all-arch
 
 FROM alpine:latest
 
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /Country.mmdb /root/.config/clash/
-COPY --from=builder /clash /
-ENTRYPOINT ["/clash"]
+COPY --from=builder /clash-src/bin/* /
+COPY --from=builder /clash-src/bin/clash-linux-amd64 /clash
+CMD ["/clash"]
