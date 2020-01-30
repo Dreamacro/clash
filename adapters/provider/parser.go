@@ -41,7 +41,7 @@ func ParseProxyProvider(name string, mapping map[string]interface{}) (ProxyProvi
 	}
 	hc := NewHealthCheck([]C.Proxy{}, schema.HealthCheck.URL, hcInterval)
 
-	path := C.Path.Reslove(schema.Path)
+	path := C.Path.Resolve(schema.Path)
 
 	var vehicle Vehicle
 	switch schema.Type {

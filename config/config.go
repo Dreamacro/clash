@@ -207,7 +207,7 @@ func parseGeneral(cfg *RawConfig) (*General, error) {
 	logLevel := cfg.LogLevel
 
 	if externalUI != "" {
-		externalUI = C.Path.Reslove(externalUI)
+		externalUI = C.Path.Resolve(externalUI)
 
 		if _, err := os.Stat(externalUI); os.IsNotExist(err) {
 			return nil, fmt.Errorf("external-ui: %s not exist", externalUI)

@@ -44,8 +44,8 @@ func (p *path) Config() string {
 	return p.configFile
 }
 
-// Reslove return a absolute path or a relative path with homedir
-func (p *path) Reslove(path string) string {
+// Resolve return a absolute path or a relative path with homedir
+func (p *path) Resolve(path string) string {
 	if !filepath.IsAbs(path) {
 		return filepath.Join(p.HomeDir(), path)
 	}
