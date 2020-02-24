@@ -6,10 +6,20 @@ import (
 )
 
 // Parse call at the beginning of clash
-func Parse() error {
+func Parse(externalUI *string, externalController *string, secret *string) error {
 	cfg, err := executor.Parse()
 	if err != nil {
 		return err
+	}
+
+	if externalUI != nil {
+		cfg.General.ExternalUI = *externalUI
+	}
+	if externalController != nil {
+		cfg.General.ExternalController = *externalController
+	}
+	if secret != nil {
+		cfg.General.Secret = *secret
 	}
 
 	if cfg.General.ExternalUI != "" {

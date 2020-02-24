@@ -16,16 +16,28 @@ import (
 )
 
 var (
+	flagset    map[string]bool
 	version    bool
 	homeDir    string
 	configFile string
+	externalUI string
+	externalController string
+	secret     string
 )
 
 func init() {
 	flag.StringVar(&homeDir, "d", "", "set configuration directory")
 	flag.StringVar(&configFile, "f", "", "specify configuration file")
+	flag.StringVar(&externalUI, "ext-ui", "", "override external ui directory")
+	flag.StringVar(&externalController, "ext-ctl", "", "override external controller address")
+	flag.StringVar(&secret, "secret", "", "override secret for RESTful API")
 	flag.BoolVar(&version, "v", false, "show current version of clash")
 	flag.Parse()
+
+	flagset = make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		flagset[f.Name] = true
+	})
 }
 
 func main() {
@@ -57,7 +69,20 @@ func main() {
 		log.Fatalln("Initial configuration directory error: %s", err.Error())
 	}
 
-	if err := hub.Parse(); err != nil {
+	externalUIPtr := &externalUI
+	if !flagset["ext-ui"] {
+		externalUIPtr = nil
+	}
+	externalControllerPtr := &externalController
+	if !flagset["ext-ctl"] {
+		externalControllerPtr = nil
+	}
+	secretPtr := &secret
+	if !flagset["secret"] {
+		secretPtr = nil
+	}
+
+	if err := hub.Parse(externalUIPtr, externalControllerPtr, secretPtr); err != nil {
 		log.Fatalln("Parse config error: %s", err.Error())
 	}
 
