@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"time"
 
 	trie "github.com/Dreamacro/clash/component/domain-trie"
 )
@@ -27,10 +28,18 @@ type Resolver interface {
 	ResolveIPv6(host string) (ip net.IP, err error)
 }
 
+// ChooseSearchedIP randomly choose a IP from all the IPs bind to the given hostname
+func ChooseSearchedIP(node *trie.Node) net.IP {
+	ips := node.Data.([]net.IP)
+	// round robin choose next one for every 30 seconds
+	result := ips[int(time.Now().Unix()/30)%len(ips)]
+	return result
+}
+
 // ResolveIPv4 with a host, return ipv4
 func ResolveIPv4(host string) (net.IP, error) {
 	if node := DefaultHosts.Search(host); node != nil {
-		if ip := node.Data.(net.IP).To4(); ip != nil {
+		if ip := ChooseSearchedIP(node).To4(); ip != nil {
 			return ip, nil
 		}
 	}
@@ -64,7 +73,7 @@ func ResolveIPv4(host string) (net.IP, error) {
 // ResolveIPv6 with a host, return ipv6
 func ResolveIPv6(host string) (net.IP, error) {
 	if node := DefaultHosts.Search(host); node != nil {
-		if ip := node.Data.(net.IP).To16(); ip != nil {
+		if ip := ChooseSearchedIP(node).To16(); ip != nil {
 			return ip, nil
 		}
 	}
@@ -98,7 +107,7 @@ func ResolveIPv6(host string) (net.IP, error) {
 // ResolveIP with a host, return ip
 func ResolveIP(host string) (net.IP, error) {
 	if node := DefaultHosts.Search(host); node != nil {
-		return node.Data.(net.IP), nil
+		return ChooseSearchedIP(node), nil
 	}
 
 	if DefaultResolver != nil {

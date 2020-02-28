@@ -3,9 +3,11 @@ package trie
 import (
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-var localIP = net.IP{127, 0, 0, 1}
+var localIP = []net.IP{{127, 0, 0, 1}, {127, 0, 0, 2}}
 
 func TestTrie_Basic(t *testing.T) {
 	tree := New()
@@ -23,9 +25,7 @@ func TestTrie_Basic(t *testing.T) {
 		t.Error("should not recv nil")
 	}
 
-	if !node.Data.(net.IP).Equal(localIP) {
-		t.Error("should equal 127.0.0.1")
-	}
+	assert.Equal(t, localIP, node.Data.([]net.IP), "should be the same IP addresses")
 
 	if tree.Insert("", localIP) == nil {
 		t.Error("should return error")
