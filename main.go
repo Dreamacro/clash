@@ -62,8 +62,6 @@ func main() {
 	}
 
 	if testConfig {
-		// silence INFO logs during config parsing
-		log.SetLevel(log.WARNING)
 		if _, err := executor.Parse(); err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			fmt.Printf("configuration file %s test failed\n", constant.Path.Config())
