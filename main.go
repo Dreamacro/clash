@@ -63,12 +63,11 @@ func main() {
 
 	if testConfig {
 		if _, err := executor.Parse(); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+			log.Errorln(err.Error())
 			fmt.Printf("configuration file %s test failed\n", constant.Path.Config())
 			os.Exit(1)
-		} else {
-			fmt.Printf("configuration file %s test is successful\n", constant.Path.Config())
 		}
+		fmt.Printf("configuration file %s test is successful\n", constant.Path.Config())
 		return
 	}
 
