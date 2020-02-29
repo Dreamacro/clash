@@ -299,8 +299,8 @@ func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 
 	var resolved bool
 
-	if node := resolver.DefaultHosts.Search(metadata.Host); node != nil {
-		ip := resolver.ChooseSearchedIP(node)
+	ip := resolver.ResolveIPFromHosts(metadata.Host, 0)
+	if ip != nil {
 		metadata.DstIP = ip
 		resolved = true
 	}

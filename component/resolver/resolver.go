@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Dreamacro/clash/common/cache"
 	trie "github.com/Dreamacro/clash/component/domain-trie"
+	"github.com/Dreamacro/clash/constant"
 )
 
 var (
@@ -15,6 +17,8 @@ var (
 
 	// DefaultHosts aim to resolve hosts
 	DefaultHosts = trie.New()
+
+	hostsCache = cache.NewLRUCache(cache.WithSize(500))
 )
 
 var (
@@ -28,20 +32,48 @@ type Resolver interface {
 	ResolveIPv6(host string) (ip net.IP, err error)
 }
 
-// ChooseSearchedIP randomly choose a IP from all the IPs bind to the given hostname
-func ChooseSearchedIP(node *trie.Node) net.IP {
-	ips := node.Data.([]net.IP)
-	// round robin choose next one for every 30 seconds
+// ResolveIPFromHosts randomly resolve IP from user given hosts bindings
+func ResolveIPFromHosts(host string, ipGen int) net.IP {
+	var ips []net.IP
+	if cached, ok := hostsCache.Get(host + string(ipGen)); ok {
+		ips = cached.([]net.IP)
+		result := ips[int(time.Now().Unix()/30)%len(ips)]
+		return result
+	}
+
+	node := DefaultHosts.Search(host)
+	if node == nil {
+		return nil
+	}
+
+	ips = node.Data.([]net.IP)
+	if ipGen != 0 {
+		searched := make([]net.IP, 0)
+		for _, ip := range ips {
+			if ipGen == constant.AtypIPv4 && ip.To4() != nil {
+				searched = append(searched, ip)
+			}
+
+			if ipGen == constant.AtypIPv6 && ip.To4() == nil {
+				searched = append(searched, ip)
+			}
+		}
+		ips = searched
+	}
+
+	if len(ips) != 0 {
+		hostsCache.Set(host+string(ipGen), ips)
+	}
+
 	result := ips[int(time.Now().Unix()/30)%len(ips)]
 	return result
 }
 
 // ResolveIPv4 with a host, return ipv4
 func ResolveIPv4(host string) (net.IP, error) {
-	if node := DefaultHosts.Search(host); node != nil {
-		if ip := ChooseSearchedIP(node).To4(); ip != nil {
-			return ip, nil
-		}
+	resolved := ResolveIPFromHosts(host, constant.AtypIPv4)
+	if resolved != nil {
+		return resolved, nil
 	}
 
 	ip := net.ParseIP(host)
@@ -72,10 +104,9 @@ func ResolveIPv4(host string) (net.IP, error) {
 
 // ResolveIPv6 with a host, return ipv6
 func ResolveIPv6(host string) (net.IP, error) {
-	if node := DefaultHosts.Search(host); node != nil {
-		if ip := ChooseSearchedIP(node).To16(); ip != nil {
-			return ip, nil
-		}
+	resolved := ResolveIPFromHosts(host, constant.AtypIPv6)
+	if resolved != nil {
+		return resolved, nil
 	}
 
 	ip := net.ParseIP(host)
@@ -106,8 +137,9 @@ func ResolveIPv6(host string) (net.IP, error) {
 
 // ResolveIP with a host, return ip
 func ResolveIP(host string) (net.IP, error) {
-	if node := DefaultHosts.Search(host); node != nil {
-		return ChooseSearchedIP(node), nil
+	resolved := ResolveIPFromHosts(host, 0)
+	if resolved != nil {
+		return resolved, nil
 	}
 
 	if DefaultResolver != nil {
