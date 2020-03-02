@@ -107,7 +107,7 @@ type RawConfig struct {
 	Secret             string       `yaml:"secret"`
 
 	ProxyProvider map[string]map[string]interface{} `yaml:"proxy-provider"`
-	Hosts         map[string]string                 `yaml:"hosts"`
+	Hosts         map[string][]string               `yaml:"hosts"`
 	DNS           RawDNS                            `yaml:"dns"`
 	Experimental  Experimental                      `yaml:"experimental"`
 	Proxy         []map[string]interface{}          `yaml:"Proxy"`
@@ -133,7 +133,7 @@ func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
 		Mode:           T.Rule,
 		Authentication: []string{},
 		LogLevel:       log.INFO,
-		Hosts:          map[string]string{},
+		Hosts:          map[string][]string{},
 		Rule:           []string{},
 		Proxy:          []map[string]interface{}{},
 		ProxyGroup:     []map[string]interface{}{},
@@ -429,12 +429,16 @@ func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 func parseHosts(cfg *RawConfig) (*trie.Trie, error) {
 	tree := trie.New()
 	if len(cfg.Hosts) != 0 {
-		for domain, ipStr := range cfg.Hosts {
-			ip := net.ParseIP(ipStr)
-			if ip == nil {
-				return nil, fmt.Errorf("%s is not a valid IP", ipStr)
+		for domain, ipStrs := range cfg.Hosts {
+			ips := make([]net.IP, 0)
+			for _, ipStr := range ipStrs {
+				ip := net.ParseIP(ipStr)
+				if ip == nil {
+					return nil, fmt.Errorf("%s is not a valid IP", ipStr)
+				}
+				ips = append(ips, ip)
 			}
-			tree.Insert(domain, ip)
+			tree.Insert(domain, ips)
 		}
 	}
 
