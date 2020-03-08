@@ -376,7 +376,7 @@ func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 	rulesConfig := cfg.Rule
 
 	// remove after 1.0
-	if len(rules) == 0 {
+	if len(rulesConfig) == 0 {
 		rulesConfig = cfg.RuleOld
 	}
 
