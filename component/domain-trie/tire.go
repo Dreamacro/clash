@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	longwildcard = "**"
 	wildcard   = "*"
 	domainStep = "."
 )
@@ -67,6 +68,9 @@ func (t *Trie) Search(domain string) *Node {
 
 		var child *Node
 		if !n.hasChild(part) {
+			if n.hasChild(longwildcard) {
+				return n
+			}
 			if !n.hasChild(wildcard) {
 				return nil
 			}
