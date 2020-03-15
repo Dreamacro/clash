@@ -55,6 +55,11 @@ func (l LogLevel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(l.String())
 }
 
+// MarshalYAML serialize LogLevel with yaml
+func (l LogLevel) MarshalYAML() (interface{}, error) {
+	return l.String(), nil
+}
+
 func (l LogLevel) String() string {
 	switch l {
 	case INFO:

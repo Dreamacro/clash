@@ -11,7 +11,6 @@ import (
 	"github.com/Dreamacro/clash/log"
 
 	D "github.com/miekg/dns"
-	yaml "gopkg.in/yaml.v2"
 )
 
 var (
@@ -46,8 +45,8 @@ func (e *EnhancedMode) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // MarshalYAML serialize EnhancedMode with yaml
-func (e EnhancedMode) MarshalYAML() ([]byte, error) {
-	return yaml.Marshal(e.String())
+func (e EnhancedMode) MarshalYAML() (interface{}, error) {
+	return e.String(), nil
 }
 
 // UnmarshalJSON unserialize EnhancedMode with json

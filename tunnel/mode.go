@@ -51,6 +51,11 @@ func (m TunnelMode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.String())
 }
 
+// MarshalYAML serialize TunnelMode with yaml
+func (m TunnelMode) MarshalYAML() (interface{}, error) {
+	return m.String(), nil
+}
+
 func (m TunnelMode) String() string {
 	switch m {
 	case Global:
