@@ -20,11 +20,11 @@
 ## Features
 
 - Local HTTP/HTTPS/SOCKS server with/without authentication
-- VMess, Shadowsocks, Trojan (experimental), Snell protocol support to circumvent firewall DPI. UDP is supported.
+- VMess, Shadowsocks, Trojan (experimental), Snell protocol support for remote connections. UDP is supported.
 - Built-in DNS server that aims to minimize DNS pollution attacks, supports DoH/DoT upstream. Fake IP is also supported.
-- Proxy rules based off domains, GEOIP, IP CIDR or ports to forward packets to different nodes
-- Proxy groups, allowing users to implement powerful rules. Supports automatic fallback, load balancing or auto select node based off latency
-- Proxy providers, allowing users to get node lists remotely instead of hardcoding in config
+- Rules based off domains, GEOIP, IP CIDR or ports to forward packets to different nodes
+- Remote groups allow users to implement powerful rules. Supports automatic fallback, load balancing or auto select node based off latency
+- Remote providers, allowing users to get node lists remotely instead of hardcoding in config
 - Netfilter TCP redirecting. You can deploy Clash on your Internet gateway with `iptables`.
 - Comprehensive HTTP API controller
 
