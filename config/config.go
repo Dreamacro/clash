@@ -295,7 +295,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 		proxyList = append(proxyList, proxy.Name())
 	}
 
-	// keep the origional order of ProxyGroups in config file
+	// keep the original order of ProxyGroups in config file
 	for idx, mapping := range groupsConfig {
 		groupName, existName := mapping["name"].(string)
 		if !existName {
