@@ -361,6 +361,7 @@ rules:
   - GEOIP,CN,DIRECT
   - DST-PORT,80,DIRECT
   - SRC-PORT,7777,DIRECT
+  - NETWORK,udp,PROXY
   # FINAL would remove after prerelease
   # you also can use `FINAL,Proxy` or `FINAL,,Proxy` now
   - MATCH,auto

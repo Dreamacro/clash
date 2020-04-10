@@ -10,6 +10,7 @@ const (
 	SrcIPCIDR
 	SrcPort
 	DstPort
+	Network
 	MATCH
 )
 
@@ -33,6 +34,8 @@ func (rt RuleType) String() string {
 		return "SrcPort"
 	case DstPort:
 		return "DstPort"
+	case Network:
+		return "Network"
 	case MATCH:
 		return "Match"
 	default:

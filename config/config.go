@@ -436,6 +436,8 @@ func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 			parsed, parseErr = R.NewPort(payload, target, true)
 		case "DST-PORT":
 			parsed, parseErr = R.NewPort(payload, target, false)
+		case "NETWORK":
+			parsed, parseErr = R.NewNetwork(payload, target)
 		case "MATCH":
 			fallthrough
 		// deprecated when bump to 1.0
