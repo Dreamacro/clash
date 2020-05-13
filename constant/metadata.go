@@ -1,6 +1,7 @@
 package constant
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"strconv"
@@ -65,6 +66,8 @@ type Metadata struct {
 	DstPort  string  `json:"destinationPort"`
 	AddrType int     `json:"-"`
 	Host     string  `json:"host"`
+
+	DialContext func(ctx context.Context, network, address string) (conn net.Conn, err error)
 }
 
 func (m *Metadata) RemoteAddress() string {

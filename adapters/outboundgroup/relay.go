@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net"
 
 	"github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/adapters/provider"
 	"github.com/Dreamacro/clash/common/singledo"
-	"github.com/Dreamacro/clash/component/dialer"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -20,40 +19,26 @@ type Relay struct {
 }
 
 func (r *Relay) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	proxies := r.proxies(metadata)
+	proxies := r.rawProxies()
 	if len(proxies) == 0 {
 		return nil, errors.New("Proxy does not exist")
 	}
-	first := proxies[0]
-	last := proxies[len(proxies)-1]
-
-	c, err := dialer.DialContext(ctx, "tcp", first.Addr())
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", first.Addr(), err)
-	}
-	tcpKeepAlive(c)
-
-	var currentMeta *C.Metadata
+	dialFunc := proxies[0].DialContext
 	for _, proxy := range proxies[1:] {
-		currentMeta, err = addrToMetadata(proxy.Addr())
-		if err != nil {
-			return nil, err
+		previousDialFunc := dialFunc
+		dialFunc = func(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
+			metadata.DialContext = func(ctx context.Context, network, address string) (conn net.Conn, err error) {
+				curMetaData, err := addrToMetadata(address)
+				if err != nil {
+					return nil, err
+				}
+				return previousDialFunc(ctx, curMetaData)
+			}
+			return proxy.DialContext(ctx, metadata)
 		}
-
-		c, err = first.StreamConn(c, currentMeta)
-		if err != nil {
-			return nil, fmt.Errorf("%s connect error: %w", first.Addr(), err)
-		}
-
-		first = proxy
 	}
 
-	c, err = last.StreamConn(c, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", last.Addr(), err)
-	}
-
-	return outbound.NewConn(c, r), nil
+	return dialFunc(ctx, metadata)
 }
 
 func (r *Relay) MarshalJSON() ([]byte, error) {

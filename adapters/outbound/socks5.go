@@ -59,7 +59,11 @@ func (ss *Socks5) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error)
 }
 
 func (ss *Socks5) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	c, err := dialer.DialContext(ctx, "tcp", ss.addr)
+	dialFunc := metadata.DialContext
+	if dialFunc == nil {
+		dialFunc = dialer.DialContext
+	}
+	c, err := dialFunc(ctx, "tcp", ss.addr)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
 	}

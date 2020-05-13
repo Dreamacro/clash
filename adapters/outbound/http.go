@@ -51,7 +51,11 @@ func (h *Http) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 }
 
 func (h *Http) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	c, err := dialer.DialContext(ctx, "tcp", h.addr)
+	dialFunc := metadata.DialContext
+	if dialFunc == nil {
+		dialFunc = dialer.DialContext
+	}
+	c, err := dialFunc(ctx, "tcp", h.addr)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", h.addr, err)
 	}

@@ -39,7 +39,11 @@ func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) 
 }
 
 func (t *Trojan) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	c, err := dialer.DialContext(ctx, "tcp", t.addr)
+	dialFunc := metadata.DialContext
+	if dialFunc == nil {
+		dialFunc = dialer.DialContext
+	}
+	c, err := dialFunc(ctx, "tcp", t.addr)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
