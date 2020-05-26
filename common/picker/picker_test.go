@@ -36,4 +36,5 @@ func TestPicker_Timeout(t *testing.T) {
 
 	number := picker.Wait()
 	assert.Nil(t, number)
+	assert.NotNil(t, picker.Error())
 }

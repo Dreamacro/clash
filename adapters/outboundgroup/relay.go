@@ -20,7 +20,7 @@ type Relay struct {
 }
 
 func (r *Relay) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	proxies := r.proxies()
+	proxies := r.proxies(metadata)
 	if len(proxies) == 0 {
 		return nil, errors.New("Proxy does not exist")
 	}
@@ -58,7 +58,7 @@ func (r *Relay) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, 
 
 func (r *Relay) MarshalJSON() ([]byte, error) {
 	var all []string
-	for _, proxy := range r.proxies() {
+	for _, proxy := range r.rawProxies() {
 		all = append(all, proxy.Name())
 	}
 	return json.Marshal(map[string]interface{}{
@@ -67,12 +67,26 @@ func (r *Relay) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (r *Relay) proxies() []C.Proxy {
+func (r *Relay) rawProxies() []C.Proxy {
 	elm, _, _ := r.single.Do(func() (interface{}, error) {
 		return getProvidersProxies(r.providers), nil
 	})
 
 	return elm.([]C.Proxy)
+}
+
+func (r *Relay) proxies(metadata *C.Metadata) []C.Proxy {
+	proxies := r.rawProxies()
+
+	for n, proxy := range proxies {
+		subproxy := proxy.Unwrap(metadata)
+		for subproxy != nil {
+			proxies[n] = subproxy
+			subproxy = subproxy.Unwrap(metadata)
+		}
+	}
+
+	return proxies
 }
 
 func NewRelay(name string, providers []provider.ProxyProvider) *Relay {

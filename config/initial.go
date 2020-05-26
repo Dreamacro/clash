@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/Dreamacro/clash/component/mmdb"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 )
@@ -25,6 +26,28 @@ func downloadMMDB(path string) (err error) {
 	_, err = io.Copy(f, resp.Body)
 
 	return err
+}
+
+func initMMDB() error {
+	if _, err := os.Stat(C.Path.MMDB()); os.IsNotExist(err) {
+		log.Infoln("Can't find MMDB, start download")
+		if err := downloadMMDB(C.Path.MMDB()); err != nil {
+			return fmt.Errorf("Can't download MMDB: %s", err.Error())
+		}
+	}
+
+	if !mmdb.Verify() {
+		log.Warnln("MMDB invalid, remove and download")
+		if err := os.Remove(C.Path.MMDB()); err != nil {
+			return fmt.Errorf("Can't remove invalid MMDB: %s", err.Error())
+		}
+
+		if err := downloadMMDB(C.Path.MMDB()); err != nil {
+			return fmt.Errorf("Can't download MMDB: %s", err.Error())
+		}
+	}
+
+	return nil
 }
 
 // Init prepare necessary files
@@ -48,11 +71,8 @@ func Init(dir string) error {
 	}
 
 	// initial mmdb
-	if _, err := os.Stat(C.Path.MMDB()); os.IsNotExist(err) {
-		log.Infoln("Can't find MMDB, start download")
-		if err := downloadMMDB(C.Path.MMDB()); err != nil {
-			return fmt.Errorf("Can't download MMDB: %s", err.Error())
-		}
+	if err := initMMDB(); err != nil {
+		return fmt.Errorf("Can't initial MMDB: %w", err)
 	}
 	return nil
 }

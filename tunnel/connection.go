@@ -18,8 +18,8 @@ func handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 	req := request.R
 	host := req.Host
 
-	inboundReeder := bufio.NewReader(request)
-	outboundReeder := bufio.NewReader(outbound)
+	inboundReader := bufio.NewReader(request)
+	outboundReader := bufio.NewReader(outbound)
 
 	for {
 		keepAlive := strings.TrimSpace(strings.ToLower(req.Header.Get("Proxy-Connection"))) == "keep-alive"
@@ -33,7 +33,7 @@ func handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		}
 
 	handleResponse:
-		resp, err := http.ReadResponse(outboundReeder, req)
+		resp, err := http.ReadResponse(outboundReader, req)
 		if err != nil {
 			break
 		}
@@ -61,14 +61,14 @@ func handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 		}
 
 		// even if resp.Write write body to the connection, but some http request have to Copy to close it
-		buf := pool.BufPool.Get().([]byte)
+		buf := pool.Get(pool.RelayBufferSize)
 		_, err = io.CopyBuffer(request, resp.Body, buf)
-		pool.BufPool.Put(buf[:cap(buf)])
+		pool.Put(buf)
 		if err != nil && err != io.EOF {
 			break
 		}
 
-		req, err = http.ReadRequest(inboundReeder)
+		req, err = http.ReadRequest(inboundReader)
 		if err != nil {
 			break
 		}
@@ -82,14 +82,16 @@ func handleHTTP(request *adapters.HTTPAdapter, outbound net.Conn) {
 }
 
 func handleUDPToRemote(packet C.UDPPacket, pc C.PacketConn, metadata *C.Metadata) {
+	defer packet.Drop()
+
 	if _, err := pc.WriteWithMetadata(packet.Data(), metadata); err != nil {
 		return
 	}
 }
 
 func handleUDPToLocal(packet C.UDPPacket, pc net.PacketConn, key string, fAddr net.Addr) {
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf[:cap(buf)])
+	buf := pool.Get(pool.RelayBufferSize)
+	defer pool.Put(buf)
 	defer natTable.Delete(key)
 	defer pc.Close()
 
@@ -120,16 +122,16 @@ func relay(leftConn, rightConn net.Conn) {
 	ch := make(chan error)
 
 	go func() {
-		buf := pool.BufPool.Get().([]byte)
+		buf := pool.Get(pool.RelayBufferSize)
 		_, err := io.CopyBuffer(leftConn, rightConn, buf)
-		pool.BufPool.Put(buf[:cap(buf)])
+		pool.Put(buf)
 		leftConn.SetReadDeadline(time.Now())
 		ch <- err
 	}()
 
-	buf := pool.BufPool.Get().([]byte)
+	buf := pool.Get(pool.RelayBufferSize)
 	io.CopyBuffer(rightConn, leftConn, buf)
-	pool.BufPool.Put(buf[:cap(buf)])
+	pool.Put(buf)
 	rightConn.SetReadDeadline(time.Now())
 	<-ch
 }

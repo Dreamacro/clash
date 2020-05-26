@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 	"strings"
@@ -41,7 +42,7 @@ type Resolver struct {
 	fallback        []dnsClient
 	fallbackFilters []fallbackFilter
 	group           singleflight.Group
-	cache           *cache.Cache
+	lruCache        *cache.LruCache
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeA
@@ -95,22 +96,35 @@ func (r *Resolver) Exchange(m *D.Msg) (msg *D.Msg, err error) {
 	}
 
 	q := m.Question[0]
-	cache, expireTime := r.cache.GetWithExpire(q.String())
-	if cache != nil {
+	cache, expireTime, hit := r.lruCache.GetWithExpire(q.String())
+	if hit {
+		now := time.Now()
 		msg = cache.(*D.Msg).Copy()
-		setMsgTTL(msg, uint32(expireTime.Sub(time.Now()).Seconds()))
+		if expireTime.Before(now) {
+			setMsgTTL(msg, uint32(1)) // Continue fetch
+			go r.exchangeWithoutCache(m)
+		} else {
+			setMsgTTL(msg, uint32(expireTime.Sub(time.Now()).Seconds()))
+		}
 		return
 	}
+	return r.exchangeWithoutCache(m)
+}
+
+// ExchangeWithoutCache a batch of dns request, and it do NOT GET from cache
+func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
+	q := m.Question[0]
+
 	defer func() {
 		if msg == nil {
 			return
 		}
 
-		putMsgToCache(r.cache, q.String(), msg)
+		putMsgToCache(r.lruCache, q.String(), msg)
 		if r.mapping {
 			ips := r.msgToIP(msg)
 			for _, ip := range ips {
-				putMsgToCache(r.cache, ip.String(), msg)
+				putMsgToCache(r.lruCache, ip.String(), msg)
 			}
 		}
 	}()
@@ -140,7 +154,7 @@ func (r *Resolver) IPToHost(ip net.IP) (string, bool) {
 		return r.pool.LookBack(ip)
 	}
 
-	cache := r.cache.Get(ip.String())
+	cache, _ := r.lruCache.Get(ip.String())
 	if cache == nil {
 		return "", false
 	}
@@ -182,7 +196,11 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 
 	elm := fast.Wait()
 	if elm == nil {
-		return nil, errors.New("All DNS requests failed")
+		err := errors.New("All DNS requests failed")
+		if fErr := fast.Error(); fErr != nil {
+			err = fmt.Errorf("%w, first error: %s", err, fErr.Error())
+		}
+		return nil, err
 	}
 
 	msg = elm.(*D.Msg)
@@ -289,17 +307,17 @@ type Config struct {
 
 func New(config Config) *Resolver {
 	defaultResolver := &Resolver{
-		main:  transform(config.Default, nil),
-		cache: cache.New(time.Second * 60),
+		main:     transform(config.Default, nil),
+		lruCache: cache.NewLRUCache(cache.WithSize(4096), cache.WithStale(true)),
 	}
 
 	r := &Resolver{
-		ipv6:    config.IPv6,
-		main:    transform(config.Main, defaultResolver),
-		cache:   cache.New(time.Second * 60),
-		mapping: config.EnhancedMode == MAPPING,
-		fakeip:  config.EnhancedMode == FAKEIP,
-		pool:    config.Pool,
+		ipv6:     config.IPv6,
+		main:     transform(config.Main, defaultResolver),
+		lruCache: cache.NewLRUCache(cache.WithSize(4096), cache.WithStale(true)),
+		mapping:  config.EnhancedMode == MAPPING,
+		fakeip:   config.EnhancedMode == FAKEIP,
+		pool:     config.Pool,
 	}
 
 	if len(config.Fallback) != 0 {

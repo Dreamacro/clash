@@ -31,7 +31,11 @@ func setsockopt(c *net.UDPConn, addr string) error {
 	}
 
 	rc.Control(func(fd uintptr) {
-		err = syscall.SetsockoptInt(int(fd), syscall.SOL_IP, syscall.IP_TRANSPARENT, 1)
+		err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
+
+		if err == nil {
+			err = syscall.SetsockoptInt(int(fd), syscall.SOL_IP, syscall.IP_TRANSPARENT, 1)
+		}
 		if err == nil && isIPv6 {
 			err = syscall.SetsockoptInt(int(fd), syscall.SOL_IPV6, IPV6_TRANSPARENT, 1)
 		}

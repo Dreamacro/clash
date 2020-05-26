@@ -42,6 +42,14 @@ func WithSize(maxSize int) Option {
 	}
 }
 
+// WithStale decide whether Stale return is enabled.
+// If this feature is enabled, element will not get Evicted according to `WithAge`.
+func WithStale(stale bool) Option {
+	return func(l *LruCache) {
+		l.staleReturn = stale
+	}
+}
+
 // LruCache is a thread-safe, in-memory lru-cache that evicts the
 // least recently used entries from memory when (if set) the entries are
 // older than maxAge (in seconds).  Use the New constructor to create one.
@@ -52,6 +60,7 @@ type LruCache struct {
 	cache          map[interface{}]*list.Element
 	lru            *list.List // Front is least-recent
 	updateAgeOnGet bool
+	staleReturn    bool
 	onEvict        EvictCallback
 }
 
@@ -72,29 +81,26 @@ func NewLRUCache(options ...Option) *LruCache {
 // Get returns the interface{} representation of a cached response and a bool
 // set to true if the key was found.
 func (c *LruCache) Get(key interface{}) (interface{}, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	le, ok := c.cache[key]
-	if !ok {
+	entry := c.get(key)
+	if entry == nil {
 		return nil, false
-	}
-
-	if c.maxAge > 0 && le.Value.(*entry).expires <= time.Now().Unix() {
-		c.deleteElement(le)
-		c.maybeDeleteOldest()
-
-		return nil, false
-	}
-
-	c.lru.MoveToBack(le)
-	entry := le.Value.(*entry)
-	if c.maxAge > 0 && c.updateAgeOnGet {
-		entry.expires = time.Now().Unix() + c.maxAge
 	}
 	value := entry.value
 
 	return value, true
+}
+
+// GetWithExpire returns the interface{} representation of a cached response,
+// a time.Time Give expected expires,
+// and a bool set to true if the key was found.
+// This method will NOT check the maxAge of element and will NOT update the expires.
+func (c *LruCache) GetWithExpire(key interface{}) (interface{}, time.Time, bool) {
+	entry := c.get(key)
+	if entry == nil {
+		return nil, time.Time{}, false
+	}
+
+	return entry.value, time.Unix(entry.expires, 0), true
 }
 
 // Exist returns if key exist in cache but not put item to the head of linked list
@@ -108,21 +114,26 @@ func (c *LruCache) Exist(key interface{}) bool {
 
 // Set stores the interface{} representation of a response for a given key.
 func (c *LruCache) Set(key interface{}, value interface{}) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	expires := int64(0)
 	if c.maxAge > 0 {
 		expires = time.Now().Unix() + c.maxAge
 	}
+	c.SetWithExpire(key, value, time.Unix(expires, 0))
+}
+
+// SetWithExpire stores the interface{} representation of a response for a given key and given exires.
+// The expires time will round to second.
+func (c *LruCache) SetWithExpire(key interface{}, value interface{}, expires time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if le, ok := c.cache[key]; ok {
 		c.lru.MoveToBack(le)
 		e := le.Value.(*entry)
 		e.value = value
-		e.expires = expires
+		e.expires = expires.Unix()
 	} else {
-		e := &entry{key: key, value: value, expires: expires}
+		e := &entry{key: key, value: value, expires: expires.Unix()}
 		c.cache[key] = c.lru.PushBack(e)
 
 		if c.maxSize > 0 {
@@ -133,6 +144,30 @@ func (c *LruCache) Set(key interface{}, value interface{}) {
 	}
 
 	c.maybeDeleteOldest()
+}
+
+func (c *LruCache) get(key interface{}) *entry {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	le, ok := c.cache[key]
+	if !ok {
+		return nil
+	}
+
+	if !c.staleReturn && c.maxAge > 0 && le.Value.(*entry).expires <= time.Now().Unix() {
+		c.deleteElement(le)
+		c.maybeDeleteOldest()
+
+		return nil
+	}
+
+	c.lru.MoveToBack(le)
+	entry := le.Value.(*entry)
+	if c.maxAge > 0 && c.updateAgeOnGet {
+		entry.expires = time.Now().Unix() + c.maxAge
+	}
+	return entry
 }
 
 // Delete removes the value associated with a key.
@@ -147,7 +182,7 @@ func (c *LruCache) Delete(key string) {
 }
 
 func (c *LruCache) maybeDeleteOldest() {
-	if c.maxAge > 0 {
+	if !c.staleReturn && c.maxAge > 0 {
 		now := time.Now().Unix()
 		for le := c.lru.Front(); le != nil && le.Value.(*entry).expires <= now; le = c.lru.Front() {
 			c.deleteElement(le)

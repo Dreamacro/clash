@@ -53,6 +53,10 @@ func (b *Base) Addr() string {
 	return b.addr
 }
 
+func (b *Base) Unwrap(metadata *C.Metadata) C.Proxy {
+	return nil
+}
+
 func NewBase(name string, addr string, tp C.AdapterType, udp bool) *Base {
 	return &Base{name, addr, tp, udp}
 }

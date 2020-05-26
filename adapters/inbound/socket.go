@@ -19,9 +19,9 @@ func (s *SocketAdapter) Metadata() *C.Metadata {
 }
 
 // NewSocket is SocketAdapter generator
-func NewSocket(target socks5.Addr, conn net.Conn, source C.Type, netType C.NetWork) *SocketAdapter {
+func NewSocket(target socks5.Addr, conn net.Conn, source C.Type) *SocketAdapter {
 	metadata := parseSocksAddr(target)
-	metadata.NetWork = netType
+	metadata.NetWork = C.TCP
 	metadata.Type = source
 	if ip, port, err := parseAddr(conn.RemoteAddr().String()); err == nil {
 		metadata.SrcIP = ip

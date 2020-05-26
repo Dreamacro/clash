@@ -38,6 +38,10 @@ func (u *URLTest) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
 	return pc, err
 }
 
+func (u *URLTest) Unwrap(metadata *C.Metadata) C.Proxy {
+	return u.fast()
+}
+
 func (u *URLTest) proxies() []C.Proxy {
 	elm, _, _ := u.single.Do(func() (interface{}, error) {
 		return getProvidersProxies(u.providers), nil

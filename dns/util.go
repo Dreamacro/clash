@@ -79,21 +79,21 @@ func (e EnhancedMode) String() string {
 	}
 }
 
-func putMsgToCache(c *cache.Cache, key string, msg *D.Msg) {
-	var ttl time.Duration
+func putMsgToCache(c *cache.LruCache, key string, msg *D.Msg) {
+	var ttl uint32
 	switch {
 	case len(msg.Answer) != 0:
-		ttl = time.Duration(msg.Answer[0].Header().Ttl) * time.Second
+		ttl = msg.Answer[0].Header().Ttl
 	case len(msg.Ns) != 0:
-		ttl = time.Duration(msg.Ns[0].Header().Ttl) * time.Second
+		ttl = msg.Ns[0].Header().Ttl
 	case len(msg.Extra) != 0:
-		ttl = time.Duration(msg.Extra[0].Header().Ttl) * time.Second
+		ttl = msg.Extra[0].Header().Ttl
 	default:
 		log.Debugln("[DNS] response msg error: %#v", msg)
 		return
 	}
 
-	c.Put(key, msg.Copy(), ttl)
+	c.SetWithExpire(key, msg.Copy(), time.Now().Add(time.Second*time.Duration(ttl)))
 }
 
 func setMsgTTL(msg *D.Msg, ttl uint32) {
@@ -133,6 +133,7 @@ func transform(servers []NameServer, resolver *Resolver) []dnsClient {
 					ClientSessionCache: globalSessionCache,
 					// alpn identifier, see https://tools.ietf.org/html/draft-hoffman-dprive-dns-tls-alpn-00#page-6
 					NextProtos: []string{"dns"},
+					ServerName: host,
 				},
 				UDPSize: 4096,
 				Timeout: 5 * time.Second,

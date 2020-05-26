@@ -147,6 +147,9 @@ func preHandleMetadata(metadata *C.Metadata) error {
 			metadata.AddrType = C.AtypDomainName
 			if enhancedMode.FakeIPEnabled() {
 				metadata.DstIP = nil
+			} else if node := resolver.DefaultHosts.Search(host); node != nil {
+				// redir-host should lookup the hosts
+				metadata.DstIP = node.Data.(net.IP)
 			}
 		} else if enhancedMode.IsFakeIP(metadata.DstIP) {
 			return fmt.Errorf("fake DNS record %s missing", metadata.DstIP)

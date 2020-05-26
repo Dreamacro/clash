@@ -36,7 +36,7 @@ func NewSocksProxy(addr string) (*SockListener, error) {
 				}
 				continue
 			}
-			go handleSocks(c)
+			go HandleSocks(c)
 		}
 	}()
 
@@ -52,17 +52,19 @@ func (l *SockListener) Address() string {
 	return l.address
 }
 
-func handleSocks(conn net.Conn) {
+func HandleSocks(conn net.Conn) {
 	target, command, err := socks5.ServerHandshake(conn, authStore.Authenticator())
 	if err != nil {
 		conn.Close()
 		return
 	}
-	conn.(*net.TCPConn).SetKeepAlive(true)
+	if c, ok := conn.(*net.TCPConn); ok {
+		c.SetKeepAlive(true)
+	}
 	if command == socks5.CmdUDPAssociate {
 		defer conn.Close()
 		io.Copy(ioutil.Discard, conn)
 		return
 	}
-	tunnel.Add(adapters.NewSocket(target, conn, C.SOCKS, C.TCP))
+	tunnel.Add(adapters.NewSocket(target, conn, C.SOCKS))
 }

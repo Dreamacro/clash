@@ -110,9 +110,9 @@ func authentication(next http.Handler) http.Handler {
 		header := r.Header.Get("Authorization")
 		text := strings.SplitN(header, " ", 2)
 
-		hasUnvalidHeader := text[0] != "Bearer"
-		hasUnvalidSecret := len(text) == 2 && text[1] != serverSecret
-		if hasUnvalidHeader || hasUnvalidSecret {
+		hasInvalidHeader := text[0] != "Bearer"
+		hasInvalidSecret := len(text) != 2 || text[1] != serverSecret
+		if hasInvalidHeader || hasInvalidSecret {
 			render.Status(r, http.StatusUnauthorized)
 			render.JSON(w, r, ErrUnauthorized)
 			return

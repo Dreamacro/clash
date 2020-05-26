@@ -34,13 +34,19 @@ func (c *client) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err
 		}
 	}
 
-	d := dialer.Dialer()
+	d, err := dialer.Dialer()
+	if err != nil {
+		return nil, err
+	}
+
 	if dialer.DialHook != nil {
 		network := "udp"
 		if strings.HasPrefix(c.Client.Net, "tcp") {
 			network = "tcp"
 		}
-		dialer.DialHook(d, network, ip)
+		if err := dialer.DialHook(d, network, ip); err != nil {
+			return nil, err
+		}
 	}
 
 	c.Client.Dialer = d

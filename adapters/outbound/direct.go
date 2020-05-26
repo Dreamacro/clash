@@ -14,10 +14,7 @@ type Direct struct {
 }
 
 func (d *Direct) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	address := net.JoinHostPort(metadata.Host, metadata.DstPort)
-	if metadata.DstIP != nil {
-		address = net.JoinHostPort(metadata.DstIP.String(), metadata.DstPort)
-	}
+	address := net.JoinHostPort(metadata.String(), metadata.DstPort)
 
 	c, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {

@@ -81,6 +81,7 @@ func (t *Trie) Search(domain string) *Node {
 
 	n := t.root
 	var dotWildcardNode *Node
+	var wildcardNode *Node
 	for i := len(parts) - 1; i >= 0; i-- {
 		part := parts[i]
 
@@ -88,10 +89,16 @@ func (t *Trie) Search(domain string) *Node {
 			dotWildcardNode = node
 		}
 
-		if n.hasChild(part) {
-			n = n.getChild(part)
-		} else {
-			n = n.getChild(wildcard)
+		child := n.getChild(part)
+		if child == nil && wildcardNode != nil {
+			child = wildcardNode.getChild(part)
+		}
+		wildcardNode = n.getChild(wildcard)
+
+		n = child
+		if n == nil {
+			n = wildcardNode
+			wildcardNode = nil
 		}
 
 		if n == nil {

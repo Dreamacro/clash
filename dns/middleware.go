@@ -18,7 +18,14 @@ func withFakeIP(fakePool *fakeip.Pool) middleware {
 			q := r.Question[0]
 
 			if q.Qtype == D.TypeAAAA {
-				D.HandleFailed(w, r)
+				msg := &D.Msg{}
+				msg.Answer = []D.RR{}
+
+				msg.SetRcode(r, D.RcodeSuccess)
+				msg.Authoritative = true
+				msg.RecursionAvailable = true
+
+				w.WriteMsg(msg)
 				return
 			} else if q.Qtype != D.TypeA {
 				next(w, r)
@@ -39,8 +46,10 @@ func withFakeIP(fakePool *fakeip.Pool) middleware {
 			msg.Answer = []D.RR{rr}
 
 			setMsgTTL(msg, 1)
-			msg.SetRcode(r, msg.Rcode)
+			msg.SetRcode(r, D.RcodeSuccess)
 			msg.Authoritative = true
+			msg.RecursionAvailable = true
+
 			w.WriteMsg(msg)
 			return
 		}

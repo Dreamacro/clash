@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/Dreamacro/clash/component/dialer"
@@ -75,10 +76,21 @@ func (h *HTTPVehicle) Read() ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
 	defer cancel()
 
-	req, err := http.NewRequest(http.MethodGet, h.url, nil)
+	uri, err := url.Parse(h.url)
 	if err != nil {
 		return nil, err
 	}
+
+	req, err := http.NewRequest(http.MethodGet, uri.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if user := uri.User; user != nil {
+		password, _ := user.Password()
+		req.SetBasicAuth(user.Username(), password)
+	}
+
 	req = req.WithContext(ctx)
 
 	transport := &http.Transport{

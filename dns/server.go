@@ -3,6 +3,8 @@ package dns
 import (
 	"net"
 
+	"github.com/Dreamacro/clash/common/sockopt"
+
 	D "github.com/miekg/dns"
 )
 
@@ -54,6 +56,11 @@ func ReCreateServer(addr string, resolver *Resolver) error {
 	}
 
 	p, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return err
+	}
+
+	err = sockopt.UDPReuseaddr(p)
 	if err != nil {
 		return err
 	}

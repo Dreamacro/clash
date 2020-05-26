@@ -8,22 +8,26 @@ import (
 	"github.com/Dreamacro/clash/component/resolver"
 )
 
-func Dialer() *net.Dialer {
+func Dialer() (*net.Dialer, error) {
 	dialer := &net.Dialer{}
 	if DialerHook != nil {
-		DialerHook(dialer)
+		if err := DialerHook(dialer); err != nil {
+			return nil, err
+		}
 	}
 
-	return dialer
+	return dialer, nil
 }
 
-func ListenConfig() *net.ListenConfig {
+func ListenConfig() (*net.ListenConfig, error) {
 	cfg := &net.ListenConfig{}
 	if ListenConfigHook != nil {
-		ListenConfigHook(cfg)
+		if err := ListenConfigHook(cfg); err != nil {
+			return nil, err
+		}
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 func Dial(network, address string) (net.Conn, error) {
@@ -38,7 +42,10 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 			return nil, err
 		}
 
-		dialer := Dialer()
+		dialer, err := Dialer()
+		if err != nil {
+			return nil, err
+		}
 
 		var ip net.IP
 		switch network {
@@ -53,7 +60,9 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 		}
 
 		if DialHook != nil {
-			DialHook(dialer, network, ip)
+			if err := DialHook(dialer, network, ip); err != nil {
+				return nil, err
+			}
 		}
 		return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
 	case "tcp", "udp":
@@ -64,13 +73,17 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 func ListenPacket(network, address string) (net.PacketConn, error) {
-	lc := ListenConfig()
+	lc, err := ListenConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	if ListenPacketHook != nil && address == "" {
-		ip := ListenPacketHook()
-		if ip != nil {
-			address = net.JoinHostPort(ip.String(), "0")
+		ip, err := ListenPacketHook()
+		if err != nil {
+			return nil, err
 		}
+		address = net.JoinHostPort(ip.String(), "0")
 	}
 	return lc.ListenPacket(context.Background(), network, address)
 }
@@ -95,7 +108,6 @@ func dualStackDailContext(ctx context.Context, network, address string) (net.Con
 	var primary, fallback dialResult
 
 	startRacer := func(ctx context.Context, network, host string, ipv6 bool) {
-		dialer := Dialer()
 		result := dialResult{ipv6: ipv6, done: true}
 		defer func() {
 			select {
@@ -106,6 +118,12 @@ func dualStackDailContext(ctx context.Context, network, address string) (net.Con
 				}
 			}
 		}()
+
+		dialer, err := Dialer()
+		if err != nil {
+			result.error = err
+			return
+		}
 
 		var ip net.IP
 		if ipv6 {
@@ -119,7 +137,9 @@ func dualStackDailContext(ctx context.Context, network, address string) (net.Con
 		result.resolved = true
 
 		if DialHook != nil {
-			DialHook(dialer, network, ip)
+			if result.error = DialHook(dialer, network, ip); result.error != nil {
+				return
+			}
 		}
 		result.Conn, result.error = dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
 	}

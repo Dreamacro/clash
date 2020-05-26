@@ -29,12 +29,12 @@ type TLSObfs struct {
 }
 
 func (to *TLSObfs) read(b []byte, discardN int) (int, error) {
-	buf := pool.BufPool.Get().([]byte)
-	_, err := io.ReadFull(to.Conn, buf[:discardN])
+	buf := pool.Get(discardN)
+	_, err := io.ReadFull(to.Conn, buf)
 	if err != nil {
 		return 0, err
 	}
-	pool.BufPool.Put(buf[:cap(buf)])
+	pool.Put(buf)
 
 	sizeBuf := make([]byte, 2)
 	_, err = io.ReadFull(to.Conn, sizeBuf)
@@ -102,15 +102,11 @@ func (to *TLSObfs) write(b []byte) (int, error) {
 		return len(b), err
 	}
 
-	size := pool.BufPool.Get().([]byte)
-	binary.BigEndian.PutUint16(size[:2], uint16(len(b)))
-
 	buf := &bytes.Buffer{}
 	buf.Write([]byte{0x17, 0x03, 0x03})
-	buf.Write(size[:2])
+	binary.Write(buf, binary.BigEndian, uint16(len(b)))
 	buf.Write(b)
 	_, err := to.Conn.Write(buf.Bytes())
-	pool.BufPool.Put(size[:cap(size)])
 	return len(b), err
 }
 

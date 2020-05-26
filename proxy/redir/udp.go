@@ -34,10 +34,10 @@ func NewRedirUDPProxy(addr string) (*RedirUDPListener, error) {
 	go func() {
 		oob := make([]byte, 1024)
 		for {
-			buf := pool.BufPool.Get().([]byte)
+			buf := pool.Get(pool.RelayBufferSize)
 			n, oobn, _, lAddr, err := c.ReadMsgUDP(buf, oob)
 			if err != nil {
-				pool.BufPool.Put(buf[:cap(buf)])
+				pool.Put(buf)
 				if rl.closed {
 					break
 				}
@@ -66,10 +66,9 @@ func (l *RedirUDPListener) Address() string {
 
 func handleRedirUDP(pc net.PacketConn, buf []byte, lAddr *net.UDPAddr, rAddr *net.UDPAddr) {
 	target := socks5.ParseAddrToSocksAddr(rAddr)
-	packet := &fakeConn{
-		PacketConn: pc,
-		lAddr:      lAddr,
-		buf:        buf,
+	pkt := &packet{
+		lAddr: lAddr,
+		buf:   buf,
 	}
-	tunnel.AddPacket(adapters.NewPacket(target, packet, C.REDIR))
+	tunnel.AddPacket(adapters.NewPacket(target, pkt, C.REDIR))
 }

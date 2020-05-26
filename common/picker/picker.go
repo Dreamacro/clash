@@ -15,8 +15,10 @@ type Picker struct {
 
 	wg sync.WaitGroup
 
-	once   sync.Once
-	result interface{}
+	once    sync.Once
+	errOnce sync.Once
+	result  interface{}
+	err     error
 }
 
 func newPicker(ctx context.Context, cancel func()) *Picker {
@@ -49,6 +51,11 @@ func (p *Picker) Wait() interface{} {
 	return p.result
 }
 
+// Error return the first error (if all success return nil)
+func (p *Picker) Error() error {
+	return p.err
+}
+
 // Go calls the given function in a new goroutine.
 // The first call to return a nil error cancels the group; its result will be returned by Wait.
 func (p *Picker) Go(f func() (interface{}, error)) {
@@ -63,6 +70,10 @@ func (p *Picker) Go(f func() (interface{}, error)) {
 				if p.cancel != nil {
 					p.cancel()
 				}
+			})
+		} else {
+			p.errOnce.Do(func() {
+				p.err = err
 			})
 		}
 	}()

@@ -34,6 +34,7 @@ func TestTrie_Wildcard(t *testing.T) {
 		"*.dev",
 		".org",
 		".example.net",
+		".apple.*",
 	}
 
 	for _, domain := range domains {
@@ -44,6 +45,7 @@ func TestTrie_Wildcard(t *testing.T) {
 	assert.NotNil(t, tree.Search("sub.foo.example.com"))
 	assert.NotNil(t, tree.Search("test.org"))
 	assert.NotNil(t, tree.Search("test.example.net"))
+	assert.NotNil(t, tree.Search("test.apple.com"))
 	assert.Nil(t, tree.Search("foo.sub.example.com"))
 	assert.Nil(t, tree.Search("foo.example.dev"))
 	assert.Nil(t, tree.Search("example.com"))

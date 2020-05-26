@@ -8,10 +8,10 @@ import (
 	"github.com/Dreamacro/clash/common/singledo"
 )
 
-type DialerHookFunc = func(dialer *net.Dialer)
-type DialHookFunc = func(dialer *net.Dialer, network string, ip net.IP)
-type ListenConfigHookFunc = func(*net.ListenConfig)
-type ListenPacketHookFunc = func() net.IP
+type DialerHookFunc = func(dialer *net.Dialer) error
+type DialHookFunc = func(dialer *net.Dialer, network string, ip net.IP) error
+type ListenConfigHookFunc = func(*net.ListenConfig) error
+type ListenPacketHookFunc = func() (net.IP, error)
 
 var (
 	DialerHook       DialerHookFunc
@@ -70,7 +70,7 @@ func lookupUDPAddr(ip net.IP, addrs []net.Addr) (*net.UDPAddr, error) {
 func ListenPacketWithInterface(name string) ListenPacketHookFunc {
 	single := singledo.NewSingle(5 * time.Second)
 
-	return func() net.IP {
+	return func() (net.IP, error) {
 		elm, err, _ := single.Do(func() (interface{}, error) {
 			iface, err := net.InterfaceByName(name)
 			if err != nil {
@@ -86,7 +86,7 @@ func ListenPacketWithInterface(name string) ListenPacketHookFunc {
 		})
 
 		if err != nil {
-			return nil
+			return nil, err
 		}
 
 		addrs := elm.([]net.Addr)
@@ -97,17 +97,17 @@ func ListenPacketWithInterface(name string) ListenPacketHookFunc {
 				continue
 			}
 
-			return addr.IP
+			return addr.IP, nil
 		}
 
-		return nil
+		return nil, ErrAddrNotFound
 	}
 }
 
 func DialerWithInterface(name string) DialHookFunc {
 	single := singledo.NewSingle(5 * time.Second)
 
-	return func(dialer *net.Dialer, network string, ip net.IP) {
+	return func(dialer *net.Dialer, network string, ip net.IP) error {
 		elm, err, _ := single.Do(func() (interface{}, error) {
 			iface, err := net.InterfaceByName(name)
 			if err != nil {
@@ -123,7 +123,7 @@ func DialerWithInterface(name string) DialHookFunc {
 		})
 
 		if err != nil {
-			return
+			return err
 		}
 
 		addrs := elm.([]net.Addr)
@@ -132,11 +132,17 @@ func DialerWithInterface(name string) DialHookFunc {
 		case "tcp", "tcp4", "tcp6":
 			if addr, err := lookupTCPAddr(ip, addrs); err == nil {
 				dialer.LocalAddr = addr
+			} else {
+				return err
 			}
 		case "udp", "udp4", "udp6":
 			if addr, err := lookupUDPAddr(ip, addrs); err == nil {
 				dialer.LocalAddr = addr
+			} else {
+				return err
 			}
 		}
+
+		return nil
 	}
 }

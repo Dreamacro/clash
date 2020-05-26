@@ -7,6 +7,7 @@ import (
 
 	"github.com/Dreamacro/clash/log"
 	"github.com/Dreamacro/clash/proxy/http"
+	"github.com/Dreamacro/clash/proxy/mixed"
 	"github.com/Dreamacro/clash/proxy/redir"
 	"github.com/Dreamacro/clash/proxy/socks"
 )
@@ -20,6 +21,8 @@ var (
 	httpListener     *http.HttpListener
 	redirListener    *redir.RedirListener
 	redirUDPListener *redir.RedirUDPListener
+	mixedListener    *mixed.MixedListener
+	mixedUDPLister   *socks.SockUDPListener
 )
 
 type listener interface {
@@ -31,6 +34,7 @@ type Ports struct {
 	Port      int `json:"port"`
 	SocksPort int `json:"socks-port"`
 	RedirPort int `json:"redir-port"`
+	MixedPort int `json:"mixed-port"`
 }
 
 func AllowLan() bool {
@@ -159,6 +163,52 @@ func ReCreateRedir(port int) error {
 	return nil
 }
 
+func ReCreateMixed(port int) error {
+	addr := genAddr(bindAddress, port, allowLan)
+
+	shouldTCPIgnore := false
+	shouldUDPIgnore := false
+
+	if mixedListener != nil {
+		if mixedListener.Address() != addr {
+			mixedListener.Close()
+			mixedListener = nil
+		} else {
+			shouldTCPIgnore = true
+		}
+	}
+	if mixedUDPLister != nil {
+		if mixedUDPLister.Address() != addr {
+			mixedUDPLister.Close()
+			mixedUDPLister = nil
+		} else {
+			shouldUDPIgnore = true
+		}
+	}
+
+	if shouldTCPIgnore && shouldUDPIgnore {
+		return nil
+	}
+
+	if portIsZero(addr) {
+		return nil
+	}
+
+	var err error
+	mixedListener, err = mixed.NewMixedProxy(addr)
+	if err != nil {
+		return err
+	}
+
+	mixedUDPLister, err = socks.NewSocksUDPProxy(addr)
+	if err != nil {
+		mixedListener.Close()
+		return err
+	}
+
+	return nil
+}
+
 // GetPorts return the ports of proxy servers
 func GetPorts() *Ports {
 	ports := &Ports{}
@@ -179,6 +229,12 @@ func GetPorts() *Ports {
 		_, portStr, _ := net.SplitHostPort(redirListener.Address())
 		port, _ := strconv.Atoi(portStr)
 		ports.RedirPort = port
+	}
+
+	if mixedListener != nil {
+		_, portStr, _ := net.SplitHostPort(mixedListener.Address())
+		port, _ := strconv.Atoi(portStr)
+		ports.MixedPort = port
 	}
 
 	return ports

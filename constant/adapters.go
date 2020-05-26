@@ -69,6 +69,8 @@ type ProxyAdapter interface {
 	SupportUDP() bool
 	MarshalJSON() ([]byte, error)
 	Addr() string
+	// Unwrap extracts the proxy from a proxy-group. It returns nil when nothing to extract.
+	Unwrap(metadata *Metadata) Proxy
 }
 
 type DelayHistory struct {
@@ -135,8 +137,8 @@ type UDPPacket interface {
 	//   this is important when using Fake-IP.
 	WriteBack(b []byte, addr net.Addr) (n int, err error)
 
-	// Close closes the underlaying connection.
-	Close() error
+	// Drop call after packet is used, could recycle buffer in this function.
+	Drop()
 
 	// LocalAddr returns the source IP/Port of packet
 	LocalAddr() net.Addr

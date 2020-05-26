@@ -59,18 +59,9 @@ func (lb *LoadBalance) DialContext(ctx context.Context, metadata *C.Metadata) (c
 		}
 	}()
 
-	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
-	proxies := lb.proxies()
-	buckets := int32(len(proxies))
-	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {
-		idx := jumpHash(key, buckets)
-		proxy := proxies[idx]
-		if proxy.Alive() {
-			c, err = proxy.DialContext(ctx, metadata)
-			return
-		}
-	}
-	c, err = proxies[0].DialContext(ctx, metadata)
+	proxy := lb.Unwrap(metadata)
+
+	c, err = proxy.DialContext(ctx, metadata)
 	return
 }
 
@@ -81,6 +72,16 @@ func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (pc C.PacketConn, err error
 		}
 	}()
 
+	proxy := lb.Unwrap(metadata)
+
+	return proxy.DialUDP(metadata)
+}
+
+func (lb *LoadBalance) SupportUDP() bool {
+	return true
+}
+
+func (lb *LoadBalance) Unwrap(metadata *C.Metadata) C.Proxy {
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	proxies := lb.proxies()
 	buckets := int32(len(proxies))
@@ -88,15 +89,11 @@ func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (pc C.PacketConn, err error
 		idx := jumpHash(key, buckets)
 		proxy := proxies[idx]
 		if proxy.Alive() {
-			return proxy.DialUDP(metadata)
+			return proxy
 		}
 	}
 
-	return proxies[0].DialUDP(metadata)
-}
-
-func (lb *LoadBalance) SupportUDP() bool {
-	return true
+	return proxies[0]
 }
 
 func (lb *LoadBalance) proxies() []C.Proxy {

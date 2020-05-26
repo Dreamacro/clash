@@ -34,7 +34,7 @@ func (cr *chunkReader) Read(b []byte) (int, error) {
 		n := copy(b, cr.buf[cr.offset:])
 		cr.offset += n
 		if cr.offset == len(cr.buf) {
-			pool.BufPool.Put(cr.buf[:cap(cr.buf)])
+			pool.Put(cr.buf)
 			cr.buf = nil
 		}
 		return n, nil
@@ -59,15 +59,15 @@ func (cr *chunkReader) Read(b []byte) (int, error) {
 		return size, nil
 	}
 
-	buf := pool.BufPool.Get().([]byte)
-	_, err = io.ReadFull(cr.Reader, buf[:size])
+	buf := pool.Get(size)
+	_, err = io.ReadFull(cr.Reader, buf)
 	if err != nil {
-		pool.BufPool.Put(buf[:cap(buf)])
+		pool.Put(buf)
 		return 0, err
 	}
-	n := copy(b, cr.buf[:])
+	n := copy(b, buf)
 	cr.offset = n
-	cr.buf = buf[:size]
+	cr.buf = buf
 	return n, nil
 }
 
@@ -76,8 +76,8 @@ type chunkWriter struct {
 }
 
 func (cw *chunkWriter) Write(b []byte) (n int, err error) {
-	buf := pool.BufPool.Get().([]byte)
-	defer pool.BufPool.Put(buf[:cap(buf)])
+	buf := pool.Get(pool.RelayBufferSize)
+	defer pool.Put(buf)
 	length := len(b)
 	for {
 		if length == 0 {

@@ -50,6 +50,10 @@ func (s *Single) Do(fn func() (interface{}, error)) (v interface{}, err error, s
 	return call.val, call.err, false
 }
 
+func (s *Single) Reset() {
+	s.last = time.Time{}
+}
+
 func NewSingle(wait time.Duration) *Single {
 	return &Single{wait: wait}
 }
