@@ -17,7 +17,7 @@ import (
 func configRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", getConfigs)
-	r.Put("/", updateConfigs)
+	r.Put("/", reloadConfigs)
 	r.Patch("/", patchConfigs)
 	return r
 }
@@ -81,7 +81,38 @@ type updateConfigRequest struct {
 	Path    string `json:"path"`
 	Payload string `json:"payload"`
 }
+type reloadConfigRequest struct {
+	Force bool   `json:"force"`
+	Path  string `json:"path"`
+}
 
+func reloadConfigs(w http.ResponseWriter, r *http.Request) {
+	req := reloadConfigRequest{}
+	if err := render.DecodeJSON(r.Body, &req); err != nil {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, ErrBadRequest)
+	}
+	var cfg *config.Config
+	var err error
+	if req.Path != "" {
+		if !filepath.IsAbs(req.Path) {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, newError("path is not a absoluted path"))
+			return
+		}
+		cfg, err = executor.ParseWithPath(req.Path)
+
+	} else {
+		cfg, err = executor.Parse()
+	}
+	if err != nil {
+		render.Status(r, http.StatusBadRequest)
+		render.JSON(w, r, newError(err.Error()))
+		return
+	}
+	executor.ApplyConfig(cfg, req.Force)
+	render.NoContent(w, r)
+}
 func updateConfigs(w http.ResponseWriter, r *http.Request) {
 	req := updateConfigRequest{}
 	if err := render.DecodeJSON(r.Body, &req); err != nil {
