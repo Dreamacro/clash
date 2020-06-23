@@ -96,45 +96,37 @@ func (t *DomainTrie) Search(domain string) *Node {
 		return nil
 	}
 
-	n := t.root
-	var dotWildcardNode *Node
-	var wildcardNode *Node
-	for i := len(parts) - 1; i >= 0; i-- {
-		part := parts[i]
-
-		if node := n.getChild(dotWildcard); node != nil {
-			dotWildcardNode = node
-		}
-
-		child := n.getChild(part)
-		if child == nil && wildcardNode != nil {
-			child = wildcardNode.getChild(part)
-		}
-		wildcardNode = n.getChild(wildcard)
-
-		n = child
-		if n == nil {
-			n = wildcardNode
-			wildcardNode = nil
-		}
-
-		if n == nil {
-			break
-		}
-	}
-
-	if n == nil {
-		if dotWildcardNode != nil {
-			return dotWildcardNode
-		}
-		return nil
-	}
+	n := t.search(t.root, parts)
 
 	if n.Data == nil {
 		return nil
 	}
 
 	return n
+}
+
+func (t *DomainTrie) search(node *Node, parts []string) *Node {
+	if len(parts) == 0 {
+		return node
+	}
+
+	if c := node.getChild(parts[len(parts)-1]); c != nil {
+		if n := t.search(c, parts[:len(parts)-1]); n != nil {
+			return n
+		}
+	}
+
+	if c := node.getChild(wildcard); c != nil {
+		if n := t.search(c, parts[:len(parts)-1]); n != nil {
+			return n
+		}
+	}
+
+	if c := node.getChild(dotWildcard); c != nil {
+		return c
+	}
+
+	return nil
 }
 
 // New returns a new, empty Trie.
