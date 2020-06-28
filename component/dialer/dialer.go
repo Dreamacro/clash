@@ -66,7 +66,7 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 		}
 		return dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
 	case "tcp", "udp":
-		return dualStackDailContext(ctx, network, address)
+		return dualStackDialContext(ctx, network, address)
 	default:
 		return nil, errors.New("network invalid")
 	}
@@ -88,7 +88,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
 	return lc.ListenPacket(context.Background(), network, address)
 }
 
-func dualStackDailContext(ctx context.Context, network, address string) (net.Conn, error) {
+func dualStackDialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
