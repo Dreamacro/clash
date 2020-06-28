@@ -20,13 +20,13 @@
 ## Features
 
 - Local HTTP/HTTPS/SOCKS server with authentication support
-- VMess, Shadowsocks, Trojan, Snell protocol support for remote connections on TCP/UDP.
+- VMess, Shadowsocks, Trojan, Snell protocol support for remote connections
 - Built-in DNS server that aims to minimize DNS pollution attack impact, supports DoH/DoT upstream and fake IP.
 - Rules based off domains, GEOIP, IP CIDR or ports to forward packets to different nodes
 - Remote groups allow users to implement powerful rules. Supports automatic fallback, load balancing or auto select node based off latency
 - Remote providers, allowing users to get node lists remotely instead of hardcoding in config
 - Netfilter TCP redirecting. Deploy Clash on your Internet gateway with `iptables`.
-- Comprehensive HTTP Restful API controller
+- Comprehensive HTTP RESTful API controller
 
 ## Getting Started
 Documentations are now moved to [GitHub Wiki](https://github.com/Dreamacro/clash/wiki).
