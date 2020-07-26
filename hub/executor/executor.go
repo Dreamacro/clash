@@ -116,6 +116,7 @@ func updateDNS(c *config.DNS) {
 		FallbackFilter: dns.FallbackFilter{
 			GeoIP:  c.FallbackFilter.GeoIP,
 			IPCIDR: c.FallbackFilter.IPCIDR,
+			Rules:  c.FallbackFilter.Rules,
 		},
 		Default: c.DefaultNameserver,
 	})

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,7 @@ var (
 )
 
 func init() {
+	dns.MatchRules = MatchHost
 	go process()
 }
 
@@ -331,4 +333,25 @@ func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	}
 
 	return proxies["DIRECT"], nil, nil
+}
+
+// MatchHost Return if the host need to through proxy or not
+func MatchHost(host string) bool {
+	configMux.RLock()
+	defer configMux.RUnlock()
+
+	host = strings.TrimSuffix(host, ".")
+
+	meta := C.Metadata{
+		Host: host,
+		AddrType: C.AtypDomainName,
+	}
+
+	for _, rule := range rules {
+		if rule.Match(&meta) && rule.Adapter() == "DIRECT" {
+			return false
+		}
+	}
+
+	return true
 }

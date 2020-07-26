@@ -20,6 +20,8 @@ var (
 		FAKEIP.String():  FAKEIP,
 		MAPPING.String(): MAPPING,
 	}
+	// MatchRules will check if the host need to resolve by fallback or not
+	MatchRules func(host string) bool
 )
 
 const (

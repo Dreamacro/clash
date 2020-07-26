@@ -37,6 +37,7 @@ type Resolver struct {
 	ipv6            bool
 	mapping         bool
 	fakeip          bool
+	rules           bool
 	pool            *fakeip.Pool
 	main            []dnsClient
 	fallback        []dnsClient
@@ -132,8 +133,11 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			}
 		}()
 
+		// will not use fallback exchange when host matching direct rules
+		willProxy := MatchRules != nil && MatchRules(q.Name) || !r.rules
+
 		isIPReq := isIPRequest(q)
-		if isIPReq {
+		if isIPReq && willProxy {
 			return r.fallbackExchange(m)
 		}
 
@@ -298,6 +302,7 @@ type NameServer struct {
 
 type FallbackFilter struct {
 	GeoIP  bool
+	Rules  bool
 	IPCIDR []*net.IPNet
 }
 
@@ -328,6 +333,8 @@ func New(config Config) *Resolver {
 	if len(config.Fallback) != 0 {
 		r.fallback = transform(config.Fallback, defaultResolver)
 	}
+
+	r.rules = config.FallbackFilter.Rules
 
 	fallbackFilters := []fallbackFilter{}
 	if config.FallbackFilter.GeoIP {

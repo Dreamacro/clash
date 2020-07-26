@@ -25,49 +25,50 @@ import (
 
 // General config
 type General struct {
-	Inbound
-	Controller
-	Mode      T.TunnelMode `json:"mode"`
-	LogLevel  log.LogLevel `json:"log-level"`
-	IPv6      bool         `json:"ipv6"`
-	Interface string       `json:"interface-name"`
+    Inbound
+    Controller
+    Mode      T.TunnelMode `json:"mode"`
+    LogLevel  log.LogLevel `json:"log-level"`
+    IPv6      bool         `json:"ipv6"`
+    Interface string       `json:"interface-name"`
 }
 
 // Inbound
 type Inbound struct {
-	Port           int      `json:"port"`
-	SocksPort      int      `json:"socks-port"`
-	RedirPort      int      `json:"redir-port"`
-	MixedPort      int      `json:"mixed-port"`
-	Authentication []string `json:"authentication"`
-	AllowLan       bool     `json:"allow-lan"`
-	BindAddress    string   `json:"bind-address"`
+    Port           int      `json:"port"`
+    SocksPort      int      `json:"socks-port"`
+    RedirPort      int      `json:"redir-port"`
+    MixedPort      int      `json:"mixed-port"`
+    Authentication []string `json:"authentication"`
+    AllowLan       bool     `json:"allow-lan"`
+    BindAddress    string   `json:"bind-address"`
 }
 
 // Controller
 type Controller struct {
-	ExternalController string `json:"-"`
-	ExternalUI         string `json:"-"`
-	Secret             string `json:"-"`
+    ExternalController string `json:"-"`
+    ExternalUI         string `json:"-"`
+    Secret             string `json:"-"`
 }
 
 // DNS config
 type DNS struct {
-	Enable            bool             `yaml:"enable"`
-	IPv6              bool             `yaml:"ipv6"`
-	NameServer        []dns.NameServer `yaml:"nameserver"`
-	Fallback          []dns.NameServer `yaml:"fallback"`
-	FallbackFilter    FallbackFilter   `yaml:"fallback-filter"`
-	Listen            string           `yaml:"listen"`
-	EnhancedMode      dns.EnhancedMode `yaml:"enhanced-mode"`
-	DefaultNameserver []dns.NameServer `yaml:"default-nameserver"`
-	FakeIPRange       *fakeip.Pool
+    Enable            bool             `yaml:"enable"`
+    IPv6              bool             `yaml:"ipv6"`
+    NameServer        []dns.NameServer `yaml:"nameserver"`
+    Fallback          []dns.NameServer `yaml:"fallback"`
+    FallbackFilter    FallbackFilter   `yaml:"fallback-filter"`
+    Listen            string           `yaml:"listen"`
+    EnhancedMode      dns.EnhancedMode `yaml:"enhanced-mode"`
+    DefaultNameserver []dns.NameServer `yaml:"default-nameserver"`
+    FakeIPRange       *fakeip.Pool
 }
 
 // FallbackFilter config
 type FallbackFilter struct {
-	GeoIP  bool         `yaml:"geoip"`
-	IPCIDR []*net.IPNet `yaml:"ipcidr"`
+    GeoIP  bool         `yaml:"geoip"`
+    Rules  bool         `yaml:"rules"`
+    IPCIDR []*net.IPNet `yaml:"ipcidr"`
 }
 
 // Experimental config
@@ -75,500 +76,503 @@ type Experimental struct{}
 
 // Config is clash config manager
 type Config struct {
-	General      *General
-	DNS          *DNS
-	Experimental *Experimental
-	Hosts        *trie.DomainTrie
-	Rules        []C.Rule
-	Users        []auth.AuthUser
-	Proxies      map[string]C.Proxy
-	Providers    map[string]provider.ProxyProvider
+    General      *General
+    DNS          *DNS
+    Experimental *Experimental
+    Hosts        *trie.DomainTrie
+    Rules        []C.Rule
+    Users        []auth.AuthUser
+    Proxies      map[string]C.Proxy
+    Providers    map[string]provider.ProxyProvider
 }
 
 type RawDNS struct {
-	Enable            bool              `yaml:"enable"`
-	IPv6              bool              `yaml:"ipv6"`
-	NameServer        []string          `yaml:"nameserver"`
-	Fallback          []string          `yaml:"fallback"`
-	FallbackFilter    RawFallbackFilter `yaml:"fallback-filter"`
-	Listen            string            `yaml:"listen"`
-	EnhancedMode      dns.EnhancedMode  `yaml:"enhanced-mode"`
-	FakeIPRange       string            `yaml:"fake-ip-range"`
-	FakeIPFilter      []string          `yaml:"fake-ip-filter"`
-	DefaultNameserver []string          `yaml:"default-nameserver"`
+    Enable            bool              `yaml:"enable"`
+    IPv6              bool              `yaml:"ipv6"`
+    NameServer        []string          `yaml:"nameserver"`
+    Fallback          []string          `yaml:"fallback"`
+    FallbackFilter    RawFallbackFilter `yaml:"fallback-filter"`
+    Listen            string            `yaml:"listen"`
+    EnhancedMode      dns.EnhancedMode  `yaml:"enhanced-mode"`
+    FakeIPRange       string            `yaml:"fake-ip-range"`
+    FakeIPFilter      []string          `yaml:"fake-ip-filter"`
+    DefaultNameserver []string          `yaml:"default-nameserver"`
 }
 
 type RawFallbackFilter struct {
-	GeoIP  bool     `yaml:"geoip"`
-	IPCIDR []string `yaml:"ipcidr"`
+    GeoIP  bool     `yaml:"geoip"`
+    Rules  bool     `yaml:"rules"`
+    IPCIDR []string `yaml:"ipcidr"`
 }
 
 type RawConfig struct {
-	Port               int          `yaml:"port"`
-	SocksPort          int          `yaml:"socks-port"`
-	RedirPort          int          `yaml:"redir-port"`
-	MixedPort          int          `yaml:"mixed-port"`
-	Authentication     []string     `yaml:"authentication"`
-	AllowLan           bool         `yaml:"allow-lan"`
-	BindAddress        string       `yaml:"bind-address"`
-	Mode               T.TunnelMode `yaml:"mode"`
-	LogLevel           log.LogLevel `yaml:"log-level"`
-	IPv6               bool         `yaml:"ipv6"`
-	ExternalController string       `yaml:"external-controller"`
-	ExternalUI         string       `yaml:"external-ui"`
-	Secret             string       `yaml:"secret"`
-	Interface          string       `yaml:"interface-name"`
+    Port               int          `yaml:"port"`
+    SocksPort          int          `yaml:"socks-port"`
+    RedirPort          int          `yaml:"redir-port"`
+    MixedPort          int          `yaml:"mixed-port"`
+    Authentication     []string     `yaml:"authentication"`
+    AllowLan           bool         `yaml:"allow-lan"`
+    BindAddress        string       `yaml:"bind-address"`
+    Mode               T.TunnelMode `yaml:"mode"`
+    LogLevel           log.LogLevel `yaml:"log-level"`
+    IPv6               bool         `yaml:"ipv6"`
+    ExternalController string       `yaml:"external-controller"`
+    ExternalUI         string       `yaml:"external-ui"`
+    Secret             string       `yaml:"secret"`
+    Interface          string       `yaml:"interface-name"`
 
-	ProxyProvider map[string]map[string]interface{} `yaml:"proxy-providers"`
-	Hosts         map[string]string                 `yaml:"hosts"`
-	DNS           RawDNS                            `yaml:"dns"`
-	Experimental  Experimental                      `yaml:"experimental"`
-	Proxy         []map[string]interface{}          `yaml:"proxies"`
-	ProxyGroup    []map[string]interface{}          `yaml:"proxy-groups"`
-	Rule          []string                          `yaml:"rules"`
+    ProxyProvider map[string]map[string]interface{} `yaml:"proxy-providers"`
+    Hosts         map[string]string                 `yaml:"hosts"`
+    DNS           RawDNS                            `yaml:"dns"`
+    Experimental  Experimental                      `yaml:"experimental"`
+    Proxy         []map[string]interface{}          `yaml:"proxies"`
+    ProxyGroup    []map[string]interface{}          `yaml:"proxy-groups"`
+    Rule          []string                          `yaml:"rules"`
 }
 
 // Parse config
 func Parse(buf []byte) (*Config, error) {
-	rawCfg, err := UnmarshalRawConfig(buf)
-	if err != nil {
-		return nil, err
-	}
+    rawCfg, err := UnmarshalRawConfig(buf)
+    if err != nil {
+        return nil, err
+    }
 
-	return ParseRawConfig(rawCfg)
+    return ParseRawConfig(rawCfg)
 }
 
 func UnmarshalRawConfig(buf []byte) (*RawConfig, error) {
-	// config with some default value
-	rawCfg := &RawConfig{
-		AllowLan:       false,
-		BindAddress:    "*",
-		Mode:           T.Rule,
-		Authentication: []string{},
-		LogLevel:       log.INFO,
-		Hosts:          map[string]string{},
-		Rule:           []string{},
-		Proxy:          []map[string]interface{}{},
-		ProxyGroup:     []map[string]interface{}{},
-		DNS: RawDNS{
-			Enable:      false,
-			FakeIPRange: "198.18.0.1/16",
-			FallbackFilter: RawFallbackFilter{
-				GeoIP:  true,
-				IPCIDR: []string{},
-			},
-			DefaultNameserver: []string{
-				"114.114.114.114",
-				"8.8.8.8",
-			},
-		},
-	}
+    // config with some default value
+    rawCfg := &RawConfig{
+        AllowLan:       false,
+        BindAddress:    "*",
+        Mode:           T.Rule,
+        Authentication: []string{},
+        LogLevel:       log.INFO,
+        Hosts:          map[string]string{},
+        Rule:           []string{},
+        Proxy:          []map[string]interface{}{},
+        ProxyGroup:     []map[string]interface{}{},
+        DNS: RawDNS{
+            Enable:      false,
+            FakeIPRange: "198.18.0.1/16",
+            FallbackFilter: RawFallbackFilter{
+                GeoIP:  true,
+                IPCIDR: []string{},
+                Rules: false,
+            },
+            DefaultNameserver: []string{
+                "114.114.114.114",
+                "8.8.8.8",
+            },
+        },
+    }
 
-	if err := yaml.Unmarshal(buf, &rawCfg); err != nil {
-		return nil, err
-	}
+    if err := yaml.Unmarshal(buf, &rawCfg); err != nil {
+        return nil, err
+    }
 
-	return rawCfg, nil
+    return rawCfg, nil
 }
 
 func ParseRawConfig(rawCfg *RawConfig) (*Config, error) {
-	config := &Config{}
+    config := &Config{}
 
-	config.Experimental = &rawCfg.Experimental
+    config.Experimental = &rawCfg.Experimental
 
-	general, err := parseGeneral(rawCfg)
-	if err != nil {
-		return nil, err
-	}
-	config.General = general
+    general, err := parseGeneral(rawCfg)
+    if err != nil {
+        return nil, err
+    }
+    config.General = general
 
-	proxies, providers, err := parseProxies(rawCfg)
-	if err != nil {
-		return nil, err
-	}
-	config.Proxies = proxies
-	config.Providers = providers
+    proxies, providers, err := parseProxies(rawCfg)
+    if err != nil {
+        return nil, err
+    }
+    config.Proxies = proxies
+    config.Providers = providers
 
-	rules, err := parseRules(rawCfg, proxies)
-	if err != nil {
-		return nil, err
-	}
-	config.Rules = rules
+    rules, err := parseRules(rawCfg, proxies)
+    if err != nil {
+        return nil, err
+    }
+    config.Rules = rules
 
-	dnsCfg, err := parseDNS(rawCfg.DNS)
-	if err != nil {
-		return nil, err
-	}
-	config.DNS = dnsCfg
+    dnsCfg, err := parseDNS(rawCfg.DNS)
+    if err != nil {
+        return nil, err
+    }
+    config.DNS = dnsCfg
 
-	hosts, err := parseHosts(rawCfg)
-	if err != nil {
-		return nil, err
-	}
-	config.Hosts = hosts
+    hosts, err := parseHosts(rawCfg)
+    if err != nil {
+        return nil, err
+    }
+    config.Hosts = hosts
 
-	config.Users = parseAuthentication(rawCfg.Authentication)
+    config.Users = parseAuthentication(rawCfg.Authentication)
 
-	return config, nil
+    return config, nil
 }
 
 func parseGeneral(cfg *RawConfig) (*General, error) {
-	externalUI := cfg.ExternalUI
+    externalUI := cfg.ExternalUI
 
-	// checkout externalUI exist
-	if externalUI != "" {
-		externalUI = C.Path.Resolve(externalUI)
+    // checkout externalUI exist
+    if externalUI != "" {
+        externalUI = C.Path.Resolve(externalUI)
 
-		if _, err := os.Stat(externalUI); os.IsNotExist(err) {
-			return nil, fmt.Errorf("external-ui: %s not exist", externalUI)
-		}
-	}
+        if _, err := os.Stat(externalUI); os.IsNotExist(err) {
+            return nil, fmt.Errorf("external-ui: %s not exist", externalUI)
+        }
+    }
 
-	return &General{
-		Inbound: Inbound{
-			Port:        cfg.Port,
-			SocksPort:   cfg.SocksPort,
-			RedirPort:   cfg.RedirPort,
-			MixedPort:   cfg.MixedPort,
-			AllowLan:    cfg.AllowLan,
-			BindAddress: cfg.BindAddress,
-		},
-		Controller: Controller{
-			ExternalController: cfg.ExternalController,
-			ExternalUI:         cfg.ExternalUI,
-			Secret:             cfg.Secret,
-		},
-		Mode:      cfg.Mode,
-		LogLevel:  cfg.LogLevel,
-		IPv6:      cfg.IPv6,
-		Interface: cfg.Interface,
-	}, nil
+    return &General{
+        Inbound: Inbound{
+            Port:        cfg.Port,
+            SocksPort:   cfg.SocksPort,
+            RedirPort:   cfg.RedirPort,
+            MixedPort:   cfg.MixedPort,
+            AllowLan:    cfg.AllowLan,
+            BindAddress: cfg.BindAddress,
+        },
+        Controller: Controller{
+            ExternalController: cfg.ExternalController,
+            ExternalUI:         cfg.ExternalUI,
+            Secret:             cfg.Secret,
+        },
+        Mode:      cfg.Mode,
+        LogLevel:  cfg.LogLevel,
+        IPv6:      cfg.IPv6,
+        Interface: cfg.Interface,
+    }, nil
 }
 
 func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[string]provider.ProxyProvider, err error) {
-	proxies = make(map[string]C.Proxy)
-	providersMap = make(map[string]provider.ProxyProvider)
-	proxyList := []string{}
-	proxiesConfig := cfg.Proxy
-	groupsConfig := cfg.ProxyGroup
-	providersConfig := cfg.ProxyProvider
+    proxies = make(map[string]C.Proxy)
+    providersMap = make(map[string]provider.ProxyProvider)
+    proxyList := []string{}
+    proxiesConfig := cfg.Proxy
+    groupsConfig := cfg.ProxyGroup
+    providersConfig := cfg.ProxyProvider
 
-	proxies["DIRECT"] = outbound.NewProxy(outbound.NewDirect())
-	proxies["REJECT"] = outbound.NewProxy(outbound.NewReject())
-	proxyList = append(proxyList, "DIRECT", "REJECT")
+    proxies["DIRECT"] = outbound.NewProxy(outbound.NewDirect())
+    proxies["REJECT"] = outbound.NewProxy(outbound.NewReject())
+    proxyList = append(proxyList, "DIRECT", "REJECT")
 
-	// parse proxy
-	for idx, mapping := range proxiesConfig {
-		proxy, err := outbound.ParseProxy(mapping)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Proxy %d: %w", idx, err)
-		}
+    // parse proxy
+    for idx, mapping := range proxiesConfig {
+        proxy, err := outbound.ParseProxy(mapping)
+        if err != nil {
+            return nil, nil, fmt.Errorf("Proxy %d: %w", idx, err)
+        }
 
-		if _, exist := proxies[proxy.Name()]; exist {
-			return nil, nil, fmt.Errorf("Proxy %s is the duplicate name", proxy.Name())
-		}
-		proxies[proxy.Name()] = proxy
-		proxyList = append(proxyList, proxy.Name())
-	}
+        if _, exist := proxies[proxy.Name()]; exist {
+            return nil, nil, fmt.Errorf("Proxy %s is the duplicate name", proxy.Name())
+        }
+        proxies[proxy.Name()] = proxy
+        proxyList = append(proxyList, proxy.Name())
+    }
 
-	// keep the original order of ProxyGroups in config file
-	for idx, mapping := range groupsConfig {
-		groupName, existName := mapping["name"].(string)
-		if !existName {
-			return nil, nil, fmt.Errorf("ProxyGroup %d: missing name", idx)
-		}
-		proxyList = append(proxyList, groupName)
-	}
+    // keep the original order of ProxyGroups in config file
+    for idx, mapping := range groupsConfig {
+        groupName, existName := mapping["name"].(string)
+        if !existName {
+            return nil, nil, fmt.Errorf("ProxyGroup %d: missing name", idx)
+        }
+        proxyList = append(proxyList, groupName)
+    }
 
-	// check if any loop exists and sort the ProxyGroups
-	if err := proxyGroupsDagSort(groupsConfig); err != nil {
-		return nil, nil, err
-	}
+    // check if any loop exists and sort the ProxyGroups
+    if err := proxyGroupsDagSort(groupsConfig); err != nil {
+        return nil, nil, err
+    }
 
-	// parse and initial providers
-	for name, mapping := range providersConfig {
-		if name == provider.ReservedName {
-			return nil, nil, fmt.Errorf("can not defined a provider called `%s`", provider.ReservedName)
-		}
+    // parse and initial providers
+    for name, mapping := range providersConfig {
+        if name == provider.ReservedName {
+            return nil, nil, fmt.Errorf("can not defined a provider called `%s`", provider.ReservedName)
+        }
 
-		pd, err := provider.ParseProxyProvider(name, mapping)
-		if err != nil {
-			return nil, nil, fmt.Errorf("parse proxy provider %s error: %w", name, err)
-		}
+        pd, err := provider.ParseProxyProvider(name, mapping)
+        if err != nil {
+            return nil, nil, fmt.Errorf("parse proxy provider %s error: %w", name, err)
+        }
 
-		providersMap[name] = pd
-	}
+        providersMap[name] = pd
+    }
 
-	for _, provider := range providersMap {
-		log.Infoln("Start initial provider %s", provider.Name())
-		if err := provider.Initial(); err != nil {
-			return nil, nil, fmt.Errorf("initial proxy provider %s error: %w", provider.Name(), err)
-		}
-	}
+    for _, provider := range providersMap {
+        log.Infoln("Start initial provider %s", provider.Name())
+        if err := provider.Initial(); err != nil {
+            return nil, nil, fmt.Errorf("initial proxy provider %s error: %w", provider.Name(), err)
+        }
+    }
 
-	// parse proxy group
-	for idx, mapping := range groupsConfig {
-		group, err := outboundgroup.ParseProxyGroup(mapping, proxies, providersMap)
-		if err != nil {
-			return nil, nil, fmt.Errorf("ProxyGroup[%d]: %w", idx, err)
-		}
+    // parse proxy group
+    for idx, mapping := range groupsConfig {
+        group, err := outboundgroup.ParseProxyGroup(mapping, proxies, providersMap)
+        if err != nil {
+            return nil, nil, fmt.Errorf("ProxyGroup[%d]: %w", idx, err)
+        }
 
-		groupName := group.Name()
-		if _, exist := proxies[groupName]; exist {
-			return nil, nil, fmt.Errorf("ProxyGroup %s: the duplicate name", groupName)
-		}
+        groupName := group.Name()
+        if _, exist := proxies[groupName]; exist {
+            return nil, nil, fmt.Errorf("ProxyGroup %s: the duplicate name", groupName)
+        }
 
-		proxies[groupName] = outbound.NewProxy(group)
-	}
+        proxies[groupName] = outbound.NewProxy(group)
+    }
 
-	// initial compatible provider
-	for _, pd := range providersMap {
-		if pd.VehicleType() != provider.Compatible {
-			continue
-		}
+    // initial compatible provider
+    for _, pd := range providersMap {
+        if pd.VehicleType() != provider.Compatible {
+            continue
+        }
 
-		log.Infoln("Start initial compatible provider %s", pd.Name())
-		if err := pd.Initial(); err != nil {
-			return nil, nil, err
-		}
-	}
+        log.Infoln("Start initial compatible provider %s", pd.Name())
+        if err := pd.Initial(); err != nil {
+            return nil, nil, err
+        }
+    }
 
-	ps := []C.Proxy{}
-	for _, v := range proxyList {
-		ps = append(ps, proxies[v])
-	}
-	hc := provider.NewHealthCheck(ps, "", 0)
-	pd, _ := provider.NewCompatibleProvider(provider.ReservedName, ps, hc)
-	providersMap[provider.ReservedName] = pd
+    ps := []C.Proxy{}
+    for _, v := range proxyList {
+        ps = append(ps, proxies[v])
+    }
+    hc := provider.NewHealthCheck(ps, "", 0)
+    pd, _ := provider.NewCompatibleProvider(provider.ReservedName, ps, hc)
+    providersMap[provider.ReservedName] = pd
 
-	global := outboundgroup.NewSelector("GLOBAL", []provider.ProxyProvider{pd})
-	proxies["GLOBAL"] = outbound.NewProxy(global)
-	return proxies, providersMap, nil
+    global := outboundgroup.NewSelector("GLOBAL", []provider.ProxyProvider{pd})
+    proxies["GLOBAL"] = outbound.NewProxy(global)
+    return proxies, providersMap, nil
 }
 
 func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
-	rules := []C.Rule{}
-	rulesConfig := cfg.Rule
+    rules := []C.Rule{}
+    rulesConfig := cfg.Rule
 
-	// parse rules
-	for idx, line := range rulesConfig {
-		rule := trimArr(strings.Split(line, ","))
-		var (
-			payload string
-			target  string
-			params  = []string{}
-		)
+    // parse rules
+    for idx, line := range rulesConfig {
+        rule := trimArr(strings.Split(line, ","))
+        var (
+            payload string
+            target  string
+            params  = []string{}
+        )
 
-		switch l := len(rule); {
-		case l == 2:
-			target = rule[1]
-		case l == 3:
-			payload = rule[1]
-			target = rule[2]
-		case l >= 4:
-			payload = rule[1]
-			target = rule[2]
-			params = rule[3:]
-		default:
-			return nil, fmt.Errorf("Rules[%d] [%s] error: format invalid", idx, line)
-		}
+        switch l := len(rule); {
+        case l == 2:
+            target = rule[1]
+        case l == 3:
+            payload = rule[1]
+            target = rule[2]
+        case l >= 4:
+            payload = rule[1]
+            target = rule[2]
+            params = rule[3:]
+        default:
+            return nil, fmt.Errorf("Rules[%d] [%s] error: format invalid", idx, line)
+        }
 
-		if _, ok := proxies[target]; !ok {
-			return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
-		}
+        if _, ok := proxies[target]; !ok {
+            return nil, fmt.Errorf("Rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
+        }
 
-		rule = trimArr(rule)
-		params = trimArr(params)
+        rule = trimArr(rule)
+        params = trimArr(params)
 
-		parsed, parseErr := R.ParseRule(rule[0], payload, target, params)
-		if parseErr != nil {
-			if parseErr == R.ErrPlatformNotSupport {
-				log.Warnln("Rules[%d] [%s] don't support current OS, skip", idx, line)
-				continue
-			}
-			return nil, fmt.Errorf("Rules[%d] [%s] error: %s", idx, line, parseErr.Error())
-		}
+        parsed, parseErr := R.ParseRule(rule[0], payload, target, params)
+        if parseErr != nil {
+            if parseErr == R.ErrPlatformNotSupport {
+                log.Warnln("Rules[%d] [%s] don't support current OS, skip", idx, line)
+                continue
+            }
+            return nil, fmt.Errorf("Rules[%d] [%s] error: %s", idx, line, parseErr.Error())
+        }
 
-		rules = append(rules, parsed)
-	}
+        rules = append(rules, parsed)
+    }
 
-	return rules, nil
+    return rules, nil
 }
 
 func parseHosts(cfg *RawConfig) (*trie.DomainTrie, error) {
-	tree := trie.New()
+    tree := trie.New()
 
-	// add default hosts
-	if err := tree.Insert("localhost", net.IP{127, 0, 0, 1}); err != nil {
-		println(err.Error())
-	}
+    // add default hosts
+    if err := tree.Insert("localhost", net.IP{127, 0, 0, 1}); err != nil {
+        println(err.Error())
+    }
 
-	if len(cfg.Hosts) != 0 {
-		for domain, ipStr := range cfg.Hosts {
-			ip := net.ParseIP(ipStr)
-			if ip == nil {
-				return nil, fmt.Errorf("%s is not a valid IP", ipStr)
-			}
-			tree.Insert(domain, ip)
-		}
-	}
+    if len(cfg.Hosts) != 0 {
+        for domain, ipStr := range cfg.Hosts {
+            ip := net.ParseIP(ipStr)
+            if ip == nil {
+                return nil, fmt.Errorf("%s is not a valid IP", ipStr)
+            }
+            tree.Insert(domain, ip)
+        }
+    }
 
-	return tree, nil
+    return tree, nil
 }
 
 func hostWithDefaultPort(host string, defPort string) (string, error) {
-	if !strings.Contains(host, ":") {
-		host += ":"
-	}
+    if !strings.Contains(host, ":") {
+        host += ":"
+    }
 
-	hostname, port, err := net.SplitHostPort(host)
-	if err != nil {
-		return "", err
-	}
+    hostname, port, err := net.SplitHostPort(host)
+    if err != nil {
+        return "", err
+    }
 
-	if port == "" {
-		port = defPort
-	}
+    if port == "" {
+        port = defPort
+    }
 
-	return net.JoinHostPort(hostname, port), nil
+    return net.JoinHostPort(hostname, port), nil
 }
 
 func parseNameServer(servers []string) ([]dns.NameServer, error) {
-	nameservers := []dns.NameServer{}
+    nameservers := []dns.NameServer{}
 
-	for idx, server := range servers {
-		// parse without scheme .e.g 8.8.8.8:53
-		if !strings.Contains(server, "://") {
-			server = "udp://" + server
-		}
-		u, err := url.Parse(server)
-		if err != nil {
-			return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
-		}
+    for idx, server := range servers {
+        // parse without scheme .e.g 8.8.8.8:53
+        if !strings.Contains(server, "://") {
+            server = "udp://" + server
+        }
+        u, err := url.Parse(server)
+        if err != nil {
+            return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
+        }
 
-		var addr, dnsNetType string
-		switch u.Scheme {
-		case "udp":
-			addr, err = hostWithDefaultPort(u.Host, "53")
-			dnsNetType = "" // UDP
-		case "tcp":
-			addr, err = hostWithDefaultPort(u.Host, "53")
-			dnsNetType = "tcp" // TCP
-		case "tls":
-			addr, err = hostWithDefaultPort(u.Host, "853")
-			dnsNetType = "tcp-tls" // DNS over TLS
-		case "https":
-			clearURL := url.URL{Scheme: "https", Host: u.Host, Path: u.Path}
-			addr = clearURL.String()
-			dnsNetType = "https" // DNS over HTTPS
-		default:
-			return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
-		}
+        var addr, dnsNetType string
+        switch u.Scheme {
+        case "udp":
+            addr, err = hostWithDefaultPort(u.Host, "53")
+            dnsNetType = "" // UDP
+        case "tcp":
+            addr, err = hostWithDefaultPort(u.Host, "53")
+            dnsNetType = "tcp" // TCP
+        case "tls":
+            addr, err = hostWithDefaultPort(u.Host, "853")
+            dnsNetType = "tcp-tls" // DNS over TLS
+        case "https":
+            clearURL := url.URL{Scheme: "https", Host: u.Host, Path: u.Path}
+            addr = clearURL.String()
+            dnsNetType = "https" // DNS over HTTPS
+        default:
+            return nil, fmt.Errorf("DNS NameServer[%d] unsupport scheme: %s", idx, u.Scheme)
+        }
 
-		if err != nil {
-			return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
-		}
+        if err != nil {
+            return nil, fmt.Errorf("DNS NameServer[%d] format error: %s", idx, err.Error())
+        }
 
-		nameservers = append(
-			nameservers,
-			dns.NameServer{
-				Net:  dnsNetType,
-				Addr: addr,
-			},
-		)
-	}
-	return nameservers, nil
+        nameservers = append(
+            nameservers,
+            dns.NameServer{
+                Net:  dnsNetType,
+                Addr: addr,
+            },
+        )
+    }
+    return nameservers, nil
 }
 
 func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
-	ipNets := []*net.IPNet{}
+    ipNets := []*net.IPNet{}
 
-	for idx, ip := range ips {
-		_, ipnet, err := net.ParseCIDR(ip)
-		if err != nil {
-			return nil, fmt.Errorf("DNS FallbackIP[%d] format error: %s", idx, err.Error())
-		}
-		ipNets = append(ipNets, ipnet)
-	}
+    for idx, ip := range ips {
+        _, ipnet, err := net.ParseCIDR(ip)
+        if err != nil {
+            return nil, fmt.Errorf("DNS FallbackIP[%d] format error: %s", idx, err.Error())
+        }
+        ipNets = append(ipNets, ipnet)
+    }
 
-	return ipNets, nil
+    return ipNets, nil
 }
 
 func parseDNS(cfg RawDNS) (*DNS, error) {
-	if cfg.Enable && len(cfg.NameServer) == 0 {
-		return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
-	}
+    if cfg.Enable && len(cfg.NameServer) == 0 {
+        return nil, fmt.Errorf("If DNS configuration is turned on, NameServer cannot be empty")
+    }
 
-	dnsCfg := &DNS{
-		Enable:       cfg.Enable,
-		Listen:       cfg.Listen,
-		IPv6:         cfg.IPv6,
-		EnhancedMode: cfg.EnhancedMode,
-		FallbackFilter: FallbackFilter{
-			IPCIDR: []*net.IPNet{},
-		},
-	}
-	var err error
-	if dnsCfg.NameServer, err = parseNameServer(cfg.NameServer); err != nil {
-		return nil, err
-	}
+    dnsCfg := &DNS{
+        Enable:       cfg.Enable,
+        Listen:       cfg.Listen,
+        IPv6:         cfg.IPv6,
+        EnhancedMode: cfg.EnhancedMode,
+        FallbackFilter: FallbackFilter{
+            IPCIDR: []*net.IPNet{},
+        },
+    }
+    var err error
+    if dnsCfg.NameServer, err = parseNameServer(cfg.NameServer); err != nil {
+        return nil, err
+    }
 
-	if dnsCfg.Fallback, err = parseNameServer(cfg.Fallback); err != nil {
-		return nil, err
-	}
+    if dnsCfg.Fallback, err = parseNameServer(cfg.Fallback); err != nil {
+        return nil, err
+    }
 
-	if len(cfg.DefaultNameserver) == 0 {
-		return nil, errors.New("default nameserver should have at least one nameserver")
-	}
-	if dnsCfg.DefaultNameserver, err = parseNameServer(cfg.DefaultNameserver); err != nil {
-		return nil, err
-	}
-	// check default nameserver is pure ip addr
-	for _, ns := range dnsCfg.DefaultNameserver {
-		host, _, err := net.SplitHostPort(ns.Addr)
-		if err != nil || net.ParseIP(host) == nil {
-			return nil, errors.New("default nameserver should be pure IP")
-		}
-	}
+    if len(cfg.DefaultNameserver) == 0 {
+        return nil, errors.New("default nameserver should have at least one nameserver")
+    }
+    if dnsCfg.DefaultNameserver, err = parseNameServer(cfg.DefaultNameserver); err != nil {
+        return nil, err
+    }
+    // check default nameserver is pure ip addr
+    for _, ns := range dnsCfg.DefaultNameserver {
+        host, _, err := net.SplitHostPort(ns.Addr)
+        if err != nil || net.ParseIP(host) == nil {
+            return nil, errors.New("default nameserver should be pure IP")
+        }
+    }
 
-	if cfg.EnhancedMode == dns.FAKEIP {
-		_, ipnet, err := net.ParseCIDR(cfg.FakeIPRange)
-		if err != nil {
-			return nil, err
-		}
+    if cfg.EnhancedMode == dns.FAKEIP {
+        _, ipnet, err := net.ParseCIDR(cfg.FakeIPRange)
+        if err != nil {
+            return nil, err
+        }
 
-		var host *trie.DomainTrie
-		// fake ip skip host filter
-		if len(cfg.FakeIPFilter) != 0 {
-			host = trie.New()
-			for _, domain := range cfg.FakeIPFilter {
-				host.Insert(domain, true)
-			}
-		}
+        var host *trie.DomainTrie
+        // fake ip skip host filter
+        if len(cfg.FakeIPFilter) != 0 {
+            host = trie.New()
+            for _, domain := range cfg.FakeIPFilter {
+                host.Insert(domain, true)
+            }
+        }
 
-		pool, err := fakeip.New(ipnet, 1000, host)
-		if err != nil {
-			return nil, err
-		}
+        pool, err := fakeip.New(ipnet, 1000, host)
+        if err != nil {
+            return nil, err
+        }
 
-		dnsCfg.FakeIPRange = pool
-	}
+        dnsCfg.FakeIPRange = pool
+    }
 
-	dnsCfg.FallbackFilter.GeoIP = cfg.FallbackFilter.GeoIP
-	if fallbackip, err := parseFallbackIPCIDR(cfg.FallbackFilter.IPCIDR); err == nil {
-		dnsCfg.FallbackFilter.IPCIDR = fallbackip
-	}
+    dnsCfg.FallbackFilter.GeoIP = cfg.FallbackFilter.GeoIP
+    dnsCfg.FallbackFilter.Rules = cfg.FallbackFilter.Rules
+    if fallbackip, err := parseFallbackIPCIDR(cfg.FallbackFilter.IPCIDR); err == nil {
+        dnsCfg.FallbackFilter.IPCIDR = fallbackip
+    }
 
-	return dnsCfg, nil
+    return dnsCfg, nil
 }
 
 func parseAuthentication(rawRecords []string) []auth.AuthUser {
-	users := make([]auth.AuthUser, 0)
-	for _, line := range rawRecords {
-		userData := strings.SplitN(line, ":", 2)
-		if len(userData) == 2 {
-			users = append(users, auth.AuthUser{User: userData[0], Pass: userData[1]})
-		}
-	}
-	return users
+    users := make([]auth.AuthUser, 0)
+    for _, line := range rawRecords {
+        userData := strings.SplitN(line, ":", 2)
+        if len(userData) == 2 {
+            users = append(users, auth.AuthUser{User: userData[0], Pass: userData[1]})
+        }
+    }
+    return users
 }
