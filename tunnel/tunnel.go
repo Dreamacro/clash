@@ -289,7 +289,7 @@ func handleTCPConn(localConn C.ServerAdapter) {
 }
 
 func shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
-	return !rule.ShouldResolveIP() && metadata.Host != "" && metadata.DstIP == nil
+	return rule.ShouldResolveIP() && metadata.Host != "" && metadata.DstIP == nil
 }
 
 func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
