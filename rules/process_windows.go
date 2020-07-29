@@ -1,0 +1,249 @@
+package rules
+
+import (
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"net"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"unsafe"
+
+	"github.com/Dreamacro/clash/common/cache"
+	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/log"
+
+	"golang.org/x/sys/windows"
+)
+
+const (
+	tcpTableFunc      = "GetExtendedTcpTable"
+	tcpTablePidConn   = 4
+	udpTableFunc      = "GetExtendedUdpTable"
+	udpTablePid       = 1
+	queryProcNameFunc = "QueryFullProcessImageNameW"
+)
+
+var (
+	processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
+
+	getExTcpTable uintptr
+	getExUdpTable uintptr
+	queryProcName uintptr
+
+	errNotFound = errors.New("process not found")
+)
+
+func init() {
+	h, err := windows.LoadLibrary("iphlpapi.dll")
+	if err != nil {
+		log.Errorln("LoadLibrary iphlpapi.dll error: %s", err.Error())
+		return
+	}
+
+	getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
+	if err != nil {
+		log.Errorln("GetProcAddress of %s error: %s", tcpTableFunc, err.Error())
+		return
+	}
+
+	getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
+	if err != nil {
+		log.Errorln("GetProcAddress of %s error: %s", udpTableFunc, err.Error())
+		return
+	}
+
+	h, err = windows.LoadLibrary("kernel32.dll")
+	if err != nil {
+		log.Errorln("LoadLibrary kernel32.dll error: %s", err.Error())
+		return
+	}
+
+	queryProcName, err = windows.GetProcAddress(h, queryProcNameFunc)
+	if err != nil {
+		log.Errorln("GetProcAddress of %s error: %s", queryProcNameFunc, err.Error())
+		return
+	}
+}
+
+type Process struct {
+	adapter string
+	process string
+}
+
+func (p *Process) RuleType() C.RuleType {
+	return C.Process
+}
+
+func (p *Process) Adapter() string {
+	return p.adapter
+}
+
+func (p *Process) Payload() string {
+	return p.process
+}
+
+func (p *Process) ShouldResolveIP() bool {
+	return false
+}
+
+func (p *Process) Match(metadata *C.Metadata) bool {
+	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
+	cached, hit := processCache.Get(key)
+	if !hit {
+		processName, err := resolveProcessName(metadata)
+		if err != nil {
+			log.Debugln("[%s] Resolve process of %s failed: %s", C.Process.String(), key, err.Error())
+		}
+
+		processCache.Set(key, processName)
+		cached = processName
+	}
+	return strings.EqualFold(cached.(string), p.process)
+}
+
+func NewProcess(process string, adapter string) (*Process, error) {
+	return &Process{
+		adapter: adapter,
+		process: process,
+	}, nil
+}
+
+func resolveProcessName(metadata *C.Metadata) (string, error) {
+	ip := metadata.SrcIP
+	family := windows.AF_INET
+	if ip.To4() == nil {
+		family = windows.AF_INET6
+	}
+
+	var class int
+	var fn uintptr
+	switch metadata.NetWork {
+	case C.TCP:
+		fn = getExTcpTable
+		class = tcpTablePidConn
+	case C.UDP:
+		fn = getExUdpTable
+		class = udpTablePid
+	default:
+		return "", ErrInvalidNetwork
+	}
+
+	srcPort, err := strconv.Atoi(metadata.SrcPort)
+	if err != nil {
+		return "", err
+	}
+
+	buf, err := getTransportTable(fn, family, class)
+	if err != nil {
+		return "", err
+	}
+
+	s := newSearcher(family == windows.AF_INET, metadata.NetWork == C.TCP)
+
+	pid, err := s.Search(buf, ip, uint16(srcPort))
+	if err != nil {
+		return "", err
+	}
+	return getExecPathFromPID(pid)
+}
+
+type searcher struct {
+	itemSize int
+	port     int
+	ip       int
+	ipSize   int
+	pid      int
+}
+
+func (s *searcher) Search(b []byte, ip net.IP, port uint16) (uint32, error) {
+	n := int(readNativeUint32(b[:4]))
+	itemSize := s.itemSize
+	for i := 0; i < n; i++ {
+		row := 4 + itemSize*i
+
+		srcPort := binary.BigEndian.Uint16(b[row+s.port : row+s.port+2])
+		if srcPort != port {
+			continue
+		}
+
+		srcIP := net.IP(b[row+s.ip : row+s.ip+s.ipSize])
+		if !ip.Equal(srcIP) {
+			continue
+		}
+
+		pid := readNativeUint32(b[row+s.pid : row+s.pid+4])
+		return pid, nil
+	}
+	return 0, errNotFound
+}
+
+func newSearcher(isV4, isTCP bool) *searcher {
+	var itemSize, port, ip, ipSize, pid int
+	switch {
+	case isV4 && isTCP:
+		// struct MIB_TCPROW_OWNER_PID
+		itemSize, port, ip, ipSize, pid = 24, 8, 4, 4, 20
+	case isV4 && !isTCP:
+		// struct MIB_UDPROW_OWNER_PID
+		itemSize, port, ip, ipSize, pid = 12, 4, 0, 4, 8
+	case !isV4 && isTCP:
+		// struct MIB_TCP6ROW_OWNER_PID
+		itemSize, port, ip, ipSize, pid = 56, 20, 0, 16, 52
+	case !isV4 && !isTCP:
+		// struct MIB_UDP6ROW_OWNER_PID
+		itemSize, port, ip, ipSize, pid = 28, 20, 0, 16, 24
+	}
+
+	return &searcher{
+		itemSize: itemSize,
+		port:     port,
+		ip:       ip,
+		ipSize:   ipSize,
+		pid:      pid,
+	}
+}
+
+func getTransportTable(fn uintptr, family int, class int) ([]byte, error) {
+	for size, buf := uint32(8), make([]byte, 8); ; {
+		ptr := unsafe.Pointer(&buf[0])
+		err, _, _ := syscall.Syscall6(fn, 6, uintptr(ptr), uintptr(unsafe.Pointer(&size)), 0, uintptr(family), uintptr(class), 0)
+
+		switch err {
+		case 0:
+			return buf, nil
+		case uintptr(syscall.ERROR_INSUFFICIENT_BUFFER):
+			buf = make([]byte, size)
+		default:
+			return nil, fmt.Errorf("syscall error: %d", err)
+		}
+	}
+}
+
+func readNativeUint32(b []byte) uint32 {
+	return *(*uint32)(unsafe.Pointer(&b[0]))
+}
+
+func getExecPathFromPID(pid uint32) (string, error) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(h)
+
+	buf := make([]uint16, syscall.MAX_LONG_PATH)
+	size := uint32(len(buf))
+	r1, _, err := syscall.Syscall6(
+		queryProcName, 4,
+		uintptr(h),
+		uintptr(1),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(unsafe.Pointer(&size)),
+		0, 0)
+	if r1 == 0 {
+		return "", err
+	}
+	return filepath.Base(syscall.UTF16ToString(buf[:size])), nil
+}
