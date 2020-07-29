@@ -33,7 +33,7 @@ func (ps *Process) Match(metadata *C.Metadata) bool {
 	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
 	cached, hit := processCache.Get(key)
 	if !hit {
-		name, err := getExecPathFromAddress(metadata.SrcIP, metadata.SrcPort, metadata.NetWork == C.TCP)
+		name, err := getExecPathFromAddress(metadata)
 		if err != nil {
 			log.Debugln("[%s] getExecPathFromAddress error: %s", C.Process.String(), err.Error())
 			return false
@@ -91,16 +91,24 @@ func getExecPathFromPID(pid uint32) (string, error) {
 	return filepath.Base(string(buf[:firstZero])), nil
 }
 
-func getExecPathFromAddress(ip net.IP, portStr string, isTCP bool) (string, error) {
-	port, err := strconv.Atoi(portStr)
+func getExecPathFromAddress(metadata *C.Metadata) (string, error) {
+	ip := metadata.SrcIP
+	port, err := strconv.Atoi(metadata.SrcPort)
 	if err != nil {
 		return "", err
 	}
 
-	spath := "net.inet.tcp.pcblist_n"
-	if !isTCP {
+	var spath string
+	switch metadata.NetWork {
+	case C.TCP:
+		spath = "net.inet.tcp.pcblist_n"
+	case C.UDP:
 		spath = "net.inet.udp.pcblist_n"
+	default:
+		return "", ErrInvalidNetwork
 	}
+
+	isIPv4 := ip.To4() != nil
 
 	value, err := syscall.Sysctl(spath)
 	if err != nil {
@@ -109,35 +117,19 @@ func getExecPathFromAddress(ip net.IP, portStr string, isTCP bool) (string, erro
 
 	buf := []byte(value)
 
-	var kinds uint32 = 0
-	so, inp := 0, 0
-	for i := roundUp8(xinpgenSize(buf)); i < uint32(len(buf)) && xinpgenSize(buf[i:]) > 24; i += roundUp8(xinpgenSize(buf[i:])) {
-		thisKind := binary.LittleEndian.Uint32(buf[i+4 : i+8])
-		if kinds&thisKind == 0 {
-			kinds |= thisKind
-			switch thisKind {
-			case 0x1:
-				// XSO_SOCKET
-				so = int(i)
-			case 0x10:
-				// XSO_INPCB
-				inp = int(i)
-			default:
-				break
-			}
-		}
-
-		// all blocks needed by tcp/udp
-		if (isTCP && kinds != 0x3f) || (!isTCP && kinds != 0x1f) {
-			continue
-		}
-		kinds = 0
-
-		// xsocket_n.xso_protocol
-		proto := binary.LittleEndian.Uint32(buf[so+36 : so+40])
-		if proto != syscall.IPPROTO_TCP && proto != syscall.IPPROTO_UDP {
-			continue
-		}
+	// from darwin-xnu/bsd/netinet/in_pcblist.c:get_pcblist_n
+	// size/offset are round up (aligned) to 8 bytes in darwin
+	// rup8(sizeof(xinpcb_n)) + rup8(sizeof(xsocket_n)) +
+	// 2 * rup8(sizeof(xsockbuf_n)) + rup8(sizeof(xsockstat_n))
+	itemSize := 384
+	if metadata.NetWork == C.TCP {
+		// rup8(sizeof(xtcpcb_n))
+		itemSize += 208
+	}
+	// skip the first and last xinpgen(24 bytes) block
+	for i := 24; i < len(buf)-24; i += itemSize {
+		// offset of xinpcb_n and xsocket_n
+		inp, so := i, i+104
 
 		srcPort := binary.BigEndian.Uint16(buf[inp+18 : inp+20])
 		if uint16(port) != srcPort {
@@ -148,13 +140,14 @@ func getExecPathFromAddress(ip net.IP, portStr string, isTCP bool) (string, erro
 		flag := buf[inp+44]
 
 		var srcIP net.IP
-		if flag&0x1 > 0 {
+		switch {
+		case flag&0x1 > 0 && isIPv4:
 			// ipv4
 			srcIP = net.IP(buf[inp+76 : inp+80])
-		} else if flag&0x2 > 0 {
+		case flag&0x2 > 0 && !isIPv4:
 			// ipv6
 			srcIP = net.IP(buf[inp+64 : inp+80])
-		} else {
+		default:
 			continue
 		}
 
@@ -163,20 +156,13 @@ func getExecPathFromAddress(ip net.IP, portStr string, isTCP bool) (string, erro
 		}
 
 		// xsocket_n.so_last_pid
-		pid := binary.LittleEndian.Uint32(buf[so+68 : so+72])
+		pid := readNativeUint32(buf[so+68 : so+72])
 		return getExecPathFromPID(pid)
 	}
 
 	return "", errors.New("process not found")
 }
 
-func xinpgenSize(b []byte) uint32 {
-	return binary.LittleEndian.Uint32(b[:4])
-}
-
-func roundUp8(n uint32) uint32 {
-	if n == 0 {
-		return uint32(8)
-	}
-	return (n + 7) & ((^uint32(8)) + 1)
+func readNativeUint32(b []byte) uint32 {
+	return *(*uint32)(unsafe.Pointer(&b[0]))
 }
