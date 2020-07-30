@@ -39,6 +39,8 @@ func (ps *Process) Match(metadata *C.Metadata) bool {
 			return false
 		}
 
+		processCache.Set(key, name)
+
 		cached = name
 	}
 
