@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -49,10 +50,16 @@ func (s *Snell) Read(b []byte) (int, error) {
 	}
 
 	// CommandError
+	// 1 byte error code
 	if _, err := io.ReadFull(s.Conn, s.buffer[:]); err != nil {
 		return 0, err
 	}
+	errcode := int(s.buffer[0])
 
+	// 1 byte error message length
+	if _, err := io.ReadFull(s.Conn, s.buffer[:]); err != nil {
+		return 0, err
+	}
 	length := int(s.buffer[0])
 	msg := make([]byte, length)
 
@@ -60,7 +67,7 @@ func (s *Snell) Read(b []byte) (int, error) {
 		return 0, err
 	}
 
-	return 0, errors.New(string(msg))
+	return 0, fmt.Errorf("server reported code: %d, message: %s", errcode, string(msg))
 }
 
 func WriteHeader(conn net.Conn, host string, port uint) error {
