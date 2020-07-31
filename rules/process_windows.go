@@ -34,38 +34,46 @@ var (
 	queryProcName uintptr
 
 	errNotFound = errors.New("process not found")
+
+	matchMeta = func(p *Process, m *C.Metadata) bool { return false }
 )
 
 func init() {
-	h, err := windows.LoadLibrary("iphlpapi.dll")
-	if err != nil {
-		log.Errorln("LoadLibrary iphlpapi.dll error: %s", err.Error())
-		return
-	}
+	err := func() error {
+		h, err := windows.LoadLibrary("iphlpapi.dll")
+		if err != nil {
+			return fmt.Errorf("LoadLibrary iphlpapi.dll failed: %s", err.Error())
+		}
 
-	getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
-	if err != nil {
-		log.Errorln("GetProcAddress of %s error: %s", tcpTableFunc, err.Error())
-		return
-	}
+		getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
+		if err != nil {
+			return fmt.Errorf("GetProcAddress of %s failed: %s", tcpTableFunc, err.Error())
+		}
 
-	getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
-	if err != nil {
-		log.Errorln("GetProcAddress of %s error: %s", udpTableFunc, err.Error())
-		return
-	}
+		getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
+		if err != nil {
+			return fmt.Errorf("GetProcAddress of %s failed: %s", udpTableFunc, err.Error())
+		}
 
-	h, err = windows.LoadLibrary("kernel32.dll")
-	if err != nil {
-		log.Errorln("LoadLibrary kernel32.dll error: %s", err.Error())
-		return
-	}
+		h, err = windows.LoadLibrary("kernel32.dll")
+		if err != nil {
+			return fmt.Errorf("LoadLibrary kernel32.dll failed: %s", err.Error())
+		}
 
-	queryProcName, err = windows.GetProcAddress(h, queryProcNameFunc)
+		queryProcName, err = windows.GetProcAddress(h, queryProcNameFunc)
+		if err != nil {
+			return fmt.Errorf("GetProcAddress of %s failed: %s", queryProcNameFunc, err.Error())
+		}
+
+		return nil
+	}()
+
 	if err != nil {
-		log.Errorln("GetProcAddress of %s error: %s", queryProcNameFunc, err.Error())
+		log.Errorln("Initialize PROCESS-NAME failed: %s", err.Error())
+		log.Warnln("All PROCESS-NAMES rules will be skiped")
 		return
 	}
+	matchMeta = match
 }
 
 type Process struct {
@@ -89,7 +97,7 @@ func (p *Process) ShouldResolveIP() bool {
 	return false
 }
 
-func (p *Process) Match(metadata *C.Metadata) bool {
+func match(p *Process, metadata *C.Metadata) bool {
 	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
 	cached, hit := processCache.Get(key)
 	if !hit {
@@ -102,6 +110,10 @@ func (p *Process) Match(metadata *C.Metadata) bool {
 		cached = processName
 	}
 	return strings.EqualFold(cached.(string), p.process)
+}
+
+func (p *Process) Match(metadata *C.Metadata) bool {
+	return matchMeta(p, metadata)
 }
 
 func NewProcess(process string, adapter string) (*Process, error) {
