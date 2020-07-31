@@ -1,4 +1,5 @@
-// +build !darwin,!linux,!freebsd
+// +build !darwin,!linux
+// +build !freebsd !amd64
 
 package rules
 
