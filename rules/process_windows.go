@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -28,52 +29,43 @@ const (
 
 var (
 	processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
+	errNotFound  = errors.New("process not found")
+	matchMeta    = func(p *Process, m *C.Metadata) bool { return false }
 
 	getExTcpTable uintptr
 	getExUdpTable uintptr
 	queryProcName uintptr
 
-	errNotFound = errors.New("process not found")
-
-	matchMeta = func(p *Process, m *C.Metadata) bool { return false }
+	once sync.Once
 )
 
-func init() {
-	err := func() error {
-		h, err := windows.LoadLibrary("iphlpapi.dll")
-		if err != nil {
-			return fmt.Errorf("LoadLibrary iphlpapi.dll failed: %s", err.Error())
-		}
-
-		getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
-		if err != nil {
-			return fmt.Errorf("GetProcAddress of %s failed: %s", tcpTableFunc, err.Error())
-		}
-
-		getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
-		if err != nil {
-			return fmt.Errorf("GetProcAddress of %s failed: %s", udpTableFunc, err.Error())
-		}
-
-		h, err = windows.LoadLibrary("kernel32.dll")
-		if err != nil {
-			return fmt.Errorf("LoadLibrary kernel32.dll failed: %s", err.Error())
-		}
-
-		queryProcName, err = windows.GetProcAddress(h, queryProcNameFunc)
-		if err != nil {
-			return fmt.Errorf("GetProcAddress of %s failed: %s", queryProcNameFunc, err.Error())
-		}
-
-		return nil
-	}()
-
+func initWin32API() error {
+	h, err := windows.LoadLibrary("iphlpapi.dll")
 	if err != nil {
-		log.Errorln("Initialize PROCESS-NAME failed: %s", err.Error())
-		log.Warnln("All PROCESS-NAMES rules will be skiped")
-		return
+		return fmt.Errorf("LoadLibrary iphlpapi.dll failed: %s", err.Error())
 	}
-	matchMeta = match
+
+	getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
+	if err != nil {
+		return fmt.Errorf("GetProcAddress of %s failed: %s", tcpTableFunc, err.Error())
+	}
+
+	getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
+	if err != nil {
+		return fmt.Errorf("GetProcAddress of %s failed: %s", udpTableFunc, err.Error())
+	}
+
+	h, err = windows.LoadLibrary("kernel32.dll")
+	if err != nil {
+		return fmt.Errorf("LoadLibrary kernel32.dll failed: %s", err.Error())
+	}
+
+	queryProcName, err = windows.GetProcAddress(h, queryProcNameFunc)
+	if err != nil {
+		return fmt.Errorf("GetProcAddress of %s failed: %s", queryProcNameFunc, err.Error())
+	}
+
+	return nil
 }
 
 type Process struct {
@@ -117,6 +109,15 @@ func (p *Process) Match(metadata *C.Metadata) bool {
 }
 
 func NewProcess(process string, adapter string) (*Process, error) {
+	once.Do(func() {
+		err := initWin32API()
+		if err != nil {
+			log.Errorln("Initialize PROCESS-NAME failed: %s", err.Error())
+			log.Warnln("All PROCESS-NAMES rules will be skiped")
+			return
+		}
+		matchMeta = match
+	})
 	return &Process{
 		adapter: adapter,
 		process: process,
