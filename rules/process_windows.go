@@ -169,25 +169,34 @@ type searcher struct {
 	ip       int
 	ipSize   int
 	pid      int
+	tcpState int
 }
 
 func (s *searcher) Search(b []byte, ip net.IP, port uint16) (uint32, error) {
 	n := int(readNativeUint32(b[:4]))
 	itemSize := s.itemSize
 	for i := 0; i < n; i++ {
-		row := 4 + itemSize*i
+		row := b[4+itemSize*i : 4+itemSize*(i+1)]
 
-		srcPort := binary.BigEndian.Uint16(b[row+s.port : row+s.port+2])
+		if s.tcpState >= 0 {
+			tcpState := readNativeUint32(row[s.tcpState : s.tcpState+4])
+			// MIB_TCP_STATE_ESTAB, only check established connections for TCP
+			if tcpState != 5 {
+				continue
+			}
+		}
+
+		srcPort := binary.BigEndian.Uint16(row[s.port : s.port+2])
 		if srcPort != port {
 			continue
 		}
 
-		srcIP := net.IP(b[row+s.ip : row+s.ip+s.ipSize])
+		srcIP := net.IP(row[s.ip : s.ip+s.ipSize])
 		if !ip.Equal(srcIP) {
 			continue
 		}
 
-		pid := readNativeUint32(b[row+s.pid : row+s.pid+4])
+		pid := readNativeUint32(row[s.pid : s.pid+4])
 		return pid, nil
 	}
 	return 0, errNotFound
@@ -195,16 +204,17 @@ func (s *searcher) Search(b []byte, ip net.IP, port uint16) (uint32, error) {
 
 func newSearcher(isV4, isTCP bool) *searcher {
 	var itemSize, port, ip, ipSize, pid int
+	tcpState := -1
 	switch {
 	case isV4 && isTCP:
 		// struct MIB_TCPROW_OWNER_PID
-		itemSize, port, ip, ipSize, pid = 24, 8, 4, 4, 20
+		itemSize, port, ip, ipSize, pid, tcpState = 24, 8, 4, 4, 20, 0
 	case isV4 && !isTCP:
 		// struct MIB_UDPROW_OWNER_PID
 		itemSize, port, ip, ipSize, pid = 12, 4, 0, 4, 8
 	case !isV4 && isTCP:
 		// struct MIB_TCP6ROW_OWNER_PID
-		itemSize, port, ip, ipSize, pid = 56, 20, 0, 16, 52
+		itemSize, port, ip, ipSize, pid, tcpState = 56, 20, 0, 16, 52, 48
 	case !isV4 && !isTCP:
 		// struct MIB_UDP6ROW_OWNER_PID
 		itemSize, port, ip, ipSize, pid = 28, 20, 0, 16, 24
@@ -216,6 +226,7 @@ func newSearcher(isV4, isTCP bool) *searcher {
 		ip:       ip,
 		ipSize:   ipSize,
 		pid:      pid,
+		tcpState: tcpState,
 	}
 }
 
