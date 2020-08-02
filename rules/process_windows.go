@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -186,7 +185,12 @@ func (s *searcher) Search(b []byte, ip net.IP, port uint16) (uint32, error) {
 			}
 		}
 
-		srcPort := binary.BigEndian.Uint16(row[s.port : s.port+2])
+		// according to MSDN, only the lower 16 bits of dwLocalPort are used and the port number is in network endian.
+		// this field can be illustrated as follows depends on different machine endianess:
+		//     little endian: [ MSB LSB  0   0  ]   interpret as native uint32 is ((LSB<<8)|MSB)
+		//       big  endian: [  0   0  MSB LSB ]   interpret as native uint32 is ((MSB<<8)|LSB)
+		// so we need an syscall.Ntohs on the lower 16 bits after read the port as native uint32
+		srcPort := syscall.Ntohs(uint16(readNativeUint32(row[s.port : s.port+4])))
 		if srcPort != port {
 			continue
 		}
@@ -251,6 +255,14 @@ func readNativeUint32(b []byte) uint32 {
 }
 
 func getExecPathFromPID(pid uint32) (string, error) {
+	switch pid {
+	case 0:
+		// reserved pid for system idle process
+		return "", nil
+	case 4:
+		// reserved pid for windows kernel image
+		return "ntoskrnl.exe", nil
+	}
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
 		return "", err
