@@ -255,13 +255,14 @@ func readNativeUint32(b []byte) uint32 {
 }
 
 func getExecPathFromPID(pid uint32) (string, error) {
+	// kernel process starts with a colon in order to distinguish with normal processes
 	switch pid {
 	case 0:
 		// reserved pid for system idle process
-		return "", nil
+		return ":System Idle Process", nil
 	case 4:
 		// reserved pid for windows kernel image
-		return "ntoskrnl.exe", nil
+		return ":System", nil
 	}
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
