@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Dreamacro/clash/common/cache"
+	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 
 	D "github.com/miekg/dns"
@@ -22,6 +23,9 @@ var (
 	}
 	// MatchRules will check if the host need to resolve by fallback or not
 	MatchRules func(host string) bool
+
+	// GetProxy Dial With Proxy
+	GetProxy func() C.Proxy
 )
 
 const (

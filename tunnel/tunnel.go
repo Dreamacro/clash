@@ -37,7 +37,8 @@ var (
 )
 
 func init() {
-	dns.MatchRules = MatchHost
+	dns.MatchRules = matchHost
+	dns.GetProxy = getGlobalProxy
 	go process()
 }
 
@@ -335,8 +336,7 @@ func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 	return proxies["DIRECT"], nil, nil
 }
 
-// MatchHost Return if the host need to through proxy or not
-func MatchHost(host string) bool {
+func matchHost(host string) bool {
 	configMux.RLock()
 	defer configMux.RUnlock()
 
@@ -354,4 +354,8 @@ func MatchHost(host string) bool {
 	}
 
 	return true
+}
+
+func getGlobalProxy() C.Proxy {
+	return proxies["GLOBAL"]
 }

@@ -118,9 +118,15 @@ func updateDNS(c *config.DNS) {
 			IPCIDR: c.FallbackFilter.IPCIDR,
 			Rules:  c.FallbackFilter.Rules,
 		},
+		FallbackProxy: c.FallbackProxy,
 		Default: c.DefaultNameserver,
 	})
-	resolver.DefaultResolver = r
+
+	// TODO: Support DefaultResolver when Fallback Proxy is enabled
+	if !c.FallbackProxy {
+		resolver.DefaultResolver = r
+	}
+
 	tunnel.SetResolver(r)
 	if err := dns.ReCreateServer(c.Listen, r); err != nil {
 		log.Errorln("Start DNS server error: %s", err.Error())

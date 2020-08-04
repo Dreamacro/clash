@@ -24,8 +24,8 @@ var (
 )
 
 type dnsClient interface {
-	Exchange(m *D.Msg) (msg *D.Msg, err error)
-	ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err error)
+	Exchange(m *D.Msg, proxy bool) (msg *D.Msg, err error)
+	ExchangeContext(ctx context.Context, m *D.Msg, proxy bool) (msg *D.Msg, err error)
 }
 
 type result struct {
@@ -141,7 +141,7 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			return r.fallbackExchange(m)
 		}
 
-		return r.batchExchange(r.main, m)
+		return r.batchExchange(r.main, m, false)
 	})
 
 	if err == nil {
@@ -188,12 +188,12 @@ func (r *Resolver) IsFakeIP(ip net.IP) bool {
 	return false
 }
 
-func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err error) {
+func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg, proxy bool) (msg *D.Msg, err error) {
 	fast, ctx := picker.WithTimeout(context.Background(), time.Second*5)
 	for _, client := range clients {
 		r := client
 		fast.Go(func() (interface{}, error) {
-			m, err := r.ExchangeContext(ctx, m)
+			m, err := r.ExchangeContext(ctx, m, proxy)
 			if err != nil {
 				return nil, err
 			} else if m.Rcode == D.RcodeServerFailure || m.Rcode == D.RcodeRefused {
@@ -217,13 +217,13 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 }
 
 func (r *Resolver) fallbackExchange(m *D.Msg) (msg *D.Msg, err error) {
-	msgCh := r.asyncExchange(r.main, m)
+	msgCh := r.asyncExchange(r.main, m, false)
 	if r.fallback == nil {
 		res := <-msgCh
 		msg, err = res.Msg, res.Error
 		return
 	}
-	fallbackMsg := r.asyncExchange(r.fallback, m)
+	fallbackMsg := r.asyncExchange(r.fallback, m, true)
 	res := <-msgCh
 	if res.Error == nil {
 		if ips := r.msgToIP(res.Msg); len(ips) != 0 {
@@ -286,10 +286,10 @@ func (r *Resolver) msgToIP(msg *D.Msg) []net.IP {
 	return ips
 }
 
-func (r *Resolver) asyncExchange(client []dnsClient, msg *D.Msg) <-chan *result {
+func (r *Resolver) asyncExchange(client []dnsClient, msg *D.Msg, proxy bool) <-chan *result {
 	ch := make(chan *result, 1)
 	go func() {
-		res, err := r.batchExchange(client, msg)
+		res, err := r.batchExchange(client, msg, proxy)
 		ch <- &result{Msg: res, Error: err}
 	}()
 	return ch
@@ -312,6 +312,7 @@ type Config struct {
 	IPv6           bool
 	EnhancedMode   EnhancedMode
 	FallbackFilter FallbackFilter
+	FallbackProxy  bool
 	Pool           *fakeip.Pool
 }
 

@@ -18,11 +18,11 @@ type client struct {
 	host string
 }
 
-func (c *client) Exchange(m *D.Msg) (msg *D.Msg, err error) {
-	return c.ExchangeContext(context.Background(), m)
+func (c *client) Exchange(m *D.Msg, proxy bool) (msg *D.Msg, err error) {
+	return c.ExchangeContext(context.Background(), m, proxy)
 }
 
-func (c *client) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err error) {
+func (c *client) ExchangeContext(ctx context.Context, m *D.Msg, proxy bool) (msg *D.Msg, err error) {
 	var ip net.IP
 	if c.r == nil {
 		// a default ip dns
