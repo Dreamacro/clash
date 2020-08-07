@@ -244,17 +244,30 @@ func resolveProcessNameByProcSearch(inode, uid int) (string, error) {
 			}
 
 			if bytes.Compare(buffer[:n], socket) == 0 {
-				n, err := syscall.Readlink(path.Join(processPath, "exe"), buffer)
+				cmdline, err := ioutil.ReadFile(path.Join(processPath, "cmdline"))
 				if err != nil {
 					return "", err
 				}
 
-				return string(buffer[:n]), nil
+				return splitCmdline(cmdline), nil
 			}
 		}
 	}
 
 	return "", syscall.ESRCH
+}
+
+func splitCmdline(cmdline []byte) string {
+	indexOfEndOfString := len(cmdline)
+
+	for i, c := range cmdline {
+		if c == 0 {
+			indexOfEndOfString = i
+			break
+		}
+	}
+
+	return string(cmdline[:indexOfEndOfString])
 }
 
 func isPid(s string) bool {
