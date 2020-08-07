@@ -11,11 +11,21 @@ var (
 	ErrInvalidNetwork     = errors.New("invalid network")
 
 	noResolve = "no-resolve"
+	fullMatch = "full-match"
 )
 
 func HasNoResolve(params []string) bool {
 	for _, p := range params {
 		if p == noResolve {
+			return true
+		}
+	}
+	return false
+}
+
+func HasFullMatch(params []string) bool {
+	for _, p := range params {
+		if p == fullMatch {
 			return true
 		}
 	}

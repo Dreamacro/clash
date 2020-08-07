@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/common/cache"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 
@@ -27,9 +26,8 @@ const (
 )
 
 var (
-	processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
-	errNotFound  = errors.New("process not found")
-	matchMeta    = func(p *Process, m *C.Metadata) bool { return false }
+	errNotFound = errors.New("process not found")
+	matchMeta   = func(p *Process, m *C.Metadata) bool { return false }
 
 	getExTcpTable uintptr
 	getExUdpTable uintptr
@@ -67,27 +65,6 @@ func initWin32API() error {
 	return nil
 }
 
-type Process struct {
-	adapter string
-	process string
-}
-
-func (p *Process) RuleType() C.RuleType {
-	return C.Process
-}
-
-func (p *Process) Adapter() string {
-	return p.adapter
-}
-
-func (p *Process) Payload() string {
-	return p.process
-}
-
-func (p *Process) ShouldResolveIP() bool {
-	return false
-}
-
 func match(p *Process, metadata *C.Metadata) bool {
 	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
 	cached, hit := processCache.Get(key)
@@ -100,14 +77,20 @@ func match(p *Process, metadata *C.Metadata) bool {
 		processCache.Set(key, processName)
 		cached = processName
 	}
-	return strings.EqualFold(cached.(string), p.process)
+
+	processName := cached.(string)
+	if !p.fullMatch {
+		processName = filepath.Base(processName)
+	}
+
+	return strings.EqualFold(processName, p.process)
 }
 
 func (p *Process) Match(metadata *C.Metadata) bool {
 	return matchMeta(p, metadata)
 }
 
-func NewProcess(process string, adapter string) (*Process, error) {
+func NewProcess(process string, adapter string, fullMatch bool) (*Process, error) {
 	once.Do(func() {
 		err := initWin32API()
 		if err != nil {
@@ -117,9 +100,15 @@ func NewProcess(process string, adapter string) (*Process, error) {
 		}
 		matchMeta = match
 	})
+
+	if !fullMatch {
+		process = filepath.Base(process)
+	}
+
 	return &Process{
-		adapter: adapter,
-		process: process,
+		adapter:   adapter,
+		process:   process,
+		fullMatch: fullMatch,
 	}, nil
 }
 
@@ -250,10 +239,6 @@ func getTransportTable(fn uintptr, family int, class int) ([]byte, error) {
 	}
 }
 
-func readNativeUint32(b []byte) uint32 {
-	return *(*uint32)(unsafe.Pointer(&b[0]))
-}
-
 func getExecPathFromPID(pid uint32) (string, error) {
 	// kernel process starts with a colon in order to distinguish with normal processes
 	switch pid {
@@ -275,12 +260,12 @@ func getExecPathFromPID(pid uint32) (string, error) {
 	r1, _, err := syscall.Syscall6(
 		queryProcName, 4,
 		uintptr(h),
-		uintptr(1),
+		uintptr(0),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(unsafe.Pointer(&size)),
 		0, 0)
 	if r1 == 0 {
 		return "", err
 	}
-	return filepath.Base(syscall.UTF16ToString(buf[:size])), nil
+	return syscall.UTF16ToString(buf[:size]), nil
 }

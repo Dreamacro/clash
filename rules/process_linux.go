@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/common/cache"
 	"github.com/Dreamacro/clash/common/pool"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
@@ -39,15 +38,6 @@ var (
 	DefaultProcessNameResolver ProcessNameResolver = resolveProcessNameByProcSearch
 )
 
-type Process struct {
-	adapter string
-	process string
-}
-
-func (p *Process) RuleType() C.RuleType {
-	return C.Process
-}
-
 func (p *Process) Match(metadata *C.Metadata) bool {
 	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
 	cached, hit := processCache.Get(key)
@@ -62,25 +52,23 @@ func (p *Process) Match(metadata *C.Metadata) bool {
 		cached = processName
 	}
 
-	return strings.EqualFold(cached.(string), p.process)
+	processName := cached.(string)
+	if !p.fullMatch {
+		processName = filepath.Base(processName)
+	}
+
+	return strings.EqualFold(processName, p.process)
 }
 
-func (p *Process) Adapter() string {
-	return p.adapter
-}
+func NewProcess(process string, adapter string, fullMatch bool) (*Process, error) {
+	if !fullMatch {
+		process = filepath.Base(process)
+	}
 
-func (p *Process) Payload() string {
-	return p.process
-}
-
-func (p *Process) ShouldResolveIP() bool {
-	return false
-}
-
-func NewProcess(process string, adapter string) (*Process, error) {
 	return &Process{
-		adapter: adapter,
-		process: process,
+		adapter:   adapter,
+		process:   process,
+		fullMatch: fullMatch,
 	}, nil
 }
 
@@ -91,8 +79,6 @@ const (
 )
 
 var nativeEndian binary.ByteOrder = binary.LittleEndian
-
-var processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
 
 func resolveProcessName(metadata *C.Metadata) (string, error) {
 	inode, uid, err := DefaultSocketResolver(metadata)
@@ -258,30 +244,17 @@ func resolveProcessNameByProcSearch(inode, uid int) (string, error) {
 			}
 
 			if bytes.Compare(buffer[:n], socket) == 0 {
-				cmdline, err := ioutil.ReadFile(path.Join(processPath, "cmdline"))
+				n, err := syscall.Readlink(path.Join(processPath, "exe"), buffer)
 				if err != nil {
 					return "", err
 				}
 
-				return splitCmdline(cmdline), nil
+				return string(buffer[:n]), nil
 			}
 		}
 	}
 
 	return "", syscall.ESRCH
-}
-
-func splitCmdline(cmdline []byte) string {
-	indexOfEndOfString := len(cmdline)
-
-	for i, c := range cmdline {
-		if c == 0 {
-			indexOfEndOfString = i
-			break
-		}
-	}
-
-	return filepath.Base(string(cmdline[:indexOfEndOfString]))
 }
 
 func isPid(s string) bool {

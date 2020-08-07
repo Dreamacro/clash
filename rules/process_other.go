@@ -7,6 +7,6 @@ import (
 	C "github.com/Dreamacro/clash/constant"
 )
 
-func NewProcess(process string, adapter string) (C.Rule, error) {
+func NewProcess(process string, adapter string, fullMatch bool) (C.Rule, error) {
 	return nil, ErrPlatformNotSupport
 }

@@ -11,24 +11,11 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/common/cache"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 )
 
-// store process name for when dealing with multiple PROCESS-NAME rules
-var processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
-
-type Process struct {
-	adapter string
-	process string
-}
-
-func (ps *Process) RuleType() C.RuleType {
-	return C.Process
-}
-
-func (ps *Process) Match(metadata *C.Metadata) bool {
+func (p *Process) Match(metadata *C.Metadata) bool {
 	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
 	cached, hit := processCache.Get(key)
 	if !hit {
@@ -43,25 +30,23 @@ func (ps *Process) Match(metadata *C.Metadata) bool {
 		cached = name
 	}
 
-	return strings.EqualFold(cached.(string), ps.process)
+	name := cached.(string)
+	if !p.fullMatch {
+		name = filepath.Base(name)
+	}
+
+	return strings.EqualFold(name, p.process)
 }
 
-func (p *Process) Adapter() string {
-	return p.adapter
-}
+func NewProcess(process string, adapter string, fullMatch bool) (*Process, error) {
+	if !fullMatch {
+		process = filepath.Base(process)
+	}
 
-func (p *Process) Payload() string {
-	return p.process
-}
-
-func (p *Process) ShouldResolveIP() bool {
-	return false
-}
-
-func NewProcess(process string, adapter string) (*Process, error) {
 	return &Process{
-		adapter: adapter,
-		process: process,
+		adapter:   adapter,
+		process:   process,
+		fullMatch: fullMatch,
 	}, nil
 }
 
@@ -83,7 +68,7 @@ func getExecPathFromPID(pid uint32) (string, error) {
 		return "", errno
 	}
 
-	return filepath.Base(string(buf[:size-1])), nil
+	return string(buf[:size-1]), nil
 }
 
 func searchSocketPid(socket uint64) (uint32, error) {
@@ -181,8 +166,4 @@ func getExecPathFromAddress(metadata *C.Metadata) (string, error) {
 	}
 
 	return "", errors.New("process not found")
-}
-
-func readNativeUint32(b []byte) uint32 {
-	return *(*uint32)(unsafe.Pointer(&b[0]))
 }
