@@ -105,6 +105,9 @@ func (a *authAES128) Decode(b []byte) ([]byte, int, error) {
 			pos = int(binary.LittleEndian.Uint16(b[5:7])) + 4
 		}
 
+		if pos > length-4 {
+			return nil, 0, errAuthAES128PositionTooLarge
+		}
 		a.buffer.Write(b[pos : length-4])
 		b = b[length:]
 		bSize -= length
