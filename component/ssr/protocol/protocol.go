@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	errAuthAES128HMACError         = errors.New("auth_aes128_* post decrypt hmac error")
+	errAuthAES128IncorrectMAC      = errors.New("auth_aes128_* post decrypt incorrect mac")
 	errAuthAES128DataLengthError   = errors.New("auth_aes128_* post decrypt length mismatch")
+	errAuthAES128IncorrectChecksum = errors.New("auth_aes128_* post decrypt incorrect checksum")
 	errAuthSHA1v4CRC32Error        = errors.New("auth_sha1_v4 post decrypt data crc32 error")
 	errAuthSHA1v4DataLengthError   = errors.New("auth_sha1_v4 post decrypt data length error")
 	errAuthSHA1v4IncorrectChecksum = errors.New("auth_sha1_v4 post decrypt incorrect checksum")

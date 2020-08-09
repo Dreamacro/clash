@@ -81,8 +81,9 @@ func (a *authAES128) Decode(b []byte) ([]byte, int, error) {
 
 		h := a.hmac(key, b[:2])
 		if !bytes.Equal(h[:2], b[2:4]) {
-			return nil, 0, errAuthAES128HMACError
+			return nil, 0, errAuthAES128IncorrectMAC
 		}
+
 		length := int(binary.LittleEndian.Uint16(b[:2]))
 		if length >= 8192 || length < 8 {
 			return nil, 0, errAuthAES128DataLengthError
@@ -90,6 +91,12 @@ func (a *authAES128) Decode(b []byte) ([]byte, int, error) {
 		if length > bSize {
 			break
 		}
+
+		h = a.hmac(key, b[:bSize-4])
+		if !bytes.Equal(h[:4], b[bSize-4:]) {
+			return nil, 0, errAuthAES128IncorrectChecksum
+		}
+
 		a.recvID++
 		pos := int(b[4])
 		if pos < 255 {
@@ -144,7 +151,7 @@ func (a *authAES128) DecodePacket(b []byte) ([]byte, int, error) {
 	bSize := len(b)
 	h := a.hmac(a.Key, b[:bSize-4])
 	if !bytes.Equal(h[:4], b[bSize-4:]) {
-		return nil, 0, errAuthAES128HMACError
+		return nil, 0, errAuthAES128IncorrectMAC
 	}
 	return b[:bSize-4], bSize - 4, nil
 }
