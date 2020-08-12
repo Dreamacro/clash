@@ -92,8 +92,8 @@ func (a *authAES128) Decode(b []byte) ([]byte, int, error) {
 			break
 		}
 
-		h = a.hmac(key, b[:bSize-4])
-		if !bytes.Equal(h[:4], b[bSize-4:]) {
+		h = a.hmac(key, b[:length-4])
+		if !bytes.Equal(h[:4], b[length-4:length]) {
 			return nil, 0, errAuthAES128IncorrectChecksum
 		}
 
