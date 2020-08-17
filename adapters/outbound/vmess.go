@@ -198,6 +198,9 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 	if err != nil {
 		return nil, err
 	}
+	if option.Network == "h2" && option.TLS == false {
+		return nil, fmt.Errorf("TLS must be true with h2 network")
+	}
 
 	return &Vmess{
 		Base: &Base{
