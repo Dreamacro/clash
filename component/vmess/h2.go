@@ -1,8 +1,6 @@
 package vmess
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"io"
 	"math/rand"
 	"net"
@@ -14,7 +12,7 @@ import (
 
 type h2Conn struct {
 	net.Conn
-	req     *http.Request
+	*http2.ClientConn
 	pwriter *io.PipeWriter
 	res     *http.Response
 	cfg     *H2Config
@@ -26,20 +24,6 @@ type H2Config struct {
 }
 
 func (hc *h2Conn) establishConn() error {
-	// TODO: use underlaying conn
-	client := &http.Client{}
-	caCertPool, err := x509.SystemCertPool()
-	if err != nil {
-		return err
-	}
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
-	client.Transport = &http2.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
 	preader, pwriter := io.Pipe()
 
 	host := hc.cfg.Hosts[rand.Intn(len(hc.cfg.Hosts))]
@@ -62,14 +46,13 @@ func (hc *h2Conn) establishConn() error {
 		},
 	}
 
-	res, err := client.Do(&req)
+	res, err := hc.ClientConn.RoundTrip(&req)
 	if err != nil {
 		return err
 	}
 
-	hc.req = &req
-	hc.res = res
 	hc.pwriter = pwriter
+	hc.res = res
 
 	return nil
 }
@@ -89,7 +72,7 @@ func (hc *h2Conn) Read(b []byte) (int, error) {
 
 // Write implements io.Writer.
 func (hc *h2Conn) Write(b []byte) (int, error) {
-	if hc.req != nil && hc.pwriter != nil && hc.res != nil && hc.res.Close == false {
+	if hc.pwriter != nil {
 		return hc.pwriter.Write(b)
 	}
 
@@ -103,15 +86,26 @@ func (hc *h2Conn) Close() error {
 	if err := hc.pwriter.Close(); err != nil {
 		return err
 	}
-	if err := hc.req.Body.Close(); err != nil {
+	if err := hc.ClientConn.Shutdown(hc.res.Request.Context()); err != nil {
+		return err
+	}
+	if err := hc.Conn.Close(); err != nil {
 		return err
 	}
 	return nil
 }
 
 func StreamH2Conn(conn net.Conn, cfg *H2Config) net.Conn {
+	transport := &http2.Transport{}
+
+	cconn, err := transport.NewClientConn(conn)
+	if err != nil {
+		panic(err)
+	}
+
 	return &h2Conn{
-		Conn: conn,
-		cfg:  cfg,
+		Conn:       conn,
+		ClientConn: cconn,
+		cfg:        cfg,
 	}
 }

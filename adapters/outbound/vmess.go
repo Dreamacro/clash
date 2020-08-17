@@ -106,23 +106,24 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 
 		c = vmess.StreamHTTPConn(c, httpOpts)
 	case "h2":
-		h2Opts := &vmess.H2Config{
-			Hosts: v.option.HTTP2Opts.Host,
-			Path:  v.option.HTTP2Opts.Path,
-		}
-
 		host, _, _ := net.SplitHostPort(v.addr)
-		tlsOpts := &vmess.TLSConfig{
+		tlsOpts := vmess.TLSConfig{
 			Host:           host,
 			SkipCertVerify: v.option.SkipCertVerify,
 			SessionCache:   getClientSessionCache(),
+			NextProtos:     []string{"h2"},
 		}
 
 		if v.option.ServerName != "" {
 			tlsOpts.Host = v.option.ServerName
 		}
 
-		c, err = vmess.StreamTLSConn(c, tlsOpts)
+		c, err = vmess.StreamTLSConn(c, &tlsOpts)
+
+		h2Opts := &vmess.H2Config{
+			Hosts: v.option.HTTP2Opts.Host,
+			Path:  v.option.HTTP2Opts.Path,
+		}
 
 		c = vmess.StreamH2Conn(c, h2Opts)
 	default:

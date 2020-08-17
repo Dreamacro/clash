@@ -9,6 +9,7 @@ type TLSConfig struct {
 	Host           string
 	SkipCertVerify bool
 	SessionCache   tls.ClientSessionCache
+	NextProtos     []string
 }
 
 func StreamTLSConn(conn net.Conn, cfg *TLSConfig) (net.Conn, error) {
@@ -16,6 +17,7 @@ func StreamTLSConn(conn net.Conn, cfg *TLSConfig) (net.Conn, error) {
 		ServerName:         cfg.Host,
 		InsecureSkipVerify: cfg.SkipCertVerify,
 		ClientSessionCache: cfg.SessionCache,
+		NextProtos:         cfg.NextProtos,
 	}
 
 	tlsConn := tls.Client(conn, tlsConfig)
