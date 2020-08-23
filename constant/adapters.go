@@ -86,6 +86,7 @@ type Proxy interface {
 	DelayHistory() []DelayHistory
 	Dial(metadata *Metadata) (Conn, error)
 	LastDelay() uint16
+	SetNotAlive()
 	URLTest(ctx context.Context, url string) (uint16, error)
 }
 

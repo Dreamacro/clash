@@ -263,6 +263,7 @@ func handleTCPConn(localConn C.ServerAdapter) {
 
 	remoteConn, err := proxy.Dial(metadata)
 	if err != nil {
+		proxy.SetNotAlive()
 		log.Warnln("dial %s error: %s", proxy.Name(), err.Error())
 		return
 	}

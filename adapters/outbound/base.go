@@ -129,6 +129,10 @@ func (p *Proxy) DelayHistory() []C.DelayHistory {
 	return histories
 }
 
+func (p *Proxy) SetNotAlive() {
+	atomic.StoreUint32(&p.alive, 0)
+}
+
 // LastDelay return last history record. if proxy is not alive, return the max value of uint16.
 func (p *Proxy) LastDelay() (delay uint16) {
 	var max uint16 = 0xffff
