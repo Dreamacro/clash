@@ -78,7 +78,7 @@ func (u *URLTest) fast() C.Proxy {
 		}
 
 		// tolerance
-		if u.fastNode == nil || u.fastNode.LastDelay() > fast.LastDelay() + u.tolerance {
+		if u.fastNode == nil || u.fastNode.LastDelay() > fast.LastDelay()+u.tolerance {
 			u.fastNode = fast
 		}
 
