@@ -12,7 +12,7 @@ import (
 )
 
 func downloadMMDB(path string) (err error) {
-	resp, err := http.Get("https://github.com/Dreamacro/maxmind-geoip/releases/latest/download/Country.mmdb")
+	resp, err := http.Get("https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/china_ip_list.mmdb")
 	if err != nil {
 		return
 	}
