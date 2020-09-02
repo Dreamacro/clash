@@ -127,8 +127,8 @@ func getExecPathFromAddress(metadata *C.Metadata) (string, error) {
 		// rup8(sizeof(xtcpcb_n))
 		itemSize += 208
 	}
-	// skip the first and last xinpgen(24 bytes) block
-	for i := 24; i < len(buf)-24; i += itemSize {
+	// skip the first xinpgen(24 bytes) block
+	for i := 24; i+itemSize <= len(buf); i += itemSize {
 		// offset of xinpcb_n and xsocket_n
 		inp, so := i, i+104
 
