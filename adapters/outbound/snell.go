@@ -39,7 +39,7 @@ func (s *Snell) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	}
 	c = snell.StreamConn(c, s.psk, s.version)
 	port, _ := strconv.Atoi(metadata.DstPort)
-	err := snell.WriteHeader(c, metadata.String(), uint(port), s.version)
+	err := snell.WriteHeader(c, metadata.String(), uint(port))
 	return c, err
 }
 

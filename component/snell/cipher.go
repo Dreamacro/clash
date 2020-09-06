@@ -4,16 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 
+	"github.com/Dreamacro/go-shadowsocks2/shadowaead"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
 )
-
-type Cipher interface {
-	KeySize() int
-	SaltSize() int
-	Encrypter(salt []byte) (cipher.AEAD, error)
-	Decrypter(salt []byte) (cipher.AEAD, error)
-}
 
 type snellCipher struct {
 	psk      []byte
@@ -31,6 +25,7 @@ func (sc *snellCipher) Decrypter(salt []byte) (cipher.AEAD, error) {
 }
 
 func snellKDF(psk, salt []byte, keySize int) []byte {
+	// snell use a special kdf function
 	return argon2.IDKey(psk, salt, 3, 8, 1, 32)[:keySize]
 }
 
@@ -42,7 +37,7 @@ func aesGCM(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(blk)
 }
 
-func NewAES128GCM(psk []byte) Cipher {
+func NewAES128GCM(psk []byte) shadowaead.Cipher {
 	return &snellCipher{
 		psk:      psk,
 		keySize:  16,
@@ -50,7 +45,7 @@ func NewAES128GCM(psk []byte) Cipher {
 	}
 }
 
-func NewChacha20Poly1305(psk []byte) Cipher {
+func NewChacha20Poly1305(psk []byte) shadowaead.Cipher {
 	return &snellCipher{
 		psk:      psk,
 		keySize:  32,

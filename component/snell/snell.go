@@ -77,16 +77,12 @@ func (s *Snell) Read(b []byte) (int, error) {
 	return 0, fmt.Errorf("server reported code: %d, message: %s", errcode, string(msg))
 }
 
-func WriteHeader(conn net.Conn, host string, port uint, version int) error {
+func WriteHeader(conn net.Conn, host string, port uint) error {
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer bufferPool.Put(buf)
 	buf.WriteByte(Version)
-	if version == Version2 {
-		buf.WriteByte(CommandConnectV2)
-	} else {
-		buf.WriteByte(CommandConnect)
-	}
+	buf.WriteByte(CommandConnect)
 
 	// clientID length & id
 	buf.WriteByte(0)
@@ -104,7 +100,7 @@ func WriteHeader(conn net.Conn, host string, port uint, version int) error {
 }
 
 func StreamConn(conn net.Conn, psk []byte, version int) net.Conn {
-	var cipher Cipher
+	var cipher shadowaead.Cipher
 	if version == Version2 {
 		cipher = NewAES128GCM(psk)
 	} else {
