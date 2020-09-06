@@ -17,6 +17,7 @@ type Snell struct {
 	*Base
 	psk        []byte
 	obfsOption *simpleObfsOption
+	version    int
 }
 
 type SnellOption struct {
@@ -24,6 +25,7 @@ type SnellOption struct {
 	Server   string                 `proxy:"server"`
 	Port     int                    `proxy:"port"`
 	Psk      string                 `proxy:"psk"`
+	Version  int                    `proxy:"version,omitempty"`
 	ObfsOpts map[string]interface{} `proxy:"obfs-opts,omitempty"`
 }
 
@@ -35,9 +37,9 @@ func (s *Snell) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 		_, port, _ := net.SplitHostPort(s.addr)
 		c = obfs.NewHTTPObfs(c, s.obfsOption.Host, port)
 	}
-	c = snell.StreamConn(c, s.psk)
+	c = snell.StreamConn(c, s.psk, s.version)
 	port, _ := strconv.Atoi(metadata.DstPort)
-	err := snell.WriteHeader(c, metadata.String(), uint(port))
+	err := snell.WriteHeader(c, metadata.String(), uint(port), s.version)
 	return c, err
 }
 
@@ -66,6 +68,14 @@ func NewSnell(option SnellOption) (*Snell, error) {
 		return nil, fmt.Errorf("snell %s obfs mode error: %s", addr, obfsOption.Mode)
 	}
 
+	// backward compatible
+	if option.Version == 0 {
+		option.Version = snell.DefaultSnellVersion
+	}
+	if option.Version != snell.Version1 && option.Version != snell.Version2 {
+		return nil, fmt.Errorf("snell version error: %d", option.Version)
+	}
+
 	return &Snell{
 		Base: &Base{
 			name: option.Name,
@@ -74,5 +84,6 @@ func NewSnell(option SnellOption) (*Snell, error) {
 		},
 		psk:        psk,
 		obfsOption: obfsOption,
+		version:    option.Version,
 	}, nil
 }

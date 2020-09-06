@@ -10,14 +10,21 @@ import (
 	"sync"
 
 	"github.com/Dreamacro/go-shadowsocks2/shadowaead"
-	"golang.org/x/crypto/chacha20poly1305"
 )
 
 const (
-	CommandPing    byte = 0
-	CommandConnect byte = 1
+	Version1            = 1
+	Version2            = 2
+	DefaultSnellVersion = Version1
+)
+
+const (
+	CommandPing      byte = 0
+	CommandConnect   byte = 1
+	CommandConnectV2 byte = 5
 
 	CommandTunnel byte = 0
+	CommandPong   byte = 1
 	CommandError  byte = 2
 
 	Version byte = 1
@@ -70,12 +77,16 @@ func (s *Snell) Read(b []byte) (int, error) {
 	return 0, fmt.Errorf("server reported code: %d, message: %s", errcode, string(msg))
 }
 
-func WriteHeader(conn net.Conn, host string, port uint) error {
+func WriteHeader(conn net.Conn, host string, port uint, version int) error {
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer bufferPool.Put(buf)
 	buf.WriteByte(Version)
-	buf.WriteByte(CommandConnect)
+	if version == Version2 {
+		buf.WriteByte(CommandConnectV2)
+	} else {
+		buf.WriteByte(CommandConnect)
+	}
 
 	// clientID length & id
 	buf.WriteByte(0)
@@ -92,7 +103,12 @@ func WriteHeader(conn net.Conn, host string, port uint) error {
 	return nil
 }
 
-func StreamConn(conn net.Conn, psk []byte) net.Conn {
-	cipher := &snellCipher{psk, chacha20poly1305.New}
+func StreamConn(conn net.Conn, psk []byte, version int) net.Conn {
+	var cipher Cipher
+	if version == Version2 {
+		cipher = NewAES128GCM(psk)
+	} else {
+		cipher = NewChacha20Poly1305(psk)
+	}
 	return &Snell{Conn: shadowaead.NewConn(conn, cipher)}
 }
