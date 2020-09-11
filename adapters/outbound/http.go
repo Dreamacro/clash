@@ -32,6 +32,8 @@ type HttpOption struct {
 	Password       string `proxy:"password,omitempty"`
 	TLS            bool   `proxy:"tls,omitempty"`
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
+	SocketMark     string `proxy:"socket-mark,omitempty"`
+	Interface      string `proxy:"interface-name,omitempty"`
 }
 
 func (h *Http) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
@@ -51,7 +53,7 @@ func (h *Http) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 }
 
 func (h *Http) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	c, err := dialer.DialContext(ctx, "tcp", h.addr)
+	c, err := dialer.DialContext(ctx, "tcp", h.addr, dialer.DialOptions{SocketMark: h.SocketMark(), Interface: h.Interface()})
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", h.addr, err)
 	}
@@ -123,9 +125,11 @@ func NewHttp(option HttpOption) *Http {
 
 	return &Http{
 		Base: &Base{
-			name: option.Name,
-			addr: net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
-			tp:   C.Http,
+			name:       option.Name,
+			addr:       net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
+			tp:         C.Http,
+			socketmark: option.SocketMark,
+			ifname:     option.Interface,
 		},
 		user:      option.UserName,
 		pass:      option.Password,
