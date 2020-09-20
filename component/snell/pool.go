@@ -33,7 +33,6 @@ func (p *Pool) Put(conn net.Conn) {
 	}
 
 	p.pool.Put(conn)
-	return
 }
 
 type PoolConn struct {
