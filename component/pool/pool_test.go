@@ -11,9 +11,9 @@ import (
 
 func lg() Factory {
 	initial := -1
-	return func(context.Context) interface{} {
+	return func(context.Context) (interface{}, error) {
 		initial++
-		return initial
+		return initial, nil
 	}
 }
 
@@ -21,11 +21,13 @@ func TestPool_Basic(t *testing.T) {
 	g := lg()
 	pool := New(g)
 
-	elm := pool.Get()
+	elm, _ := pool.Get()
 	assert.Equal(t, 0, elm.(int))
 	pool.Put(elm)
-	assert.Equal(t, 0, pool.Get().(int))
-	assert.Equal(t, 1, pool.Get().(int))
+	elm, _ = pool.Get()
+	assert.Equal(t, 0, elm.(int))
+	elm, _ = pool.Get()
+	assert.Equal(t, 1, elm.(int))
 }
 
 func TestPool_MaxSize(t *testing.T) {
@@ -36,10 +38,11 @@ func TestPool_MaxSize(t *testing.T) {
 	items := []interface{}{}
 
 	for i := 0; i < size; i++ {
-		items = append(items, pool.Get())
+		item, _ := pool.Get()
+		items = append(items, item)
 	}
 
-	extra := pool.Get()
+	extra, _ := pool.Get()
 	assert.Equal(t, size, extra.(int))
 
 	for _, item := range items {
@@ -49,7 +52,8 @@ func TestPool_MaxSize(t *testing.T) {
 	pool.Put(extra)
 
 	for _, item := range items {
-		assert.Equal(t, item.(int), pool.Get().(int))
+		elm, _ := pool.Get()
+		assert.Equal(t, item.(int), elm.(int))
 	}
 }
 
@@ -57,14 +61,16 @@ func TestPool_MaxAge(t *testing.T) {
 	g := lg()
 	pool := New(g, WithAge(20))
 
-	pool.Put(pool.Get())
+	elm, _ := pool.Get()
+	pool.Put(elm)
 
-	elm := pool.Get()
+	elm, _ = pool.Get()
 	assert.Equal(t, 0, elm.(int))
 	pool.Put(elm)
 
 	time.Sleep(time.Millisecond * 22)
-	assert.Equal(t, 1, pool.Get().(int))
+	elm, _ = pool.Get()
+	assert.Equal(t, 1, elm.(int))
 }
 
 func TestPool_AutoGC(t *testing.T) {
@@ -75,7 +81,8 @@ func TestPool_AutoGC(t *testing.T) {
 		sign <- item.(int)
 	}))
 
-	assert.Equal(t, 0, pool.Get().(int))
+	elm, _ := pool.Get()
+	assert.Equal(t, 0, elm.(int))
 	pool.Put(2)
 
 	runtime.GC()
