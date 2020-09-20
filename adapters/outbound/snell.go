@@ -111,14 +111,14 @@ func NewSnell(option SnellOption) (*Snell, error) {
 	}
 
 	if option.Version == snell.Version2 {
-		s.pool = snell.NewPool(func(ctx context.Context) *snell.Snell {
+		s.pool = snell.NewPool(func(ctx context.Context) (*snell.Snell, error) {
 			c, err := dialer.DialContext(ctx, "tcp", addr)
 			if err != nil {
-				return nil
+				return nil, err
 			}
 
 			tcpKeepAlive(c)
-			return streamConn(c, streamOption{psk, option.Version, addr, obfsOption})
+			return streamConn(c, streamOption{psk, option.Version, addr, obfsOption}), nil
 		})
 	}
 	return s, nil

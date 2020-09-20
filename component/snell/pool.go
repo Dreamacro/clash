@@ -2,7 +2,6 @@ package snell
 
 import (
 	"context"
-	"errors"
 	"net"
 
 	"github.com/Dreamacro/clash/component/pool"
@@ -18,9 +17,9 @@ func (p *Pool) Get() (net.Conn, error) {
 }
 
 func (p *Pool) GetContext(ctx context.Context) (net.Conn, error) {
-	elm := p.pool.GetContext(ctx)
-	if elm == nil {
-		return nil, errors.New("get nil on pool")
+	elm, err := p.pool.GetContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	return &PoolConn{elm.(*Snell), p}, nil
@@ -65,9 +64,9 @@ func (pc *PoolConn) Close() error {
 	return nil
 }
 
-func NewPool(factory func(context.Context) *Snell) *Pool {
+func NewPool(factory func(context.Context) (*Snell, error)) *Pool {
 	p := pool.New(
-		func(ctx context.Context) interface{} {
+		func(ctx context.Context) (interface{}, error) {
 			return factory(ctx)
 		},
 		pool.WithAge(15000),

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Factory = func(context.Context) interface{}
+type Factory = func(context.Context) (interface{}, error)
 
 type entry struct {
 	elm  interface{}
@@ -48,7 +48,7 @@ type pool struct {
 	maxAge  int64
 }
 
-func (p *pool) GetContext(ctx context.Context) interface{} {
+func (p *pool) GetContext(ctx context.Context) (interface{}, error) {
 	now := time.Now()
 	for {
 		select {
@@ -61,14 +61,14 @@ func (p *pool) GetContext(ctx context.Context) interface{} {
 				continue
 			}
 
-			return elm.elm
+			return elm.elm, nil
 		default:
 			return p.factory(ctx)
 		}
 	}
 }
 
-func (p *pool) Get() interface{} {
+func (p *pool) Get() (interface{}, error) {
 	return p.GetContext(context.Background())
 }
 
