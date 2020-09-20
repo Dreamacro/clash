@@ -32,6 +32,7 @@ const (
 
 var (
 	bufferPool = sync.Pool{New: func() interface{} { return &bytes.Buffer{} }}
+	endSignal  = []byte{}
 )
 
 type Snell struct {
@@ -77,12 +78,16 @@ func (s *Snell) Read(b []byte) (int, error) {
 	return 0, fmt.Errorf("server reported code: %d, message: %s", errcode, string(msg))
 }
 
-func WriteHeader(conn net.Conn, host string, port uint) error {
+func WriteHeader(conn net.Conn, host string, port uint, version int) error {
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer bufferPool.Put(buf)
 	buf.WriteByte(Version)
-	buf.WriteByte(CommandConnect)
+	if version == Version2 {
+		buf.WriteByte(CommandConnectV2)
+	} else {
+		buf.WriteByte(CommandConnect)
+	}
 
 	// clientID length & id
 	buf.WriteByte(0)
@@ -99,7 +104,19 @@ func WriteHeader(conn net.Conn, host string, port uint) error {
 	return nil
 }
 
-func StreamConn(conn net.Conn, psk []byte, version int) net.Conn {
+// HalfClose works only on version2
+func HalfClose(conn net.Conn) error {
+	if _, err := conn.Write(endSignal); err != nil {
+		return err
+	}
+
+	if s, ok := conn.(*Snell); ok {
+		s.reply = false
+	}
+	return nil
+}
+
+func StreamConn(conn net.Conn, psk []byte, version int) *Snell {
 	var cipher shadowaead.Cipher
 	if version == Version2 {
 		cipher = NewAES128GCM(psk)
