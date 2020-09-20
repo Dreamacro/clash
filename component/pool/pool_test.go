@@ -83,7 +83,7 @@ func TestPool_AutoGC(t *testing.T) {
 	select {
 	case num := <-sign:
 		assert.Equal(t, 2, num)
-	case <-time.After(time.Second):
+	case <-time.After(time.Second * 3):
 		assert.Fail(t, "something wrong")
 	}
 }
