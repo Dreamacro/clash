@@ -59,7 +59,7 @@ func (hc *h2Conn) establishConn() error {
 
 // Read implements net.Conn.Read()
 func (hc *h2Conn) Read(b []byte) (int, error) {
-	if hc.res != nil && hc.res.Close == false {
+	if hc.res != nil && !hc.res.Close {
 		n, err := hc.res.Body.Read(b)
 		return n, err
 	}

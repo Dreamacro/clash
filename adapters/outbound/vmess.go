@@ -119,6 +119,9 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 		}
 
 		c, err = vmess.StreamTLSConn(c, &tlsOpts)
+		if err != nil {
+			return nil, err
+		}
 
 		h2Opts := &vmess.H2Config{
 			Hosts: v.option.HTTP2Opts.Host,
@@ -198,7 +201,7 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 	if err != nil {
 		return nil, err
 	}
-	if option.Network == "h2" && option.TLS == false {
+	if option.Network == "h2" && !option.TLS {
 		return nil, fmt.Errorf("TLS must be true with h2 network")
 	}
 
