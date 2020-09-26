@@ -95,17 +95,17 @@ func (hc *h2Conn) Close() error {
 	return nil
 }
 
-func StreamH2Conn(conn net.Conn, cfg *H2Config) net.Conn {
+func StreamH2Conn(conn net.Conn, cfg *H2Config) (net.Conn, error) {
 	transport := &http2.Transport{}
 
 	cconn, err := transport.NewClientConn(conn)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &h2Conn{
 		Conn:       conn,
 		ClientConn: cconn,
 		cfg:        cfg,
-	}
+	}, nil
 }

@@ -125,7 +125,7 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 			Path:  v.option.HTTP2Opts.Path,
 		}
 
-		c = vmess.StreamH2Conn(c, h2Opts)
+		c, err = vmess.StreamH2Conn(c, h2Opts)
 	default:
 		// handle TLS
 		if v.option.TLS {
