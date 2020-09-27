@@ -22,7 +22,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Get dependencies, run test and static check
+      - name: go fmt check
+        run: |
+          make fmtcheck
+
+      - name: Get dependencies and run test and static check
         run: |
           go test ./...
           go vet ./...
