@@ -98,6 +98,13 @@ $(zip_releases): %.zip : %
 	zip -m -j $(BINDIR)/$(NAME)-$(basename $@)-$(VERSION).zip $(BINDIR)/$(NAME)-$(basename $@).exe
 
 all-arch: $(PLATFORM_LIST) $(WINDOWS_ARCH_LIST)
+.PHONY: fmt
+fmt:
+	go fmt ./...
+
+.PHONY: fmtcheck
+fmtcheck: ## Checks for style violation using gofmt
+	go fmt ./... | grep ".*\.go"; if [ "$$?" = "0" ]; then exit 1; fi
 
 releases: $(gz_releases) $(zip_releases)
 clean:
