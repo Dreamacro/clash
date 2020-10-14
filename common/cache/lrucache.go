@@ -121,7 +121,7 @@ func (c *LruCache) Set(key interface{}, value interface{}) {
 	c.SetWithExpire(key, value, time.Unix(expires, 0))
 }
 
-// SetWithExpire stores the interface{} representation of a response for a given key and given exires.
+// SetWithExpire stores the interface{} representation of a response for a given key and given expires.
 // The expires time will round to second.
 func (c *LruCache) SetWithExpire(key interface{}, value interface{}, expires time.Time) {
 	c.mu.Lock()

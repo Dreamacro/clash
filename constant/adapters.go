@@ -137,7 +137,7 @@ type UDPPacket interface {
 
 	// WriteBack writes the payload with source IP/Port equals addr
 	// - variable source IP/Port is important to STUN
-	// - if addr is not provided, WriteBack will wirte out UDP packet with SourceIP/Prot equals to origional Target,
+	// - if addr is not provided, WriteBack will write out UDP packet with SourceIP/Port equals to original Target,
 	//   this is important when using Fake-IP.
 	WriteBack(b []byte, addr net.Addr) (n int, err error)
 

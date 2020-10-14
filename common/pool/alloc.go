@@ -61,7 +61,7 @@ func (alloc *Allocator) Put(buf []byte) error {
 	return nil
 }
 
-// msb return the pos of most significiant bit
+// msb return the pos of most significant bit
 func msb(size int) uint16 {
 	return uint16(bits.Len32(uint32(size)) - 1)
 }
