@@ -97,6 +97,20 @@ func main() {
 		log.Fatalln("Parse config error: %s", err.Error())
 	}
 
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGHUP)
+		for range sigCh {
+			log.Infoln("SIGHUP received, reloading config")
+			cfg, err := executor.Parse()
+			if err != nil {
+				log.Warnln("Parse config error: %s", err.Error())
+				continue
+			}
+			executor.ApplyConfig(cfg, true)
+		}
+	}()
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
