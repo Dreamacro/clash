@@ -17,7 +17,6 @@ import (
 type LoadBalance struct {
 	*outbound.Base
 	single    *singledo.Single
-	maxRetry  int
 	providers []provider.ProxyProvider
 }
 
@@ -85,11 +84,17 @@ func (lb *LoadBalance) Unwrap(metadata *C.Metadata) C.Proxy {
 	key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 	proxies := lb.proxies()
 	buckets := int32(len(proxies))
-	for i := 0; i < lb.maxRetry; i, key = i+1, key+1 {
-		idx := jumpHash(key, buckets)
-		proxy := proxies[idx]
-		if proxy.Alive() {
-			return proxy
+	index := jumpHash(key, buckets)
+
+	for i := index; ; {
+		if proxies[i].Alive() {
+			return proxies[i]
+		}
+
+		i = (i + 1) % buckets
+
+		if i == index {
+			break
 		}
 	}
 
@@ -119,7 +124,6 @@ func NewLoadBalance(name string, providers []provider.ProxyProvider) *LoadBalanc
 	return &LoadBalance{
 		Base:      outbound.NewBase(name, "", C.LoadBalance, false),
 		single:    singledo.NewSingle(defaultGetProxiesDuration),
-		maxRetry:  3,
 		providers: providers,
 	}
 }
