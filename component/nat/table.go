@@ -22,9 +22,9 @@ func (t *Table) Get(key string) C.PacketConn {
 	return item.(C.PacketConn)
 }
 
-func (t *Table) GetOrCreateLock(key string) (*sync.WaitGroup, bool) {
-	item, loaded := t.mapping.LoadOrStore(key, &sync.WaitGroup{})
-	return item.(*sync.WaitGroup), loaded
+func (t *Table) GetOrCreateLock(key string) (*sync.Cond, bool) {
+	item, loaded := t.mapping.LoadOrStore(key, sync.NewCond(&sync.Mutex{}))
+	return item.(*sync.Cond), loaded
 }
 
 func (t *Table) Delete(key string) {
