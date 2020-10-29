@@ -28,6 +28,7 @@ type configSchema struct {
 	RedirPort   *int               `json:"redir-port"`
 	MixedPort   *int               `json:"mixed-port"`
 	AllowLan    *bool              `json:"allow-lan"`
+	TProxy      *bool              `json:"tproxy"`
 	BindAddress *string            `json:"bind-address"`
 	Mode        *tunnel.TunnelMode `json:"mode"`
 	LogLevel    *log.LogLevel      `json:"log-level"`
@@ -56,6 +57,10 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 
 	if general.AllowLan != nil {
 		P.SetAllowLan(*general.AllowLan)
+	}
+
+	if general.TProxy != nil {
+		P.SetTProxy(*general.TProxy)
 	}
 
 	if general.BindAddress != nil {

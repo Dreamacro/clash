@@ -89,6 +89,7 @@ func GetGeneral() *config.General {
 			MixedPort:      ports.MixedPort,
 			Authentication: authenticator,
 			AllowLan:       P.AllowLan(),
+			TProxy:         P.TProxy(),
 			BindAddress:    P.BindAddress(),
 		},
 		Mode:     tunnel.Mode(),
@@ -175,6 +176,9 @@ func updateGeneral(general *config.General, force bool) {
 
 	allowLan := general.AllowLan
 	P.SetAllowLan(allowLan)
+
+	tproxy := general.TProxy
+	P.SetTProxy(tproxy)
 
 	bindAddress := general.BindAddress
 	P.SetBindAddress(bindAddress)

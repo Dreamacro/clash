@@ -15,6 +15,7 @@ import (
 
 var (
 	allowLan    = false
+	tproxy      = false
 	bindAddress = "*"
 
 	socksListener    *socks.SockListener
@@ -43,12 +44,20 @@ func AllowLan() bool {
 	return allowLan
 }
 
+func TProxy() bool {
+	return tproxy
+}
+
 func BindAddress() string {
 	return bindAddress
 }
 
 func SetAllowLan(al bool) {
 	allowLan = al
+}
+
+func SetTProxy(tp bool) {
+	tproxy = tp
 }
 
 func SetBindAddress(host string) {
@@ -161,7 +170,7 @@ func ReCreateRedir(port int) error {
 	}
 
 	var err error
-	redirListener, err = redir.NewRedirProxy(addr)
+	redirListener, err = redir.NewRedirProxy(addr, tproxy)
 	if err != nil {
 		return err
 	}

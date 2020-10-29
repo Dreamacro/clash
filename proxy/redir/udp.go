@@ -26,7 +26,12 @@ func NewRedirUDPProxy(addr string) (*RedirUDPListener, error) {
 
 	c := l.(*net.UDPConn)
 
-	err = setsockopt(c, addr)
+	rc, err := c.SyscallConn()
+	if err != nil {
+		return nil, err
+	}
+
+	err = setsockopt(rc, addr)
 	if err != nil {
 		return nil, err
 	}

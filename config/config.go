@@ -41,6 +41,7 @@ type Inbound struct {
 	MixedPort      int      `json:"mixed-port"`
 	Authentication []string `json:"authentication"`
 	AllowLan       bool     `json:"allow-lan"`
+	TProxy         bool     `json:"tproxy"`
 	BindAddress    string   `json:"bind-address"`
 }
 
@@ -114,6 +115,7 @@ type RawConfig struct {
 	MixedPort          int          `yaml:"mixed-port"`
 	Authentication     []string     `yaml:"authentication"`
 	AllowLan           bool         `yaml:"allow-lan"`
+	TProxy             bool         `yaml:"tproxy"`
 	BindAddress        string       `yaml:"bind-address"`
 	Mode               T.TunnelMode `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
@@ -236,6 +238,7 @@ func parseGeneral(cfg *RawConfig) (*General, error) {
 			RedirPort:   cfg.RedirPort,
 			MixedPort:   cfg.MixedPort,
 			AllowLan:    cfg.AllowLan,
+			TProxy:      cfg.TProxy,
 			BindAddress: cfg.BindAddress,
 		},
 		Controller: Controller{
