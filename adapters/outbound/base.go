@@ -6,11 +6,12 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/Dreamacro/clash/common/queue"
 	C "github.com/Dreamacro/clash/constant"
+
+	"go.uber.org/atomic"
 )
 
 type Base struct {
@@ -95,11 +96,11 @@ func newPacketConn(pc net.PacketConn, a C.ProxyAdapter) C.PacketConn {
 type Proxy struct {
 	C.ProxyAdapter
 	history *queue.Queue
-	alive   uint32
+	alive   *atomic.Bool
 }
 
 func (p *Proxy) Alive() bool {
-	return atomic.LoadUint32(&p.alive) > 0
+	return p.alive.Load()
 }
 
 func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
@@ -111,7 +112,7 @@ func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
 func (p *Proxy) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
 	conn, err := p.ProxyAdapter.DialContext(ctx, metadata)
 	if err != nil {
-		atomic.StoreUint32(&p.alive, 0)
+		p.alive.Store(false)
 	}
 	return conn, err
 }
@@ -128,7 +129,7 @@ func (p *Proxy) DelayHistory() []C.DelayHistory {
 // LastDelay return last history record. if proxy is not alive, return the max value of uint16.
 func (p *Proxy) LastDelay() (delay uint16) {
 	var max uint16 = 0xffff
-	if atomic.LoadUint32(&p.alive) == 0 {
+	if !p.alive.Load() {
 		return max
 	}
 
@@ -160,9 +161,9 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
 func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	defer func() {
 		if err == nil {
-			atomic.StoreUint32(&p.alive, 1)
+			p.alive.Store(true)
 		} else {
-			atomic.StoreUint32(&p.alive, 0)
+			p.alive.Store(false)
 		}
 		record := C.DelayHistory{Time: time.Now()}
 		if err == nil {
@@ -219,5 +220,5 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 }
 
 func NewProxy(adapter C.ProxyAdapter) *Proxy {
-	return &Proxy{adapter, queue.New(10), 1}
+	return &Proxy{adapter, queue.New(10), atomic.NewBool(true)}
 }
