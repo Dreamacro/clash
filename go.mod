@@ -13,6 +13,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.4.0
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.6.1
+	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201020065357-d65d470038a5
 	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
