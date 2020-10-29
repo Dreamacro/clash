@@ -2,11 +2,11 @@ package observable
 
 import (
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/atomic"
 )
 
 func iterator(item []interface{}) chan interface{} {
@@ -33,25 +33,25 @@ func TestObservable(t *testing.T) {
 	assert.Equal(t, count, 5)
 }
 
-func TestObservable_MutilSubscribe(t *testing.T) {
+func TestObservable_MultiSubscribe(t *testing.T) {
 	iter := iterator([]interface{}{1, 2, 3, 4, 5})
 	src := NewObservable(iter)
 	ch1, _ := src.Subscribe()
 	ch2, _ := src.Subscribe()
-	var count int32
+	var count = atomic.NewInt32(0)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	waitCh := func(ch <-chan interface{}) {
 		for range ch {
-			atomic.AddInt32(&count, 1)
+			count.Inc()
 		}
 		wg.Done()
 	}
 	go waitCh(ch1)
 	go waitCh(ch2)
 	wg.Wait()
-	assert.Equal(t, int32(10), count)
+	assert.Equal(t, int32(10), count.Load())
 }
 
 func TestObservable_UnSubscribe(t *testing.T) {
