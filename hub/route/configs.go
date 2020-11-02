@@ -26,9 +26,9 @@ type configSchema struct {
 	Port        *int               `json:"port"`
 	SocksPort   *int               `json:"socks-port"`
 	RedirPort   *int               `json:"redir-port"`
+	TProxyPort  *int               `json:"tproxy-port"`
 	MixedPort   *int               `json:"mixed-port"`
 	AllowLan    *bool              `json:"allow-lan"`
-	TProxy      *bool              `json:"tproxy"`
 	BindAddress *string            `json:"bind-address"`
 	Mode        *tunnel.TunnelMode `json:"mode"`
 	LogLevel    *log.LogLevel      `json:"log-level"`
@@ -59,10 +59,6 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 		P.SetAllowLan(*general.AllowLan)
 	}
 
-	if general.TProxy != nil {
-		P.SetTProxy(*general.TProxy)
-	}
-
 	if general.BindAddress != nil {
 		P.SetBindAddress(*general.BindAddress)
 	}
@@ -71,6 +67,7 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 	P.ReCreateHTTP(pointerOrDefault(general.Port, ports.Port))
 	P.ReCreateSocks(pointerOrDefault(general.SocksPort, ports.SocksPort))
 	P.ReCreateRedir(pointerOrDefault(general.RedirPort, ports.RedirPort))
+	P.ReCreateTProxy(pointerOrDefault(general.TProxyPort, ports.TProxyPort))
 	P.ReCreateMixed(pointerOrDefault(general.MixedPort, ports.MixedPort))
 
 	if general.Mode != nil {
