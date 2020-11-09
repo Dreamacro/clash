@@ -33,8 +33,9 @@ func NewTProxy(addr string) (*TProxyListener, error) {
 		return nil, err
 	}
 
-	rl := &TProxyListener{Listener: l,
-		address: addr,
+	rl := &TProxyListener{
+		Listener: l,
+		address:  addr,
 	}
 
 	go func() {
