@@ -66,5 +66,5 @@ func (l *TProxyListener) Address() string {
 func (l *TProxyListener) handleRedir(conn net.Conn) {
 	target := socks5.ParseAddrToSocksAddr(conn.LocalAddr())
 	conn.(*net.TCPConn).SetKeepAlive(true)
-	tunnel.Add(inbound.NewSocket(target, conn, C.REDIR))
+	tunnel.Add(inbound.NewSocket(target, conn, C.TPROXY))
 }
