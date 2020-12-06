@@ -8,17 +8,6 @@ import (
 	"github.com/Dreamacro/clash/component/resolver"
 )
 
-func Dialer() (*net.Dialer, error) {
-	dialer := &net.Dialer{}
-	if DialerHook != nil {
-		if err := DialerHook(dialer); err != nil {
-			return nil, err
-		}
-	}
-
-	return dialer, nil
-}
-
 func Dial(network, address string) (net.Conn, error) {
 	return DialContext(context.Background(), network, address)
 }
@@ -59,19 +48,6 @@ func DialContext(ctx context.Context, network, address string) (net.Conn, error)
 	default:
 		return nil, errors.New("network invalid")
 	}
-}
-
-func ListenPacket(network, address string) (net.PacketConn, error) {
-	cfg := &net.ListenConfig{}
-	if ListenPacketHook != nil {
-		var err error
-		address, err = ListenPacketHook(cfg, address)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return cfg.ListenPacket(context.Background(), network, address)
 }
 
 func dualStackDialContext(ctx context.Context, network, address string) (net.Conn, error) {
