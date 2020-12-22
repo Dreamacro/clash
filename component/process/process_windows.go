@@ -133,7 +133,8 @@ func (s *searcher) Search(b []byte, ip net.IP, port uint16) (uint32, error) {
 		}
 
 		srcIP := net.IP(row[s.ip : s.ip+s.ipSize])
-		if !ip.Equal(srcIP) {
+		// windows binds an unbound udp socket to 0.0.0.0/[::] while first sendto
+		if !ip.Equal(srcIP) && (!srcIP.IsUnspecified() || s.tcpState != -1) {
 			continue
 		}
 
