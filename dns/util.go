@@ -122,6 +122,11 @@ func transform(servers []NameServer, resolver *Resolver) []dnsClient {
 			continue
 		}
 
+		if s.Net == "quic" {
+			ret = append(ret, &doqClient{addr: s.Addr})
+			continue
+		}
+
 		host, port, _ := net.SplitHostPort(s.Addr)
 		ret = append(ret, &client{
 			Client: &D.Client{
