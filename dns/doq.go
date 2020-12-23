@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -14,12 +15,12 @@ import (
 
 const NextProtoDQ = "doq-i00"
 
-type doqClient struct {
-	addr    string
-	session quic.Session
+var bytesPool = sync.Pool{New: func() interface{} { return &bytes.Buffer{} }}
 
-	bytesPool    *sync.Pool // byte packets pool
-	sync.RWMutex            // protects session and bytesPool
+type doqClient struct {
+	addr         string
+	session      quic.Session
+	sync.RWMutex // protects session and bytesPool
 }
 
 func (dc *doqClient) Exchange(m *D.Msg) (msg *D.Msg, err error) {
@@ -53,21 +54,17 @@ func (dc *doqClient) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg,
 	// stream.Close() -- closes the write-direction of the stream.
 	_ = stream.Close()
 
-	pool := dc.getBytesPool()
-	respBuf := pool.Get().([]byte)
+	respBuf := bytesPool.Get().(*bytes.Buffer)
+	defer bytesPool.Put(respBuf)
+	defer respBuf.Reset()
 
-	// Linter says that the argument needs to be pointer-like
-	// But it's already pointer-like
-	// nolint
-	defer pool.Put(respBuf)
-
-	n, err := stream.Read(respBuf)
+	n, err := respBuf.ReadFrom(stream)
 	if err != nil && n == 0 {
 		return nil, err
 	}
 
 	reply := new(D.Msg)
-	err = reply.Unpack(respBuf)
+	err = reply.Unpack(respBuf.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -119,19 +116,6 @@ func (dc *doqClient) getSession() (quic.Session, error) {
 	}
 	dc.session = session
 	return session, nil
-}
-
-func (dc *doqClient) getBytesPool() *sync.Pool {
-	dc.Lock()
-	if dc.bytesPool == nil {
-		dc.bytesPool = &sync.Pool{
-			New: func() interface{} {
-				return make([]byte, D.MaxMsgSize)
-			},
-		}
-	}
-	dc.Unlock()
-	return dc.bytesPool
 }
 
 func (dc *doqClient) openSession() (quic.Session, error) {
