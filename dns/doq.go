@@ -54,8 +54,7 @@ func (dc *doqClient) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg,
 	_ = stream.Close()
 
 	pool := dc.getBytesPool()
-	var respBuf []byte
-	respBuf = pool.Get().([]byte)
+	respBuf := pool.Get().([]byte)
 
 	// Linter says that the argument needs to be pointer-like
 	// But it's already pointer-like
