@@ -17,23 +17,18 @@ const NextProtoDQ = "doq-i00"
 
 var bytesPool = sync.Pool{New: func() interface{} { return &bytes.Buffer{} }}
 
-type doqClient struct {
+type quicClient struct {
 	addr         string
 	session      quic.Session
 	sync.RWMutex // protects session and bytesPool
 }
 
-func (dc *doqClient) Exchange(m *D.Msg) (msg *D.Msg, err error) {
+func (dc *quicClient) Exchange(m *D.Msg) (msg *D.Msg, err error) {
 	return dc.ExchangeContext(context.Background(), m)
 }
 
-func (dc *doqClient) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err error) {
-	session, err := dc.getSession()
-	if err != nil {
-		return nil, err
-	}
-
-	stream, err := dc.openStream(ctx, session)
+func (dc *quicClient) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err error) {
+	stream, err := dc.openStream(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open new stream to %s", dc.addr)
 	}
@@ -84,7 +79,7 @@ func isActive(s quic.Session) bool {
 // getSession - opens or returns an existing quic.Session
 // useCached - if true and cached session exists, return it right away
 // otherwise - forcibly creates a new session
-func (dc *doqClient) getSession() (quic.Session, error) {
+func (dc *quicClient) getSession() (quic.Session, error) {
 	var session quic.Session
 	dc.RLock()
 	session = dc.session
@@ -118,7 +113,7 @@ func (dc *doqClient) getSession() (quic.Session, error) {
 	return session, nil
 }
 
-func (dc *doqClient) openSession() (quic.Session, error) {
+func (dc *quicClient) openSession() (quic.Session, error) {
 	tlsConfig := &tls.Config{
 		ClientSessionCache: globalSessionCache,
 		InsecureSkipVerify: true,
@@ -141,17 +136,12 @@ func (dc *doqClient) openSession() (quic.Session, error) {
 	return session, nil
 }
 
-func (dc *doqClient) openStream(ctx context.Context, session quic.Session) (quic.Stream, error) {
-	stream, err := session.OpenStreamSync(ctx)
-	if err == nil {
-		return stream, nil
-	}
-
-	// try to recreate the session
-	newSession, err := dc.getSession()
+func (dc *quicClient) openStream(ctx context.Context) (quic.Stream, error) {
+	session, err := dc.getSession()
 	if err != nil {
 		return nil, err
 	}
+
 	// open a new stream
-	return newSession.OpenStreamSync(ctx)
+	return session.OpenStreamSync(ctx)
 }

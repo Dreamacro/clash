@@ -123,7 +123,7 @@ func transform(servers []NameServer, resolver *Resolver) []dnsClient {
 		}
 
 		if s.Net == "quic" {
-			ret = append(ret, &doqClient{addr: s.Addr})
+			ret = append(ret, &quicClient{addr: s.Addr})
 			continue
 		}
 
