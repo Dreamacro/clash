@@ -34,11 +34,12 @@ func handleHTTP(request *inbound.HTTPAdapter, outbound net.Conn) {
 		}
 
 	handleResponse:
+		// resp will be closed after we call resp.Write()
+		// see https://golang.org/pkg/net/http/#Response.Write
 		resp, err := http.ReadResponse(outboundReader, req)
 		if err != nil {
 			break
 		}
-		defer resp.Body.Close()
 		inbound.RemoveHopByHopHeaders(resp.Header)
 
 		if resp.StatusCode == http.StatusContinue {
