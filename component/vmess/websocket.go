@@ -161,6 +161,7 @@ func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
 		}
 		return nil, fmt.Errorf("dial %s error: %s", uri.Host, reason)
 	}
+	defer resp.Body.Close()
 
 	return &websocketConn{
 		conn:       wsConn,

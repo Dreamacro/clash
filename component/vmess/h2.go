@@ -50,6 +50,7 @@ func (hc *h2Conn) establishConn() error {
 	if err != nil {
 		return err
 	}
+	defer res.Body.Close()
 
 	hc.pwriter = pwriter
 	hc.res = res
