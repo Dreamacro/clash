@@ -38,6 +38,7 @@ func handleHTTP(request *inbound.HTTPAdapter, outbound net.Conn) {
 		if err != nil {
 			break
 		}
+		defer resp.Body.Close()
 		inbound.RemoveHopByHopHeaders(resp.Header)
 
 		if resp.StatusCode == http.StatusContinue {

@@ -46,6 +46,7 @@ func (hc *h2Conn) establishConn() error {
 		},
 	}
 
+	// it will be close at : (hc *h2Conn) establishConn()
 	res, err := hc.ClientConn.RoundTrip(&req)
 	if err != nil {
 		return err
