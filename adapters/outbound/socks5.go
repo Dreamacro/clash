@@ -122,7 +122,21 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, err error) {
 		pc.Close()
 	}()
 
-	return newPacketConn(&socksPacketConn{PacketConn: pc, rAddr: bindAddr.UDPAddr(), tcpConn: c}, ss), nil
+	// Support unspecified UDP bind address.
+	bindUDPAddr := bindAddr.UDPAddr()
+	if bindUDPAddr == nil {
+		err = errors.New("invalid UDP bind address")
+		return
+	} else if bindUDPAddr.IP.IsUnspecified() {
+		serverAddr, err := resolveUDPAddr("udp", ss.Addr())
+		if err != nil {
+			return nil, err
+		}
+
+		bindUDPAddr.IP = serverAddr.IP
+	}
+
+	return newPacketConn(&socksPacketConn{PacketConn: pc, rAddr: bindUDPAddr, tcpConn: c}, ss), nil
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {
