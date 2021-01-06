@@ -108,8 +108,10 @@ func (f *fetcher) Update() (interface{}, bool, error) {
 		return nil, false, err
 	}
 
-	if err := safeWrite(f.vehicle.Path(), buf); err != nil {
-		return nil, false, err
+	if f.vehicle.Type() != File {
+		if err := safeWrite(f.vehicle.Path(), buf); err != nil {
+			return nil, false, err
+		}
 	}
 
 	f.updatedAt = &now
