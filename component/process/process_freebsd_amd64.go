@@ -1,8 +1,7 @@
-package rules
+package process
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -12,78 +11,48 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/common/cache"
-	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/log"
 )
 
 // store process name for when dealing with multiple PROCESS-NAME rules
 var (
-	processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
-	errNotFound  = errors.New("process not found")
-	matchMeta    = func(p *Process, m *C.Metadata) bool { return false }
-
 	defaultSearcher *searcher
 
 	once sync.Once
 )
 
-type Process struct {
-	adapter string
-	process string
-}
-
-func (ps *Process) RuleType() C.RuleType {
-	return C.Process
-}
-
-func match(ps *Process, metadata *C.Metadata) bool {
-	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
-	cached, hit := processCache.Get(key)
-	if !hit {
-		name, err := getExecPathFromAddress(metadata)
-		if err != nil {
-			log.Debugln("[%s] getExecPathFromAddress error: %s", C.Process.String(), err.Error())
-		}
-
-		processCache.Set(key, name)
-
-		cached = name
-	}
-
-	return strings.EqualFold(cached.(string), ps.process)
-}
-
-func (ps *Process) Match(metadata *C.Metadata) bool {
-	return matchMeta(ps, metadata)
-}
-
-func (p *Process) Adapter() string {
-	return p.adapter
-}
-
-func (p *Process) Payload() string {
-	return p.process
-}
-
-func (p *Process) ShouldResolveIP() bool {
-	return false
-}
-
-func NewProcess(process string, adapter string) (*Process, error) {
+func findProcessName(network string, ip net.IP, srcPort int) (string, error) {
 	once.Do(func() {
-		err := initSearcher()
-		if err != nil {
+		if err := initSearcher(); err != nil {
 			log.Errorln("Initialize PROCESS-NAME failed: %s", err.Error())
 			log.Warnln("All PROCESS-NAME rules will be skipped")
 			return
 		}
-		matchMeta = match
 	})
-	return &Process{
-		adapter: adapter,
-		process: process,
-	}, nil
+
+	var spath string
+	isTCP := network == TCP
+	switch network {
+	case TCP:
+		spath = "net.inet.tcp.pcblist"
+	case UDP:
+		spath = "net.inet.udp.pcblist"
+	default:
+		return "", ErrInvalidNetwork
+	}
+
+	value, err := syscall.Sysctl(spath)
+	if err != nil {
+		return "", err
+	}
+
+	buf := []byte(value)
+	pid, err := defaultSearcher.Search(buf, ip, uint16(srcPort), isTCP)
+	if err != nil {
+		return "", err
+	}
+
+	return getExecPathFromPID(pid)
 }
 
 func getExecPathFromPID(pid uint32) (string, error) {
@@ -105,41 +74,6 @@ func getExecPathFromPID(pid uint32) (string, error) {
 	}
 
 	return filepath.Base(string(buf[:size-1])), nil
-}
-
-func getExecPathFromAddress(metadata *C.Metadata) (string, error) {
-	ip := metadata.SrcIP
-	port, err := strconv.Atoi(metadata.SrcPort)
-	if err != nil {
-		return "", err
-	}
-
-	var spath string
-	var isTCP bool
-	switch metadata.NetWork {
-	case C.TCP:
-		spath = "net.inet.tcp.pcblist"
-		isTCP = true
-	case C.UDP:
-		spath = "net.inet.udp.pcblist"
-		isTCP = false
-	default:
-		return "", ErrInvalidNetwork
-	}
-
-	value, err := syscall.Sysctl(spath)
-	if err != nil {
-		return "", err
-	}
-
-	buf := []byte(value)
-
-	pid, err := defaultSearcher.Search(buf, ip, uint16(port), isTCP)
-	if err != nil {
-		return "", err
-	}
-
-	return getExecPathFromPID(pid)
 }
 
 func readNativeUint32(b []byte) uint32 {
@@ -213,7 +147,7 @@ func (s *searcher) Search(buf []byte, ip net.IP, port uint16, isTCP bool) (uint3
 		socket := binary.BigEndian.Uint64(buf[inp+s.socket : inp+s.socket+8])
 		return s.searchSocketPid(socket)
 	}
-	return 0, errNotFound
+	return 0, ErrNotFound
 }
 
 func (s *searcher) searchSocketPid(socket uint64) (uint32, error) {
@@ -235,7 +169,7 @@ func (s *searcher) searchSocketPid(socket uint64) (uint32, error) {
 			return pid, nil
 		}
 	}
-	return 0, errNotFound
+	return 0, ErrNotFound
 }
 
 func newSearcher(major int) *searcher {

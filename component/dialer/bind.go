@@ -52,6 +52,10 @@ func lookupUDPAddr(ip net.IP, addrs []net.Addr) (*net.UDPAddr, error) {
 }
 
 func fallbackBindToDialer(dialer *net.Dialer, network string, ip net.IP, name string) error {
+	if !ip.IsGlobalUnicast() {
+		return nil
+	}
+
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
 		return err

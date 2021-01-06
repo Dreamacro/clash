@@ -39,7 +39,7 @@ func (c *client) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err
 		return nil, err
 	}
 
-	if dialer.DialHook != nil {
+	if ip != nil && ip.IsGlobalUnicast() && dialer.DialHook != nil {
 		network := "udp"
 		if strings.HasPrefix(c.Client.Net, "tcp") {
 			network = "tcp"

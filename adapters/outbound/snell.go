@@ -87,7 +87,10 @@ func NewSnell(option SnellOption) (*Snell, error) {
 		return nil, fmt.Errorf("snell %s initialize obfs error: %w", addr, err)
 	}
 
-	if obfsOption.Mode != "tls" && obfsOption.Mode != "http" {
+	switch obfsOption.Mode {
+	case "tls", "http", "":
+		break
+	default:
 		return nil, fmt.Errorf("snell %s obfs mode error: %s", addr, obfsOption.Mode)
 	}
 

@@ -40,7 +40,7 @@ type ShadowSocksOption struct {
 }
 
 type simpleObfsOption struct {
-	Mode string `obfs:"mode"`
+	Mode string `obfs:"mode,omitempty"`
 	Host string `obfs:"host,omitempty"`
 }
 

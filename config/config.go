@@ -395,10 +395,6 @@ func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 
 		parsed, parseErr := R.ParseRule(rule[0], payload, target, params)
 		if parseErr != nil {
-			if parseErr == R.ErrPlatformNotSupport {
-				log.Warnln("Rules[%d] [%s] don't support current OS, skip", idx, line)
-				continue
-			}
 			return nil, fmt.Errorf("rules[%d] [%s] error: %s", idx, line, parseErr.Error())
 		}
 

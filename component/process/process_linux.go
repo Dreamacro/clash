@@ -1,4 +1,4 @@
-package rules
+package process
 
 import (
 	"bytes"
@@ -9,15 +9,10 @@ import (
 	"net"
 	"path"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/common/cache"
 	"github.com/Dreamacro/clash/common/pool"
-	C "github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/log"
 )
 
 // from https://github.com/vishvananda/netlink/blob/bca67dfc8220b44ef582c9da4e9172bf1c9ec973/nl/nl_linux.go#L52-L62
@@ -30,7 +25,7 @@ func init() {
 	}
 }
 
-type SocketResolver func(metadata *C.Metadata) (inode, uid int, err error)
+type SocketResolver func(network string, ip net.IP, srcPort int) (inode, uid int, err error)
 type ProcessNameResolver func(inode, uid int) (name string, err error)
 
 // export for android
@@ -38,51 +33,6 @@ var (
 	DefaultSocketResolver      SocketResolver      = resolveSocketByNetlink
 	DefaultProcessNameResolver ProcessNameResolver = resolveProcessNameByProcSearch
 )
-
-type Process struct {
-	adapter string
-	process string
-}
-
-func (p *Process) RuleType() C.RuleType {
-	return C.Process
-}
-
-func (p *Process) Match(metadata *C.Metadata) bool {
-	key := fmt.Sprintf("%s:%s:%s", metadata.NetWork.String(), metadata.SrcIP.String(), metadata.SrcPort)
-	cached, hit := processCache.Get(key)
-	if !hit {
-		processName, err := resolveProcessName(metadata)
-		if err != nil {
-			log.Debugln("[%s] Resolve process of %s failure: %s", C.Process.String(), key, err.Error())
-		}
-
-		processCache.Set(key, processName)
-
-		cached = processName
-	}
-
-	return strings.EqualFold(cached.(string), p.process)
-}
-
-func (p *Process) Adapter() string {
-	return p.adapter
-}
-
-func (p *Process) Payload() string {
-	return p.process
-}
-
-func (p *Process) ShouldResolveIP() bool {
-	return false
-}
-
-func NewProcess(process string, adapter string) (*Process, error) {
-	return &Process{
-		adapter: adapter,
-		process: process,
-	}, nil
-}
 
 const (
 	sizeOfSocketDiagRequest = syscall.SizeofNlMsghdr + 8 + 48
@@ -92,10 +42,8 @@ const (
 
 var nativeEndian binary.ByteOrder = binary.LittleEndian
 
-var processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
-
-func resolveProcessName(metadata *C.Metadata) (string, error) {
-	inode, uid, err := DefaultSocketResolver(metadata)
+func findProcessName(network string, ip net.IP, srcPort int) (string, error) {
+	inode, uid, err := DefaultSocketResolver(network, ip, srcPort)
 	if err != nil {
 		return "", err
 	}
@@ -103,31 +51,26 @@ func resolveProcessName(metadata *C.Metadata) (string, error) {
 	return DefaultProcessNameResolver(inode, uid)
 }
 
-func resolveSocketByNetlink(metadata *C.Metadata) (int, int, error) {
+func resolveSocketByNetlink(network string, ip net.IP, srcPort int) (int, int, error) {
 	var family byte
 	var protocol byte
 
-	switch metadata.NetWork {
-	case C.TCP:
+	switch network {
+	case TCP:
 		protocol = syscall.IPPROTO_TCP
-	case C.UDP:
+	case UDP:
 		protocol = syscall.IPPROTO_UDP
 	default:
 		return 0, 0, ErrInvalidNetwork
 	}
 
-	if metadata.SrcIP.To4() != nil {
+	if ip.To4() != nil {
 		family = syscall.AF_INET
 	} else {
 		family = syscall.AF_INET6
 	}
 
-	srcPort, err := strconv.Atoi(metadata.SrcPort)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	req := packSocketDiagRequest(family, protocol, metadata.SrcIP, uint16(srcPort))
+	req := packSocketDiagRequest(family, protocol, ip, uint16(srcPort))
 
 	socket, err := syscall.Socket(syscall.AF_NETLINK, syscall.SOCK_DGRAM, syscall.NETLINK_INET_DIAG)
 	if err != nil {

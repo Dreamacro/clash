@@ -28,8 +28,17 @@
 - Netfilter TCP redirecting. Deploy Clash on your Internet gateway with `iptables`.
 - Comprehensive HTTP RESTful API controller
 
+## Premium Features
+
+- TUN mode on macOS, Linux and Windows. [Doc](https://github.com/Dreamacro/clash/wiki/premium-core-features#tun-device)
+- Match your tunnel by [Script](https://github.com/Dreamacro/clash/wiki/premium-core-features#script)
+- [Rule Provider](https://github.com/Dreamacro/clash/wiki/premium-core-features#rule-providers)
+
 ## Getting Started
 Documentations are now moved to [GitHub Wiki](https://github.com/Dreamacro/clash/wiki).
+
+## Premium Release
+[Release](https://github.com/Dreamacro/clash/releases/tag/premium)
 
 ## Credits
 
