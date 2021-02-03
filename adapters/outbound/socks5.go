@@ -10,8 +10,10 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/Dreamacro/clash/common/structure"
 	"github.com/Dreamacro/clash/component/dialer"
 	"github.com/Dreamacro/clash/component/socks5"
+	v2rayObfs "github.com/Dreamacro/clash/component/v2ray-plugin"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -22,20 +24,31 @@ type Socks5 struct {
 	tls            bool
 	skipCertVerify bool
 	tlsConfig      *tls.Config
+	obfsMode       string
+	v2rayOption    *v2rayObfs.Option
 }
 
 type Socks5Option struct {
-	Name           string `proxy:"name"`
-	Server         string `proxy:"server"`
-	Port           int    `proxy:"port"`
-	UserName       string `proxy:"username,omitempty"`
-	Password       string `proxy:"password,omitempty"`
-	TLS            bool   `proxy:"tls,omitempty"`
-	UDP            bool   `proxy:"udp,omitempty"`
-	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
+	Name           string                 `proxy:"name"`
+	Server         string                 `proxy:"server"`
+	Port           int                    `proxy:"port"`
+	UserName       string                 `proxy:"username,omitempty"`
+	Password       string                 `proxy:"password,omitempty"`
+	TLS            bool                   `proxy:"tls,omitempty"`
+	UDP            bool                   `proxy:"udp,omitempty"`
+	SkipCertVerify bool                   `proxy:"skip-cert-verify,omitempty"`
+	Plugin         string                 `proxy:"plugin,omitempty"`
+	PluginOpts     map[string]interface{} `proxy:"plugin-opts,omitempty"`
 }
 
 func (ss *Socks5) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
+	if ss.obfsMode == "websocket" {
+		var err error
+		c, err = v2rayObfs.NewV2rayObfs(c, ss.v2rayOption)
+		if err != nil {
+			return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
+		}
+	}
 	if ss.tls {
 		cc := tls.Client(c, ss.tlsConfig)
 		err := cc.Handshake()
@@ -125,13 +138,42 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, err error) {
 	return newPacketConn(&socksPacketConn{PacketConn: pc, rAddr: bindAddr.UDPAddr(), tcpConn: c}, ss), nil
 }
 
-func NewSocks5(option Socks5Option) *Socks5 {
+func NewSocks5(option Socks5Option) (*Socks5, error) {
+	addr := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
 	var tlsConfig *tls.Config
 	if option.TLS {
 		tlsConfig = &tls.Config{
 			InsecureSkipVerify: option.SkipCertVerify,
 			ClientSessionCache: getClientSessionCache(),
 			ServerName:         option.Server,
+		}
+	}
+
+	var v2rayOption *v2rayObfs.Option
+	obfsMode := ""
+
+	decoder := structure.NewDecoder(structure.Option{TagName: "obfs", WeaklyTypedInput: true})
+	if option.Plugin == "v2ray-plugin" {
+		opts := v2rayObfsOption{Host: "bing.com", Mux: false}
+		if err := decoder.Decode(option.PluginOpts, &opts); err != nil {
+			return nil, fmt.Errorf("ss %s initialize v2ray-plugin error: %w", addr, err)
+		}
+
+		if opts.Mode != "websocket" {
+			return nil, fmt.Errorf("ss %s obfs mode error: %s", addr, opts.Mode)
+		}
+		obfsMode = opts.Mode
+		v2rayOption = &v2rayObfs.Option{
+			Host:    opts.Host,
+			Path:    opts.Path,
+			Headers: opts.Headers,
+			Mux:     opts.Mux,
+		}
+
+		if opts.TLS {
+			v2rayOption.TLS = true
+			v2rayOption.SkipCertVerify = opts.SkipCertVerify
+			v2rayOption.SessionCache = getClientSessionCache()
 		}
 	}
 
@@ -147,7 +189,9 @@ func NewSocks5(option Socks5Option) *Socks5 {
 		tls:            option.TLS,
 		skipCertVerify: option.SkipCertVerify,
 		tlsConfig:      tlsConfig,
-	}
+		obfsMode:       obfsMode,
+		v2rayOption:    v2rayOption,
+	}, nil
 }
 
 type socksPacketConn struct {

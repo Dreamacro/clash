@@ -39,7 +39,7 @@ func ParseProxy(mapping map[string]interface{}) (C.Proxy, error) {
 		if err != nil {
 			break
 		}
-		proxy = NewSocks5(*socksOption)
+		proxy, err = NewSocks5(*socksOption)
 	case "http":
 		httpOption := &HttpOption{}
 		err = decoder.Decode(mapping, httpOption)
