@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Dreamacro/clash/common/observable"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -72,6 +73,19 @@ func Level() LogLevel {
 
 func SetLevel(newLevel LogLevel) {
 	level = newLevel
+}
+
+func SetOutput(location string) {
+	if location != "" {
+		log.SetOutput(&lumberjack.Logger{
+			Filename:  location,
+			MaxSize:   100, // megabytes
+			MaxAge:    28,  //days
+			LocalTime: true,
+		})
+	} else {
+		log.Info("No log-file specified, default to stdout.")
+	}
 }
 
 func print(data *Event) {

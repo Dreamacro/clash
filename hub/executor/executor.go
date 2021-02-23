@@ -165,6 +165,7 @@ func updateRules(rules []C.Rule) {
 
 func updateGeneral(general *config.General, force bool) {
 	log.SetLevel(general.LogLevel)
+	log.SetOutput(general.LogFile)
 	tunnel.SetMode(general.Mode)
 	resolver.DisableIPv6 = !general.IPv6
 
