@@ -104,8 +104,12 @@ func handleUDPToRemote(packet C.UDPPacket, pc C.PacketConn, metadata *C.Metadata
 		return errors.New("udp addr invalid")
 	}
 
-	_, err := pc.WriteTo(packet.Data(), addr)
-	return err
+	if _, err := pc.WriteTo(packet.Data(), addr); err != nil {
+		return err
+	}
+	pc.SetReadDeadline(time.Now().Add(udpTimeout))
+
+	return nil
 }
 
 func handleUDPToLocal(packet C.UDPPacket, pc net.PacketConn, key string, fAddr net.Addr) {
