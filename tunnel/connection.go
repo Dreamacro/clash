@@ -107,7 +107,7 @@ func handleUDPToRemote(packet C.UDPPacket, pc C.PacketConn, metadata *C.Metadata
 	if _, err := pc.WriteTo(packet.Data(), addr); err != nil {
 		return err
 	}
-	pc.SetReadDeadline(time.Now().Add(udpTimeout))
+	pc.SetReadDeadline(time.Now().Add(udpTimeout)) /* reset timeout */
 
 	return nil
 }
