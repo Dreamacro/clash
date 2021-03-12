@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Dreamacro/clash/component/dialer"
+	"github.com/Dreamacro/clash/component/gun"
 	"github.com/Dreamacro/clash/component/resolver"
 	"github.com/Dreamacro/clash/component/vmess"
 	C "github.com/Dreamacro/clash/constant"
@@ -22,21 +23,22 @@ type Vmess struct {
 }
 
 type VmessOption struct {
-	Name           string            `proxy:"name"`
-	Server         string            `proxy:"server"`
-	Port           int               `proxy:"port"`
-	UUID           string            `proxy:"uuid"`
-	AlterID        int               `proxy:"alterId"`
-	Cipher         string            `proxy:"cipher"`
-	TLS            bool              `proxy:"tls,omitempty"`
-	UDP            bool              `proxy:"udp,omitempty"`
-	Network        string            `proxy:"network,omitempty"`
-	HTTPOpts       HTTPOptions       `proxy:"http-opts,omitempty"`
-	HTTP2Opts      HTTP2Options      `proxy:"h2-opts,omitempty"`
-	WSPath         string            `proxy:"ws-path,omitempty"`
-	WSHeaders      map[string]string `proxy:"ws-headers,omitempty"`
-	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
-	ServerName     string            `proxy:"servername,omitempty"`
+	Name            string            `proxy:"name"`
+	Server          string            `proxy:"server"`
+	Port            int               `proxy:"port"`
+	UUID            string            `proxy:"uuid"`
+	AlterID         int               `proxy:"alterId"`
+	Cipher          string            `proxy:"cipher"`
+	TLS             bool              `proxy:"tls,omitempty"`
+	UDP             bool              `proxy:"udp,omitempty"`
+	Network         string            `proxy:"network,omitempty"`
+	HTTPOpts        HTTPOptions       `proxy:"http-opts,omitempty"`
+	HTTP2Opts       HTTP2Options      `proxy:"h2-opts,omitempty"`
+	WSPath          string            `proxy:"ws-path,omitempty"`
+	WSHeaders       map[string]string `proxy:"ws-headers,omitempty"`
+	SkipCertVerify  bool              `proxy:"skip-cert-verify,omitempty"`
+	ServerName      string            `proxy:"servername,omitempty"`
+	GrpcServiceName string            `proxy:"grpc-service-name,omitempty"`
 }
 
 type HTTPOptions struct {
@@ -129,6 +131,19 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 		}
 
 		c, err = vmess.StreamH2Conn(c, h2Opts)
+	case "grpc":
+		host, port, _ := net.SplitHostPort(v.addr)
+		gunConfig := gun.Config{
+			ServiceName:    v.option.GrpcServiceName,
+			SkipCertVerify: v.option.SkipCertVerify,
+			Tls:            v.option.TLS,
+			Host:           host,
+			Port:           port,
+		}
+		if v.option.ServerName != "" {
+			gunConfig.Host = v.option.ServerName
+		}
+		c, err = gun.StreamGunConn(metadata, &gunConfig, context.Background())
 	default:
 		// handle TLS
 		if v.option.TLS {

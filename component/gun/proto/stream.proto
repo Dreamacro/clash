@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "github.com/clash/common/gun/proto";
+
+message Hunk {
+  bytes data = 1;
+}
+
+service GunService {
+  rpc Tun (stream Hunk) returns (stream Hunk);
+}
