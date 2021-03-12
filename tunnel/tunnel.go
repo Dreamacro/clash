@@ -122,7 +122,7 @@ func preHandleMetadata(metadata *C.Metadata) error {
 	if ip := net.ParseIP(metadata.Host); ip != nil {
 		metadata.DstIP = ip
 		metadata.Host = ""
-		if len(ip) == net.IPv4len {
+		if ip.To4() != nil {
 			metadata.AddrType = C.AtypIPv4
 		} else {
 			metadata.AddrType = C.AtypIPv6
