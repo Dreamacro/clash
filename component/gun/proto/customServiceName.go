@@ -33,10 +33,4 @@ func (c *gunServiceClient) TunCustomName(ctx context.Context, name string, opts 
 
 type GunServiceClientX interface {
 	TunCustomName(ctx context.Context, name string, opts ...grpc.CallOption) (GunService_TunClient, error)
-	Tun(ctx context.Context, opts ...grpc.CallOption) (GunService_TunClient, error)
-}
-
-func RegisterGunServiceServerX(s *grpc.Server, srv GunServiceServer, name string) {
-	desc := ServerDesc(name)
-	s.RegisterService(&desc, srv)
 }

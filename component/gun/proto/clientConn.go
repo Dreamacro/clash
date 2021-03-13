@@ -7,8 +7,6 @@ import (
 	"io"
 	"net"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type ClientConn struct {
@@ -41,15 +39,19 @@ func (s *ClientConn) Read(b []byte) (n int, err error) {
 	if s.reader == nil {
 		h, err := s.client.Recv()
 		if err != nil {
-			log.Debug(err)
-			return 0, errors.New("unable to read from gRPC tunnel")
+			if err == io.EOF {
+				s.reader = nil
+				return n, err
+			} else {
+				return 0, errors.New("unable to read from gRPC tunnel")
+			}
 		}
 		s.reader = bytes.NewReader(h.Data)
 	}
 	n, err = s.reader.Read(b)
-	if err == io.EOF {
+	if err != nil {
 		s.reader = nil
-		return n, nil
+		return n, err
 	}
 	return n, err
 }

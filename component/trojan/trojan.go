@@ -2,6 +2,7 @@ package trojan
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
@@ -11,7 +12,9 @@ import (
 	"net"
 	"sync"
 
+	"github.com/Dreamacro/clash/component/gun"
 	"github.com/Dreamacro/clash/component/socks5"
+	C "github.com/Dreamacro/clash/constant"
 )
 
 const (
@@ -39,6 +42,8 @@ type Option struct {
 	ServerName         string
 	SkipCertVerify     bool
 	ClientSessionCache tls.ClientSessionCache
+	GrpcServiceName    string
+	Network            string
 }
 
 type Trojan struct {
@@ -46,7 +51,7 @@ type Trojan struct {
 	hexPassword []byte
 }
 
-func (t *Trojan) StreamConn(conn net.Conn) (net.Conn, error) {
+func (t *Trojan) StreamConn(conn net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	alpn := defaultALPN
 	if len(t.option.ALPN) != 0 {
 		alpn = t.option.ALPN
@@ -59,13 +64,27 @@ func (t *Trojan) StreamConn(conn net.Conn) (net.Conn, error) {
 		ServerName:         t.option.ServerName,
 		ClientSessionCache: t.option.ClientSessionCache,
 	}
+	if t.option.Network == "grpc" {
+		grpcConn, err := gun.StreamGunConn(metadata, &gun.Config{
+			ServiceName:    t.option.GrpcServiceName,
+			SkipCertVerify: t.option.SkipCertVerify,
+			Tls:            true,
+			Adder:          conn.RemoteAddr().String(),
+			ServerName:     t.option.ServerName,
+		}, context.Background())
+		if err != nil {
+			return nil, err
+		}
+		return grpcConn, nil
+	} else {
+		tlsConn := tls.Client(conn, tlsConfig)
+		if err := tlsConn.Handshake(); err != nil {
+			return nil, err
+		}
 
-	tlsConn := tls.Client(conn, tlsConfig)
-	if err := tlsConn.Handshake(); err != nil {
-		return nil, err
+		return tlsConn, nil
 	}
 
-	return tlsConn, nil
 }
 
 func (t *Trojan) WriteHeader(w io.Writer, command Command, socks5Addr []byte) error {

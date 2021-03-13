@@ -3,6 +3,7 @@ package gun
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -21,12 +22,11 @@ var (
 )
 
 type Config struct {
-	Host           string
 	ServiceName    string
 	SkipCertVerify bool
 	Tls            bool
-	Port           string
 	ServerName     string
+	Adder          string
 }
 
 func getGunClient(cfg *Config, metadata *C.Metadata, dialOption grpc.DialOption) (*grpc.ClientConn, error) {
@@ -36,13 +36,13 @@ func getGunClient(cfg *Config, metadata *C.Metadata, dialOption grpc.DialOption)
 	if globalDialerMap == nil {
 		globalDialerMap = make(map[string]*grpc.ClientConn)
 	}
-	falg := metadata.RemoteAddress()
+	falg := metadata.Host + ":" + metadata.RemoteAddress()
 	if client, found := globalDialerMap[falg]; found && client.GetState() != connectivity.Shutdown {
 		return client, nil
 	}
 
 	conn, err := grpc.Dial(
-		net.JoinHostPort(cfg.Host, cfg.Port),
+		cfg.Adder,
 		dialOption,
 		grpc.WithConnectParams(grpc.ConnectParams{
 			Backoff: backoff.Config{
@@ -62,22 +62,18 @@ func StreamGunConn(metadata *C.Metadata, cfg *Config, ctx context.Context) (net.
 	dialOption := grpc.WithInsecure()
 	if cfg.Tls {
 		tlsConfig := &tls.Config{ServerName: cfg.ServerName, InsecureSkipVerify: cfg.SkipCertVerify}
-		if cfg.ServerName != "" {
-			tlsConfig.ServerName = cfg.ServerName
-		} else {
-			tlsConfig.ServerName = cfg.Host
-		}
 		dialOption = grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))
 	}
 	gConn, err := getGunClient(cfg, metadata, dialOption)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to dial remote: " + err.Error())
 	}
 	client := proto.NewGunServiceClient(gConn)
 	grpcservice, err := client.(proto.GunServiceClientX).TunCustomName(ctx, cfg.ServiceName)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to create context: " + err.Error())
 	}
+
 	clientConn := proto.NewClientConn(grpcservice)
 	return clientConn, nil
 }

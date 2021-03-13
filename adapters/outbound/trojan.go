@@ -18,18 +18,20 @@ type Trojan struct {
 }
 
 type TrojanOption struct {
-	Name           string   `proxy:"name"`
-	Server         string   `proxy:"server"`
-	Port           int      `proxy:"port"`
-	Password       string   `proxy:"password"`
-	ALPN           []string `proxy:"alpn,omitempty"`
-	SNI            string   `proxy:"sni,omitempty"`
-	SkipCertVerify bool     `proxy:"skip-cert-verify,omitempty"`
-	UDP            bool     `proxy:"udp,omitempty"`
+	Name            string   `proxy:"name"`
+	Server          string   `proxy:"server"`
+	Port            int      `proxy:"port"`
+	Password        string   `proxy:"password"`
+	ALPN            []string `proxy:"alpn,omitempty"`
+	SNI             string   `proxy:"sni,omitempty"`
+	SkipCertVerify  bool     `proxy:"skip-cert-verify,omitempty"`
+	UDP             bool     `proxy:"udp,omitempty"`
+	GrpcServiceName string   `proxy:"grpc-service-name,omitempty"`
+	Network         string   `proxy:"network,omitempty"`
 }
 
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	c, err := t.instance.StreamConn(c)
+	c, err := t.instance.StreamConn(c, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
@@ -60,7 +62,7 @@ func (t *Trojan) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
 	tcpKeepAlive(c)
-	c, err = t.instance.StreamConn(c)
+	c, err = t.instance.StreamConn(c, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
@@ -89,6 +91,8 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 		ServerName:         option.Server,
 		SkipCertVerify:     option.SkipCertVerify,
 		ClientSessionCache: getClientSessionCache(),
+		Network:            option.Network,
+		GrpcServiceName:    option.GrpcServiceName,
 	}
 
 	if option.SNI != "" {

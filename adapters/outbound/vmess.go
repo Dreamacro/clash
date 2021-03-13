@@ -132,16 +132,11 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 
 		c, err = vmess.StreamH2Conn(c, h2Opts)
 	case "grpc":
-		host, port, _ := net.SplitHostPort(v.addr)
 		gunConfig := gun.Config{
 			ServiceName:    v.option.GrpcServiceName,
 			SkipCertVerify: v.option.SkipCertVerify,
 			Tls:            v.option.TLS,
-			Host:           host,
-			Port:           port,
-		}
-		if v.option.ServerName != "" {
-			gunConfig.Host = v.option.ServerName
+			Adder:          v.addr,
 		}
 		c, err = gun.StreamGunConn(metadata, &gunConfig, context.Background())
 	default:
