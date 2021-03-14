@@ -31,7 +31,7 @@ type TrojanOption struct {
 }
 
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	c, err := t.instance.StreamConn(c, metadata)
+	c, err := t.instance.StreamConn(c)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
@@ -62,7 +62,7 @@ func (t *Trojan) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
 	tcpKeepAlive(c)
-	c, err = t.instance.StreamConn(c, metadata)
+	c, err = t.instance.StreamConn(c)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}

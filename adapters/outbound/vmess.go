@@ -138,7 +138,7 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 			Tls:            v.option.TLS,
 			Adder:          v.addr,
 		}
-		c, err = gun.StreamGunConn(metadata, &gunConfig, context.Background())
+		c, err = gun.StreamGunConn(&gunConfig)
 	default:
 		// handle TLS
 		if v.option.TLS {

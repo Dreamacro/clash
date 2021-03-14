@@ -2,7 +2,6 @@ package trojan
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
@@ -51,7 +50,7 @@ type Trojan struct {
 	hexPassword []byte
 }
 
-func (t *Trojan) StreamConn(conn net.Conn, metadata *C.Metadata) (net.Conn, error) {
+func (t *Trojan) StreamConn(conn net.Conn) (net.Conn, error) {
 	alpn := defaultALPN
 	if len(t.option.ALPN) != 0 {
 		alpn = t.option.ALPN
@@ -65,13 +64,13 @@ func (t *Trojan) StreamConn(conn net.Conn, metadata *C.Metadata) (net.Conn, erro
 		ClientSessionCache: t.option.ClientSessionCache,
 	}
 	if t.option.Network == "grpc" {
-		grpcConn, err := gun.StreamGunConn(metadata, &gun.Config{
+		grpcConn, err := gun.StreamGunConn(&gun.Config{
 			ServiceName:    t.option.GrpcServiceName,
 			SkipCertVerify: t.option.SkipCertVerify,
 			Tls:            true,
 			Adder:          conn.RemoteAddr().String(),
 			ServerName:     t.option.ServerName,
-		}, context.Background())
+		})
 		if err != nil {
 			return nil, err
 		}
