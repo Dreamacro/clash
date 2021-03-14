@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"ekyu.moe/leb128"
+	"github.com/Dreamacro/clash/log"
 	"golang.org/x/net/http2"
 )
 
@@ -44,69 +45,6 @@ type Config struct {
 	Adder          string
 }
 
-func newGunClientWithContext(ctx context.Context, config *Config) *Client {
-	var dialFunc func(network, addr string, cfg *tls.Config) (net.Conn, error) = nil
-	if config.Tls {
-		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			return net.Dial(network, addr)
-		}
-	} else {
-		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			pconn, err := net.Dial(network, addr)
-			if err != nil {
-				return nil, err
-			}
-
-			cn := tls.Client(pconn, cfg)
-			if err := cn.Handshake(); err != nil {
-				return nil, err
-			}
-			state := cn.ConnectionState()
-			if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
-				return nil, errors.New("http2: unexpected ALPN protocol " + p + "; want q" + http2.NextProtoTLS)
-			}
-			return cn, nil
-		}
-	}
-
-	var tlsClientConfig *tls.Config = nil
-	if config.ServerName != "" {
-		tlsClientConfig = new(tls.Config)
-		tlsClientConfig.ServerName = config.ServerName
-	}
-
-	client := &http.Client{
-		Transport: &http2.Transport{
-			DialTLS:            dialFunc,
-			TLSClientConfig:    tlsClientConfig,
-			AllowHTTP:          false,
-			DisableCompression: true,
-			ReadIdleTimeout:    0,
-			PingTimeout:        0,
-		},
-	}
-
-	var serviceName = "GunService"
-	if config.ServiceName != "" {
-		serviceName = config.ServiceName
-	}
-
-	return &Client{
-		ctx:    ctx,
-		client: client,
-		url: &url.URL{
-			Scheme: "https",
-			Host:   config.Adder,
-			Path:   fmt.Sprintf("/%s/Tun", serviceName),
-		},
-		headers: http.Header{
-			"content-type": []string{"application/grpc"},
-			"user-agent":   []string{"grpc-go/1.36.0"},
-			"te":           []string{"trailers"},
-		},
-	}
-}
-
 type ChainedClosable []io.Closer
 
 // Close implements io.Closer.Close().
@@ -117,56 +55,9 @@ func (cc ChainedClosable) Close() error {
 	return nil
 }
 
-func (cli *Client) dialConn() (net.Conn, error) {
-	reader, writer := io.Pipe()
-	request := &http.Request{
-		Method:     http.MethodPost,
-		Body:       reader,
-		URL:        cli.url,
-		Proto:      "HTTP/2",
-		ProtoMajor: 2,
-		ProtoMinor: 0,
-		Header:     cli.headers,
-	}
-	anotherReader, anotherWriter := io.Pipe()
-	go func() {
-		defer anotherWriter.Close()
-		response, err := cli.client.Do(request)
-		if err != nil {
-			return
-		}
-		_, _ = io.Copy(anotherWriter, response.Body)
-	}()
-
-	return newGunConn(anotherReader, writer, ChainedClosable{reader, writer, anotherReader}, nil, nil), nil
-}
-
 var (
 	ErrInvalidLength = errors.New("invalid length")
 )
-
-func newGunConn(reader io.Reader, writer io.Writer, closer io.Closer, local net.Addr, remote net.Addr) *Conn {
-	if local == nil {
-		local = &net.TCPAddr{
-			IP:   []byte{0, 0, 0, 0},
-			Port: 0,
-		}
-	}
-	if remote == nil {
-		remote = &net.TCPAddr{
-			IP:   []byte{0, 0, 0, 0},
-			Port: 0,
-		}
-	}
-	return &Conn{
-		reader: reader,
-		writer: writer,
-		closer: closer,
-		local:  local,
-		remote: remote,
-		done:   make(chan struct{}),
-	}
-}
 
 func (g *Conn) isClosed() bool {
 	select {
@@ -246,10 +137,99 @@ func (g Conn) SetWriteDeadline(t time.Time) error {
 }
 
 func StreamGunConn(cfg *Config) (net.Conn, error) {
-	client := newGunClientWithContext(context.TODO(), cfg)
-	gConn, err := client.dialConn()
-	if err != nil {
-		return nil, errors.New("failed to dial remote: " + err.Error())
+	var dialFunc func(network, addr string, cfg *tls.Config) (net.Conn, error) = nil
+	if cfg.Tls {
+		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+			pconn, err := net.Dial(network, addr)
+			if err != nil {
+				return nil, err
+			}
+
+			cn := tls.Client(pconn, cfg)
+			if err := cn.Handshake(); err != nil {
+				return nil, err
+			}
+			state := cn.ConnectionState()
+			if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
+				return nil, errors.New("http2: unexpected ALPN protocol " + p + "; want q" + http2.NextProtoTLS)
+			}
+			return cn, nil
+		}
+	} else {
+		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+			return net.Dial(network, addr)
+		}
 	}
-	return gConn, nil
+
+	var tlsClientConfig *tls.Config = nil
+	if cfg.ServerName != "" {
+		tlsClientConfig = new(tls.Config)
+		tlsClientConfig.ServerName = cfg.ServerName
+	}
+
+	client := &http.Client{
+		Transport: &http2.Transport{
+			DialTLS:            dialFunc,
+			TLSClientConfig:    tlsClientConfig,
+			AllowHTTP:          false,
+			DisableCompression: true,
+			ReadIdleTimeout:    0,
+			PingTimeout:        0,
+		},
+	}
+
+	var serviceName = "GunService"
+	if cfg.ServiceName != "" {
+		serviceName = cfg.ServiceName
+	}
+
+	clientConn := &Client{
+		ctx:    context.TODO(),
+		client: client,
+		url: &url.URL{
+			Scheme: "https",
+			Host:   cfg.Adder,
+			Path:   fmt.Sprintf("/%s/Tun", serviceName),
+		},
+		headers: http.Header{
+			"content-type": []string{"application/grpc"},
+			"user-agent":   []string{"grpc-go/1.36.0"},
+			"te":           []string{"trailers"},
+		},
+	}
+	reader, writer := io.Pipe()
+	request := &http.Request{
+		Method:     http.MethodPost,
+		Body:       reader,
+		URL:        clientConn.url,
+		Proto:      "HTTP/2",
+		ProtoMajor: 2,
+		ProtoMinor: 0,
+		Header:     clientConn.headers,
+	}
+	anotherReader, anotherWriter := io.Pipe()
+	go func() {
+		defer anotherWriter.Close()
+		response, err := clientConn.client.Do(request)
+		if err != nil {
+			log.Errorln("failed to dial remote: " + err.Error())
+			return
+		}
+		_, _ = io.Copy(anotherWriter, response.Body)
+	}()
+
+	return &Conn{
+		reader: anotherReader,
+		writer: writer,
+		closer: ChainedClosable{reader, writer, anotherReader},
+		local: &net.TCPAddr{
+			IP:   []byte{0, 0, 0, 0},
+			Port: 0,
+		},
+		remote: &net.TCPAddr{
+			IP:   []byte{0, 0, 0, 0},
+			Port: 0,
+		},
+		done: make(chan struct{}),
+	}, nil
 }
