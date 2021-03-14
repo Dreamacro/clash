@@ -13,7 +13,6 @@ import (
 
 	"github.com/Dreamacro/clash/component/gun"
 	"github.com/Dreamacro/clash/component/socks5"
-	C "github.com/Dreamacro/clash/constant"
 )
 
 const (
