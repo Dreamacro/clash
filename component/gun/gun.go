@@ -96,7 +96,7 @@ func newGunClientWithContext(ctx context.Context, config *Config) *Client {
 		client: client,
 		url: &url.URL{
 			Scheme: "https",
-			Host:   config.ServerName,
+			Host:   config.Adder,
 			Path:   fmt.Sprintf("/%s/Tun", serviceName),
 		},
 		headers: http.Header{
