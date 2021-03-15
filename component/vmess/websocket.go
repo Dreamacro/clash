@@ -141,49 +141,84 @@ func StreamWebsocketEDConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) 
 	return conn, nil
 }
 
-func (w *websocketEDConn) Close() error {
-	w.closed = true
-	w.cancel()
-	if w.Conn == nil {
+func (wsedc *websocketEDConn) Close() error {
+	wsedc.closed = true
+	wsedc.cancel()
+	if wsedc.Conn == nil {
 		return nil
 	}
-	return w.Conn.Close()
+	return wsedc.Conn.Close()
 }
 
-func (w *websocketEDConn) Write(b []byte) (int, error) {
-	if w.closed {
+func (wsedc *websocketEDConn) Write(b []byte) (int, error) {
+	if wsedc.closed {
 		return 0, io.ErrClosedPipe
 	}
-	if w.Conn == nil {
+	if wsedc.Conn == nil {
 		ed := b
-		if len(ed) > int(w.config.Ed) {
+		if len(ed) > int(wsedc.config.Ed) {
 			ed = nil
 		}
 		var err error
-		if w.Conn, err = StreamWebsocketConn(w.realConn, w.config, ed); err != nil {
-			w.Close()
+		if wsedc.Conn, err = StreamWebsocketConn(wsedc.realConn, wsedc.config, ed); err != nil {
+			wsedc.Close()
 			return 0, errors.New("failed to dial WebSocket: " + err.Error())
 		}
-		w.dialed <- true
+		wsedc.dialed <- true
 		if ed != nil {
 			return len(ed), nil
 		}
 	}
-	return w.Conn.Write(b)
+	return wsedc.Conn.Write(b)
 }
 
-func (w *websocketEDConn) Read(b []byte) (int, error) {
-	if w.closed {
+func (wsedc *websocketEDConn) Read(b []byte) (int, error) {
+	if wsedc.closed {
 		return 0, io.ErrClosedPipe
 	}
-	if w.Conn == nil {
+	if wsedc.Conn == nil {
 		select {
-		case <-w.ctx.Done():
+		case <-wsedc.ctx.Done():
 			return 0, io.ErrUnexpectedEOF
-		case <-w.dialed:
+		case <-wsedc.dialed:
 		}
 	}
-	return w.Conn.Read(b)
+	return wsedc.Conn.Read(b)
+}
+
+func (wsedc *websocketEDConn) LocalAddr() net.Addr {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.LocalAddr()
+}
+
+func (wsedc *websocketEDConn) RemoteAddr() net.Addr {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.RemoteAddr()
+}
+
+func (wsedc *websocketEDConn) SetDeadline(t time.Time) error {
+	if err := wsedc.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return wsedc.SetWriteDeadline(t)
+}
+
+func (wsedc *websocketEDConn) SetReadDeadline(t time.Time) error {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.SetReadDeadline(t)
+}
+
+func (wsedc *websocketEDConn) SetWriteDeadline(t time.Time) error {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.SetWriteDeadline(t)
 }
 
 func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig, ed []byte) (net.Conn, error) {
