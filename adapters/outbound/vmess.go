@@ -56,6 +56,12 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	switch v.option.Network {
 	case "ws":
 		host, port, _ := net.SplitHostPort(v.addr)
+		wsOpts := &vmess.WebsocketConfig{
+			Host: host,
+			Port: port,
+			Path: v.option.WSPath,
+		}
+
 		var ed uint32
 		if u, err := url.Parse(v.option.WSPath); err == nil {
 			if q := u.Query(); q.Get("ed") != "" {
@@ -63,17 +69,10 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 				ed = uint32(Ed)
 				q.Del("ed")
 				u.RawQuery = q.Encode()
-				v.option.WSPath = u.String()
+				wsOpts.Path = u.String()
 			}
 		}
-
-		wsOpts := &vmess.WebsocketConfig{
-			Host: host,
-			Port: port,
-			Path: v.option.WSPath,
-			Ed:   ed,
-		}
-
+		wsOpts.Ed = ed
 		if len(v.option.WSHeaders) != 0 {
 			header := http.Header{}
 			for key, value := range v.option.WSHeaders {
