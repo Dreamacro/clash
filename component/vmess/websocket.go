@@ -188,14 +188,14 @@ func (wsedc *websocketEDConn) Read(b []byte) (int, error) {
 
 func (wsedc *websocketEDConn) LocalAddr() net.Addr {
 	if wsedc.Conn == nil {
-		return nil
+		return wsedc.realConn.LocalAddr()
 	}
 	return wsedc.Conn.LocalAddr()
 }
 
 func (wsedc *websocketEDConn) RemoteAddr() net.Addr {
 	if wsedc.Conn == nil {
-		return nil
+		return wsedc.realConn.RemoteAddr()
 	}
 	return wsedc.Conn.RemoteAddr()
 }
