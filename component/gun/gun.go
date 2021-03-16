@@ -41,6 +41,7 @@ type Conn struct {
 	writer   *io.PipeWriter
 	once     sync.Once
 	close    *atomic.Bool
+	err      error
 }
 
 type Config struct {
@@ -48,18 +49,26 @@ type Config struct {
 	Host        string
 }
 
+func (g *Conn) initRequest() {
+	response, err := g.client.Do(g.request)
+	if err != nil {
+		g.err = err
+		g.writer.Close()
+		return
+	}
+
+	if !g.close.Load() {
+		g.response = response
+	} else {
+		response.Body.Close()
+	}
+}
+
 func (g *Conn) Read(b []byte) (n int, err error) {
-	g.once.Do(func() {
-		response, err := g.client.Do(g.request)
-		if err != nil {
-			return
-		}
-		if !g.close.Load() {
-			g.response = response
-		} else {
-			response.Body.Close()
-		}
-	})
+	g.once.Do(g.initRequest)
+	if g.err != nil {
+		return 0, g.err
+	}
 
 	buf := make([]byte, 5)
 	_, err = io.ReadFull(g.response.Body, buf)
@@ -98,6 +107,10 @@ func (g *Conn) Write(b []byte) (n int, err error) {
 
 	buffers := net.Buffers{grpcHeader, protobufHeader, b}
 	_, err = buffers.WriteTo(g.writer)
+	if err == io.ErrClosedPipe && g.err != nil {
+		err = g.err
+	}
+
 	return len(b), err
 }
 
@@ -171,13 +184,15 @@ func StreamGunWithTransport(transport *http2.Transport, cfg *Config) (net.Conn, 
 		Header:     defaultHeader,
 	}
 
-	return &Conn{
+	conn := &Conn{
 		request: request,
 		client:  client,
 		writer:  writer,
 		close:   atomic.NewBool(false),
-	}, nil
+	}
 
+	go conn.once.Do(conn.initRequest)
+	return conn, nil
 }
 
 func StreamGunWithConn(conn net.Conn, tlsConfig *tls.Config, cfg *Config) (net.Conn, error) {
