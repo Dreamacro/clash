@@ -4,8 +4,6 @@
 package gun
 
 import (
-	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"errors"
@@ -14,77 +12,72 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
-	"ekyu.moe/leb128"
-	"github.com/Dreamacro/clash/log"
+	"github.com/Dreamacro/clash/common/pool"
+
+	"go.uber.org/atomic"
 	"golang.org/x/net/http2"
 )
-
-type Conn struct {
-	reader io.Reader
-	writer io.Writer
-	closer io.Closer
-	local  net.Addr
-	remote net.Addr
-	done   chan struct{}
-}
-
-type Client struct {
-	ctx     context.Context
-	client  *http.Client
-	url     *url.URL
-	headers http.Header
-}
-
-type Config struct {
-	ServiceName    string
-	SkipCertVerify bool
-	Tls            bool
-	ServerName     string
-	Adder          string
-}
-
-type ChainedClosable []io.Closer
-
-// Close implements io.Closer.Close().
-func (cc ChainedClosable) Close() error {
-	for _, c := range cc {
-		_ = c.Close()
-	}
-	return nil
-}
 
 var (
 	ErrInvalidLength = errors.New("invalid length")
 )
 
-func (g *Conn) isClosed() bool {
-	select {
-	case <-g.done:
-		return true
-	default:
-		return false
+var (
+	defaultHeader = http.Header{
+		"content-type": []string{"application/grpc"},
+		"user-agent":   []string{"grpc-go/1.36.0"},
 	}
+)
+
+type DialFn = func(network, addr string) (net.Conn, error)
+
+type Conn struct {
+	response *http.Response
+	request  *http.Request
+	client   *http.Client
+	writer   *io.PipeWriter
+	once     sync.Once
+	close    *atomic.Bool
 }
 
-func (g Conn) Read(b []byte) (n int, err error) {
+type Config struct {
+	ServiceName string
+	Host        string
+}
+
+func (g *Conn) Read(b []byte) (n int, err error) {
+	g.once.Do(func() {
+		response, err := g.client.Do(g.request)
+		if err != nil {
+			return
+		}
+		if !g.close.Load() {
+			g.response = response
+		} else {
+			response.Body.Close()
+		}
+	})
+
 	buf := make([]byte, 5)
-	n, err = io.ReadFull(g.reader, buf)
+	_, err = io.ReadFull(g.response.Body, buf)
 	if err != nil {
 		return 0, err
 	}
-	//log.Printf("GRPC Header: %x", buf[:n])
 	grpcPayloadLen := binary.BigEndian.Uint32(buf[1:])
-	//log.Printf("GRPC Payload Length: %d", grpcPayloadLen)
+	if grpcPayloadLen > pool.RelayBufferSize {
+		return 0, ErrInvalidLength
+	}
 
-	buf = make([]byte, grpcPayloadLen)
-	n, err = io.ReadFull(g.reader, buf)
+	buf = pool.Get(int(grpcPayloadLen))
+	defer pool.Put(buf)
+	_, err = io.ReadFull(g.response.Body, buf)
 	if err != nil {
 		return 0, io.ErrUnexpectedEOF
 	}
-	protobufPayloadLen, protobufLengthLen := leb128.DecodeUleb128(buf[1:])
-	//log.Printf("Protobuf Payload Length: %d, Length Len: %d", protobufPayloadLen, protobufLengthLen)
+	protobufPayloadLen, protobufLengthLen := decodeUleb128(buf[1:])
 	if protobufLengthLen == 0 {
 		return 0, ErrInvalidLength
 	}
@@ -92,144 +85,106 @@ func (g Conn) Read(b []byte) (n int, err error) {
 		return 0, ErrInvalidLength
 	}
 
-	return bytes.NewReader(buf[1+protobufLengthLen:]).Read(b)
+	// TODO: handle buf large than b
+	n = copy(b, buf[1+protobufLengthLen:])
+	return
 }
 
-func (g Conn) Write(b []byte) (n int, err error) {
-	if g.isClosed() {
-		return 0, io.ErrClosedPipe
-	}
-	protobufHeader := leb128.AppendUleb128([]byte{0x0A}, uint64(len(b)))
+func (g *Conn) Write(b []byte) (n int, err error) {
+	protobufHeader := appendUleb128([]byte{0x0A}, uint64(len(b)))
 	grpcHeader := make([]byte, 5)
 	grpcPayloadLen := uint32(len(protobufHeader) + len(b))
 	binary.BigEndian.PutUint32(grpcHeader[1:5], grpcPayloadLen)
-	_, err = io.Copy(g.writer, io.MultiReader(bytes.NewReader(grpcHeader), bytes.NewReader(protobufHeader), bytes.NewReader(b)))
-	if f, ok := g.writer.(http.Flusher); ok {
-		f.Flush()
-	}
+
+	buffers := net.Buffers{grpcHeader, protobufHeader, b}
+	_, err = buffers.WriteTo(g.writer)
 	return len(b), err
 }
 
-func (g Conn) Close() error {
-	defer close(g.done)
-	err := g.closer.Close()
-	return err
+func (g *Conn) Close() error {
+	g.close.Store(true)
+	if r := g.response; r != nil {
+		r.Body.Close()
+	}
+
+	return g.writer.Close()
 }
 
-func (g Conn) LocalAddr() net.Addr {
-	return g.local
-}
+func (g *Conn) LocalAddr() net.Addr                { return &net.TCPAddr{IP: net.IPv4zero, Port: 0} }
+func (g *Conn) RemoteAddr() net.Addr               { return &net.TCPAddr{IP: net.IPv4zero, Port: 0} }
+func (g *Conn) SetDeadline(t time.Time) error      { return nil }
+func (g *Conn) SetReadDeadline(t time.Time) error  { return nil }
+func (g *Conn) SetWriteDeadline(t time.Time) error { return nil }
 
-func (g Conn) RemoteAddr() net.Addr {
-	return g.remote
-}
-
-func (g Conn) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (g Conn) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (g Conn) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
-func StreamGunConn(cfg *Config) (net.Conn, error) {
-	var dialFunc func(network, addr string, cfg *tls.Config) (net.Conn, error) = nil
-	if cfg.Tls {
-		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			pconn, err := net.Dial(network, addr)
-			if err != nil {
-				return nil, err
-			}
-
-			cn := tls.Client(pconn, cfg)
-			if err := cn.Handshake(); err != nil {
-				return nil, err
-			}
-			state := cn.ConnectionState()
-			if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
-				return nil, errors.New("http2: unexpected ALPN protocol " + p + "; want q" + http2.NextProtoTLS)
-			}
-			return cn, nil
+func NewHTTP2Client(dialFn DialFn, tlsConfig *tls.Config) *http2.Transport {
+	dialFunc := func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+		pconn, err := dialFn(network, addr)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		dialFunc = func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			return net.Dial(network, addr)
+
+		cn := tls.Client(pconn, cfg)
+		if err := cn.Handshake(); err != nil {
+			pconn.Close()
+			return nil, err
 		}
+		state := cn.ConnectionState()
+		if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
+			cn.Close()
+			return nil, errors.New("http2: unexpected ALPN protocol " + p + "; want q" + http2.NextProtoTLS)
+		}
+		return cn, nil
 	}
 
-	var tlsClientConfig *tls.Config = nil
-	if cfg.ServerName != "" {
-		tlsClientConfig = new(tls.Config)
-		tlsClientConfig.ServerName = cfg.ServerName
+	return &http2.Transport{
+		DialTLS:            dialFunc,
+		TLSClientConfig:    tlsConfig,
+		AllowHTTP:          false,
+		DisableCompression: true,
+		ReadIdleTimeout:    0,
+		PingTimeout:        0,
 	}
+}
 
-	client := &http.Client{
-		Transport: &http2.Transport{
-			DialTLS:            dialFunc,
-			TLSClientConfig:    tlsClientConfig,
-			AllowHTTP:          false,
-			DisableCompression: true,
-			ReadIdleTimeout:    0,
-			PingTimeout:        0,
-		},
-	}
-
-	var serviceName = "GunService"
+func StreamGunWithTransport(transport *http2.Transport, cfg *Config) (net.Conn, error) {
+	serviceName := "GunService"
 	if cfg.ServiceName != "" {
 		serviceName = cfg.ServiceName
 	}
 
-	clientConn := &Client{
-		ctx:    context.TODO(),
-		client: client,
-		url: &url.URL{
-			Scheme: "https",
-			Host:   cfg.Adder,
-			Path:   fmt.Sprintf("/%s/Tun", serviceName),
-		},
-		headers: http.Header{
-			"content-type": []string{"application/grpc"},
-			"user-agent":   []string{"grpc-go/1.36.0"},
-			"te":           []string{"trailers"},
-		},
+	client := &http.Client{
+		Transport: transport,
 	}
+
 	reader, writer := io.Pipe()
 	request := &http.Request{
-		Method:     http.MethodPost,
-		Body:       reader,
-		URL:        clientConn.url,
+		Method: http.MethodPost,
+		Body:   reader,
+		URL: &url.URL{
+			Scheme: "https",
+			Host:   cfg.Host,
+			Path:   fmt.Sprintf("/%s/Tun", serviceName),
+		},
 		Proto:      "HTTP/2",
 		ProtoMajor: 2,
 		ProtoMinor: 0,
-		Header:     clientConn.headers,
+		Header:     defaultHeader,
 	}
-	anotherReader, anotherWriter := io.Pipe()
-	go func() {
-		defer anotherWriter.Close()
-		response, err := clientConn.client.Do(request)
-		if err != nil {
-			log.Errorln("failed to dial remote: " + err.Error())
-			return
-		}
-		_, _ = io.Copy(anotherWriter, response.Body)
-	}()
 
 	return &Conn{
-		reader: anotherReader,
-		writer: writer,
-		closer: ChainedClosable{reader, writer, anotherReader},
-		local: &net.TCPAddr{
-			IP:   []byte{0, 0, 0, 0},
-			Port: 0,
-		},
-		remote: &net.TCPAddr{
-			IP:   []byte{0, 0, 0, 0},
-			Port: 0,
-		},
-		done: make(chan struct{}),
+		request: request,
+		client:  client,
+		writer:  writer,
+		close:   atomic.NewBool(false),
 	}, nil
+
+}
+
+func StreamGunWithConn(conn net.Conn, tlsConfig *tls.Config, cfg *Config) (net.Conn, error) {
+	dialFn := func(network, addr string) (net.Conn, error) {
+		return conn, nil
+	}
+
+	transport := NewHTTP2Client(dialFn, tlsConfig)
+	return StreamGunWithTransport(transport, cfg)
 }

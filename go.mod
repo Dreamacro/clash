@@ -3,7 +3,6 @@ module github.com/Dreamacro/clash
 go 1.16
 
 require (
-	ekyu.moe/leb128 v0.0.0-20190626180622-d3722dc409a8
 	github.com/Dreamacro/go-shadowsocks2 v0.1.6
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-chi/cors v1.1.1

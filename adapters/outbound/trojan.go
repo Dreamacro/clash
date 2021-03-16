@@ -2,36 +2,51 @@ package outbound
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
 
 	"github.com/Dreamacro/clash/component/dialer"
+	"github.com/Dreamacro/clash/component/gun"
 	"github.com/Dreamacro/clash/component/trojan"
 	C "github.com/Dreamacro/clash/constant"
+
+	"golang.org/x/net/http2"
 )
 
 type Trojan struct {
 	*Base
 	instance *trojan.Trojan
+
+	// for gun mux
+	gunTLSConfig *tls.Config
+	gunConfig    *gun.Config
+	transport    *http2.Transport
 }
 
 type TrojanOption struct {
-	Name            string   `proxy:"name"`
-	Server          string   `proxy:"server"`
-	Port            int      `proxy:"port"`
-	Password        string   `proxy:"password"`
-	ALPN            []string `proxy:"alpn,omitempty"`
-	SNI             string   `proxy:"sni,omitempty"`
-	SkipCertVerify  bool     `proxy:"skip-cert-verify,omitempty"`
-	UDP             bool     `proxy:"udp,omitempty"`
-	GrpcServiceName string   `proxy:"grpc-service-name,omitempty"`
-	Network         string   `proxy:"network,omitempty"`
+	Name           string     `proxy:"name"`
+	Server         string     `proxy:"server"`
+	Port           int        `proxy:"port"`
+	Password       string     `proxy:"password"`
+	ALPN           []string   `proxy:"alpn,omitempty"`
+	SNI            string     `proxy:"sni,omitempty"`
+	SkipCertVerify bool       `proxy:"skip-cert-verify,omitempty"`
+	UDP            bool       `proxy:"udp,omitempty"`
+	Network        string     `proxy:"network,omitempty"`
+	GUNOpts        GUNOptions `proxy:"gun-opts,omitempty"`
 }
 
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	c, err := t.instance.StreamConn(c)
+	var err error
+	if t.transport != nil {
+		c, err = gun.StreamGunWithConn(c, t.gunTLSConfig, t.gunConfig)
+	} else {
+		c, err = t.instance.StreamConn(c)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
 	}
@@ -41,6 +56,21 @@ func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) 
 }
 
 func (t *Trojan) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
+	// gun transport, TODO: Optimize mux dial code
+	if t.transport != nil {
+		c, err := gun.StreamGunWithTransport(t.transport, t.gunConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = t.instance.WriteHeader(c, trojan.CommandTCP, serializesSocksAddr(metadata)); err != nil {
+			c.Close()
+			return nil, err
+		}
+
+		return NewConn(c, t), nil
+	}
+
 	c, err := dialer.DialContext(ctx, "tcp", t.addr)
 	if err != nil {
 		return nil, fmt.Errorf("%s connect error: %w", t.addr, err)
@@ -55,6 +85,22 @@ func (t *Trojan) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn,
 }
 
 func (t *Trojan) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
+	// gun transport, TODO: Optimize mux dial code
+	if t.transport != nil {
+		c, err := gun.StreamGunWithTransport(t.transport, t.gunConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = t.instance.WriteHeader(c, trojan.CommandUDP, serializesSocksAddr(metadata)); err != nil {
+			c.Close()
+			return nil, err
+		}
+
+		pc := t.instance.PacketConn(c)
+		return newPacketConn(pc, t), err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), tcpTimeout)
 	defer cancel()
 	c, err := dialer.DialContext(ctx, "tcp", t.addr)
@@ -91,15 +137,13 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 		ServerName:         option.Server,
 		SkipCertVerify:     option.SkipCertVerify,
 		ClientSessionCache: getClientSessionCache(),
-		Network:            option.Network,
-		GrpcServiceName:    option.GrpcServiceName,
 	}
 
 	if option.SNI != "" {
 		tOption.ServerName = option.SNI
 	}
 
-	return &Trojan{
+	t := &Trojan{
 		Base: &Base{
 			name: option.Name,
 			addr: addr,
@@ -107,5 +151,33 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 			udp:  option.UDP,
 		},
 		instance: trojan.New(tOption),
-	}, nil
+	}
+
+	if option.Network == "grpc" {
+		dialFn := func(network, addr string) (net.Conn, error) {
+			c, err := dialer.DialContext(context.Background(), "tcp", t.addr)
+			if err != nil {
+				return nil, fmt.Errorf("%s connect error: %s", t.addr, err.Error())
+			}
+			tcpKeepAlive(c)
+			return c, nil
+		}
+
+		tlsConfig := &tls.Config{
+			NextProtos:         option.ALPN,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: tOption.SkipCertVerify,
+			ServerName:         tOption.ServerName,
+			ClientSessionCache: getClientSessionCache(),
+		}
+
+		t.transport = gun.NewHTTP2Client(dialFn, tlsConfig)
+		t.gunTLSConfig = tlsConfig
+		t.gunConfig = &gun.Config{
+			ServiceName: option.GUNOpts.GrpcServiceName,
+			Host:        tOption.ServerName,
+		}
+	}
+
+	return t, nil
 }

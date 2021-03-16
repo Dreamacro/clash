@@ -11,7 +11,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/Dreamacro/clash/component/gun"
 	"github.com/Dreamacro/clash/component/socks5"
 )
 
@@ -40,8 +39,6 @@ type Option struct {
 	ServerName         string
 	SkipCertVerify     bool
 	ClientSessionCache tls.ClientSessionCache
-	GrpcServiceName    string
-	Network            string
 }
 
 type Trojan struct {
@@ -62,27 +59,13 @@ func (t *Trojan) StreamConn(conn net.Conn) (net.Conn, error) {
 		ServerName:         t.option.ServerName,
 		ClientSessionCache: t.option.ClientSessionCache,
 	}
-	if t.option.Network == "grpc" {
-		grpcConn, err := gun.StreamGunConn(&gun.Config{
-			ServiceName:    t.option.GrpcServiceName,
-			SkipCertVerify: t.option.SkipCertVerify,
-			Tls:            true,
-			Adder:          conn.RemoteAddr().String(),
-			ServerName:     t.option.ServerName,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return grpcConn, nil
-	} else {
-		tlsConn := tls.Client(conn, tlsConfig)
-		if err := tlsConn.Handshake(); err != nil {
-			return nil, err
-		}
 
-		return tlsConn, nil
+	tlsConn := tls.Client(conn, tlsConfig)
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
 	}
 
+	return tlsConn, nil
 }
 
 func (t *Trojan) WriteHeader(w io.Writer, command Command, socks5Addr []byte) error {
