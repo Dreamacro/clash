@@ -25,7 +25,9 @@ type Vmess struct {
 	option *VmessOption
 
 	// for gun mux
-	transport *http2.Transport
+	gunTLSConfig *tls.Config
+	gunConfig    *gun.Config
+	transport    *http2.Transport
 }
 
 type VmessOption struct {
@@ -40,7 +42,7 @@ type VmessOption struct {
 	Network        string            `proxy:"network,omitempty"`
 	HTTPOpts       HTTPOptions       `proxy:"http-opts,omitempty"`
 	HTTP2Opts      HTTP2Options      `proxy:"h2-opts,omitempty"`
-	GUNOpts        GUNOptions        `proxy:"gun-opts,omitempty"`
+	GrpcOpts       GrpcOptions       `proxy:"grpc-opts,omitempty"`
 	WSPath         string            `proxy:"ws-path,omitempty"`
 	WSHeaders      map[string]string `proxy:"ws-headers,omitempty"`
 	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
@@ -58,7 +60,7 @@ type HTTP2Options struct {
 	Path string   `proxy:"path,omitempty"`
 }
 
-type GUNOptions struct {
+type GrpcOptions struct {
 	GrpcServiceName string `proxy:"grpc-service-name,omitempty"`
 }
 
@@ -142,22 +144,7 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 
 		c, err = vmess.StreamH2Conn(c, h2Opts)
 	case "grpc":
-		gunConfig := &gun.Config{
-			ServiceName: v.option.GUNOpts.GrpcServiceName,
-			Host:        v.option.ServerName,
-		}
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: v.option.SkipCertVerify,
-			ServerName:         v.option.ServerName,
-		}
-
-		if v.option.ServerName == "" {
-			host, _, _ := net.SplitHostPort(v.addr)
-			gunConfig.Host = host
-			tlsConfig.ServerName = host
-		}
-
-		c, err = gun.StreamGunWithConn(c, tlsConfig, gunConfig)
+		c, err = gun.StreamGunWithConn(c, v.gunTLSConfig, v.gunConfig)
 	default:
 		// handle TLS
 		if v.option.TLS {
@@ -183,24 +170,10 @@ func (v *Vmess) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	return v.client.StreamConn(c, parseVmessAddr(metadata))
 }
 
-func (v *Vmess) dialMuxConn() (net.Conn, error) {
-	gunConfig := &gun.Config{
-		ServiceName: v.option.GUNOpts.GrpcServiceName,
-		Host:        v.option.ServerName,
-	}
-
-	if v.option.ServerName == "" {
-		host, _, _ := net.SplitHostPort(v.addr)
-		gunConfig.Host = host
-	}
-
-	return gun.StreamGunWithTransport(v.transport, gunConfig)
-}
-
 func (v *Vmess) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
 	// gun transport, TODO: Optimize mux dial code
 	if v.transport != nil {
-		c, err := v.dialMuxConn()
+		c, err := gun.StreamGunWithTransport(v.transport, v.gunConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +208,7 @@ func (v *Vmess) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
 
 	// gun transport, TODO: Optimize mux dial code
 	if v.transport != nil {
-		c, err := v.dialMuxConn()
+		c, err := gun.StreamGunWithTransport(v.transport, v.gunConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -303,6 +276,10 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 			return c, nil
 		}
 
+		gunConfig := &gun.Config{
+			ServiceName: v.option.GrpcOpts.GrpcServiceName,
+			Host:        v.option.ServerName,
+		}
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: v.option.SkipCertVerify,
 			ServerName:         v.option.ServerName,
@@ -311,7 +288,11 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 		if v.option.ServerName == "" {
 			host, _, _ := net.SplitHostPort(v.addr)
 			tlsConfig.ServerName = host
+			gunConfig.Host = host
 		}
+
+		v.gunTLSConfig = tlsConfig
+		v.gunConfig = gunConfig
 		v.transport = gun.NewHTTP2Client(dialFn, tlsConfig)
 	}
 

@@ -27,16 +27,16 @@ type Trojan struct {
 }
 
 type TrojanOption struct {
-	Name           string     `proxy:"name"`
-	Server         string     `proxy:"server"`
-	Port           int        `proxy:"port"`
-	Password       string     `proxy:"password"`
-	ALPN           []string   `proxy:"alpn,omitempty"`
-	SNI            string     `proxy:"sni,omitempty"`
-	SkipCertVerify bool       `proxy:"skip-cert-verify,omitempty"`
-	UDP            bool       `proxy:"udp,omitempty"`
-	Network        string     `proxy:"network,omitempty"`
-	GUNOpts        GUNOptions `proxy:"gun-opts,omitempty"`
+	Name           string      `proxy:"name"`
+	Server         string      `proxy:"server"`
+	Port           int         `proxy:"port"`
+	Password       string      `proxy:"password"`
+	ALPN           []string    `proxy:"alpn,omitempty"`
+	SNI            string      `proxy:"sni,omitempty"`
+	SkipCertVerify bool        `proxy:"skip-cert-verify,omitempty"`
+	UDP            bool        `proxy:"udp,omitempty"`
+	Network        string      `proxy:"network,omitempty"`
+	GrpcOpts       GrpcOptions `proxy:"grpc-opts,omitempty"`
 }
 
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
@@ -174,7 +174,7 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 		t.transport = gun.NewHTTP2Client(dialFn, tlsConfig)
 		t.gunTLSConfig = tlsConfig
 		t.gunConfig = &gun.Config{
-			ServiceName: option.GUNOpts.GrpcServiceName,
+			ServiceName: option.GrpcOpts.GrpcServiceName,
 			Host:        tOption.ServerName,
 		}
 	}

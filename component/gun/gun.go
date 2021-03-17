@@ -42,6 +42,9 @@ type Conn struct {
 	once     sync.Once
 	close    *atomic.Bool
 	err      error
+
+	buf    []byte
+	offset int
 }
 
 type Config struct {
@@ -70,6 +73,16 @@ func (g *Conn) Read(b []byte) (n int, err error) {
 		return 0, g.err
 	}
 
+	if g.buf != nil {
+		n = copy(b, g.buf[g.offset:])
+		g.offset += n
+		if g.offset == len(g.buf) {
+			g.offset = 0
+			g.buf = nil
+		}
+		return
+	}
+
 	buf := make([]byte, 5)
 	_, err = io.ReadFull(g.response.Body, buf)
 	if err != nil {
@@ -81,25 +94,34 @@ func (g *Conn) Read(b []byte) (n int, err error) {
 	}
 
 	buf = pool.Get(int(grpcPayloadLen))
-	defer pool.Put(buf)
 	_, err = io.ReadFull(g.response.Body, buf)
 	if err != nil {
+		pool.Put(buf)
 		return 0, io.ErrUnexpectedEOF
 	}
 	protobufPayloadLen, protobufLengthLen := decodeUleb128(buf[1:])
 	if protobufLengthLen == 0 {
+		pool.Put(buf)
 		return 0, ErrInvalidLength
 	}
 	if grpcPayloadLen != uint32(protobufPayloadLen)+uint32(protobufLengthLen)+1 {
+		pool.Put(buf)
 		return 0, ErrInvalidLength
 	}
 
-	// TODO: handle buf large than b
+	if len(b) >= int(grpcPayloadLen)-1-int(protobufLengthLen) {
+		n = copy(b, buf[1+protobufLengthLen:])
+		pool.Put(buf)
+		return
+	}
 	n = copy(b, buf[1+protobufLengthLen:])
+	g.offset = n + 1 + int(protobufLengthLen)
+	g.buf = buf
 	return
 }
 
 func (g *Conn) Write(b []byte) (n int, err error) {
+	defer println("write")
 	protobufHeader := appendUleb128([]byte{0x0A}, uint64(len(b)))
 	grpcHeader := make([]byte, 5)
 	grpcPayloadLen := uint32(len(protobufHeader) + len(b))
