@@ -121,7 +121,6 @@ func (g *Conn) Read(b []byte) (n int, err error) {
 }
 
 func (g *Conn) Write(b []byte) (n int, err error) {
-	defer println("write")
 	protobufHeader := appendUleb128([]byte{0x0A}, uint64(len(b)))
 	grpcHeader := make([]byte, 5)
 	grpcPayloadLen := uint32(len(protobufHeader) + len(b))
