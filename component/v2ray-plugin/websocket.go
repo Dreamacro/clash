@@ -38,7 +38,7 @@ func NewV2rayObfs(conn net.Conn, option *Option) (net.Conn, error) {
 	}
 
 	var err error
-	conn, err = vmess.StreamWebsocketConn(conn, config)
+	conn, err = vmess.StreamWebsocketConn(conn, config, nil)
 	if err != nil {
 		return nil, err
 	}
