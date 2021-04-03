@@ -11,7 +11,7 @@ import (
 	P "github.com/Dreamacro/clash/proxy"
 	"github.com/Dreamacro/clash/tunnel"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
 
