@@ -20,21 +20,27 @@ func ParseProxy(mapping map[string]interface{}) (C.Proxy, error) {
 	)
 	switch proxyType {
 	case "ss":
-		ssOption := &ShadowSocksOption{}
+		ssOption := &ShadowSocksOption{
+			UDP: true,
+		}
 		err = decoder.Decode(mapping, ssOption)
 		if err != nil {
 			break
 		}
 		proxy, err = NewShadowSocks(*ssOption)
 	case "ssr":
-		ssrOption := &ShadowSocksROption{}
+		ssrOption := &ShadowSocksROption{
+			UDP: true,
+		}
 		err = decoder.Decode(mapping, ssrOption)
 		if err != nil {
 			break
 		}
 		proxy, err = NewShadowSocksR(*ssrOption)
 	case "socks5":
-		socksOption := &Socks5Option{}
+		socksOption := &Socks5Option{
+			UDP: true,
+		}
 		err = decoder.Decode(mapping, socksOption)
 		if err != nil {
 			break
@@ -49,6 +55,7 @@ func ParseProxy(mapping map[string]interface{}) (C.Proxy, error) {
 		proxy = NewHttp(*httpOption)
 	case "vmess":
 		vmessOption := &VmessOption{
+			UDP: true,
 			HTTPOpts: HTTPOptions{
 				Method: "GET",
 				Path:   []string{"/"},
@@ -67,7 +74,9 @@ func ParseProxy(mapping map[string]interface{}) (C.Proxy, error) {
 		}
 		proxy, err = NewSnell(*snellOption)
 	case "trojan":
-		trojanOption := &TrojanOption{}
+		trojanOption := &TrojanOption{
+			UDP: true,
+		}
 		err = decoder.Decode(mapping, trojanOption)
 		if err != nil {
 			break
