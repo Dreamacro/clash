@@ -27,6 +27,8 @@ func ParseRule(tp, payload, target string, params []string) (C.Rule, error) {
 		parsed, parseErr = NewIPCIDR(payload, target, WithIPCIDRNoResolve(noResolve))
 	case "SRC-IP-CIDR":
 		parsed, parseErr = NewIPCIDR(payload, target, WithIPCIDRSourceIP(true), WithIPCIDRNoResolve(true))
+	case "PROTO":
+		parsed,parseErr = NewProto(payload,target)
 	case "SRC-PORT":
 		parsed, parseErr = NewPort(payload, target, true)
 	case "DST-PORT":

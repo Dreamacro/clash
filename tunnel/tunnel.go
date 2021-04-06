@@ -234,7 +234,7 @@ func handleUDPConn(packet *inbound.PacketAdapter) {
 		case mode == Direct:
 			log.Infoln("[UDP] %s --> %v using DIRECT", metadata.SourceAddress(), metadata.String())
 		default:
-			log.Infoln("[UDP] %s --> %v doesn't match any rule using DIRECT", metadata.SourceAddress(), metadata.String())
+			log.Infoln("[UDP] %s --> %v doesn't match any rule using REJECT", metadata.SourceAddress(), metadata.String())
 		}
 
 		go handleUDPToLocal(packet.UDPPacket, pc, key, fAddr)
@@ -284,7 +284,7 @@ func handleTCPConn(ctx C.ConnContext) {
 	case mode == Direct:
 		log.Infoln("[TCP] %s --> %v using DIRECT", metadata.SourceAddress(), metadata.String())
 	default:
-		log.Infoln("[TCP] %s --> %v doesn't match any rule using DIRECT", metadata.SourceAddress(), metadata.String())
+		log.Infoln("[TCP] %s --> %v doesn't match any rule using REJECT", metadata.SourceAddress(), metadata.String())
 	}
 
 	switch c := ctx.(type) {
@@ -329,13 +329,8 @@ func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 				continue
 			}
 
-			if metadata.NetWork == C.UDP && !adapter.SupportUDP() {
-				log.Debugln("%v UDP is not supported", adapter.Name())
-				continue
-			}
 			return adapter, rule, nil
 		}
 	}
-
-	return proxies["DIRECT"], nil, nil
+	return proxies["REJECT"], nil, nil
 }
