@@ -2,7 +2,8 @@ package constant
 
 // Rule Type
 const (
-	Domain RuleType = iota
+	Base RuleType = iota
+	Domain
 	DomainSuffix
 	DomainKeyword
 	GEOIP
@@ -19,6 +20,8 @@ type RuleType int
 
 func (rt RuleType) String() string {
 	switch rt {
+	case Base:
+		return "Base"
 	case Domain:
 		return "Domain"
 	case DomainSuffix:

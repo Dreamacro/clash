@@ -376,40 +376,16 @@ func parseRules(cfg *RawConfig, proxies map[string]C.Proxy) ([]C.Rule, error) {
 
 	// parse rules
 	for idx, line := range rulesConfig {
-		rule := trimArr(strings.Split(line, ","))
-		var (
-			payload string
-			target  string
-			params  = []string{}
-		)
 
-		switch l := len(rule); {
-		case l == 2:
-			target = rule[1]
-		case l == 3:
-			payload = rule[1]
-			target = rule[2]
-		case l >= 4:
-			payload = rule[1]
-			target = rule[2]
-			params = rule[3:]
-		default:
-			return nil, fmt.Errorf("rules[%d] [%s] error: format invalid", idx, line)
-		}
-
-		if _, ok := proxies[target]; !ok {
-			return nil, fmt.Errorf("rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
-		}
-
-		rule = trimArr(rule)
-		params = trimArr(params)
-
-		parsed, parseErr := R.ParseRule(rule[0], payload, target, params)
+		rule, parseErr := R.ParseRule(line)
+		target := rule.Adapter()
 		if parseErr != nil {
 			return nil, fmt.Errorf("rules[%d] [%s] error: %s", idx, line, parseErr.Error())
 		}
-
-		rules = append(rules, parsed)
+		if _, ok := proxies[target]; !ok {
+			return nil, fmt.Errorf("rules[%d] [%s] error: proxy [%s] not found", idx, line, target)
+		}
+		rules = append(rules, rule)
 	}
 
 	return rules, nil
