@@ -43,6 +43,7 @@ func ParseUnitRule(tp, payload, target string) (C.Rule, error) {
 
 func ParseRule(rule string) (C.Rule, error) {
 	units := []C.Rule{}
+	inverses := []bool{}
 	tokenList := trimArr(strings.Split(rule, ","))
 
 	if tokenList[0] == "MATCH" {
@@ -51,9 +52,12 @@ func ParseRule(rule string) (C.Rule, error) {
 
 	i := 0
 	for i < len(tokenList)-1 {
-		unit, err := ParseUnitRule(tokenList[i], tokenList[i+1], "DUMMY")
+		tp := tokenList[i]
+		payload, inverse := parseInverse(tokenList[i+1])
+		unit, err := ParseUnitRule(tp, payload, "DUMMY")
 		if err == nil {
 			units = append(units, unit)
+			inverses = append(inverses, inverse)
 			i += 2
 		} else if !errors.Is(err, errNotRule) {
 			return nil, err
@@ -66,9 +70,12 @@ func ParseRule(rule string) (C.Rule, error) {
 	if len(tokenList[i:]) > 1 {
 		params = tokenList[i+1:]
 	}
-	baseRule := NewBaseRule(units, target, params)
-
-	return baseRule, nil
+	return &Base{
+		units:    units,
+		inverses: inverses,
+		params:   params,
+		adapter:  target,
+	}, nil
 }
 
 func trimArr(arr []string) (r []string) {
@@ -76,4 +83,8 @@ func trimArr(arr []string) (r []string) {
 		r = append(r, strings.Trim(e, " "))
 	}
 	return
+}
+
+func parseInverse(token string) (string, bool) {
+	return strings.TrimPrefix(token, "!"), strings.HasPrefix(token, "!")
 }

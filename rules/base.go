@@ -24,9 +24,10 @@ func HasNoResolve(params []string) bool {
 }
 
 type Base struct {
-	units   []C.Rule
-	params  []string
-	adapter string
+	units    []C.Rule
+	inverses []bool
+	params   []string
+	adapter  string
 }
 
 func (b *Base) RuleType() C.RuleType {
@@ -34,8 +35,8 @@ func (b *Base) RuleType() C.RuleType {
 }
 
 func (b *Base) Match(metadata *C.Metadata) bool {
-	for _, unit := range b.units {
-		if !unit.Match(metadata) {
+	for i, unit := range b.units {
+		if !unit.Match(metadata) && !b.inverses[i] {
 			return false
 		}
 	}
@@ -43,8 +44,13 @@ func (b *Base) Match(metadata *C.Metadata) bool {
 }
 func (b *Base) Payload() string {
 	s := []string{}
-	for _, unit := range b.units {
-		s = append(s, fmt.Sprintf("%s(%s)", unit.RuleType(), unit.Payload()))
+	for i, unit := range b.units {
+		if b.inverses[i] {
+			s = append(s, fmt.Sprintf("%s(not %s)", unit.RuleType(), unit.Payload()))
+		} else {
+			s = append(s, fmt.Sprintf("%s(%s)", unit.RuleType(), unit.Payload()))
+		}
+
 	}
 	p := strings.Join(s, " ")
 	return p
@@ -65,12 +71,4 @@ func (b *Base) ShouldResolveIP() bool {
 
 func (b *Base) Adapter() string {
 	return b.adapter
-}
-
-func NewBaseRule(units []C.Rule, adapter string, params []string) *Base {
-	return &Base{
-		units:   units,
-		adapter: adapter,
-		params:  params,
-	}
 }
