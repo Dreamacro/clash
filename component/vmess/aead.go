@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"sync"
 
 	"github.com/Dreamacro/clash/common/pool"
 )
@@ -15,6 +16,8 @@ type aeadWriter struct {
 	nonce [32]byte
 	count uint16
 	iv    []byte
+
+	writeLock sync.Mutex
 }
 
 func newAEADWriter(w io.Writer, aead cipher.AEAD, iv []byte) *aeadWriter {
@@ -22,8 +25,12 @@ func newAEADWriter(w io.Writer, aead cipher.AEAD, iv []byte) *aeadWriter {
 }
 
 func (w *aeadWriter) Write(b []byte) (n int, err error) {
+	w.writeLock.Lock()
 	buf := pool.Get(pool.RelayBufferSize)
-	defer pool.Put(buf)
+	defer func() {
+		w.writeLock.Unlock()
+		pool.Put(buf)
+	}()
 	length := len(b)
 	for {
 		if length == 0 {
