@@ -62,6 +62,8 @@ func (pc *PoolConn) Write(b []byte) (int, error) {
 }
 
 func (pc *PoolConn) Close() error {
+	// clash use SetReadDeadline to break bidirectional copy between client and server.
+	// reset it before reuse connection to avoid io timeout error.
 	pc.Snell.Conn.SetReadDeadline(time.Time{})
 	pc.pool.Put(pc.Snell)
 	return nil
