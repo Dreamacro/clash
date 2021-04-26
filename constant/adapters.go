@@ -86,6 +86,8 @@ type ProxyAdapter interface {
 
 	DialUDP(metadata *Metadata) (PacketConn, error)
 	SupportUDP() bool
+	SupportIpv4() bool
+	SupportIpv6() bool
 	MarshalJSON() ([]byte, error)
 	Addr() string
 	// Unwrap extracts the proxy from a proxy-group. It returns nil when nothing to extract.
