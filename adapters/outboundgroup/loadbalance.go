@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-type strategyFn = func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy
+type strategyFn = func(lb *LoadBalance, proxies []C.Proxy, metadata *C.Metadata) C.Proxy
 
 type LoadBalance struct {
 	*outbound.Base
@@ -24,6 +24,7 @@ type LoadBalance struct {
 	single     *singledo.Single
 	providers  []provider.ProxyProvider
 	strategyFn strategyFn
+	timeout    int
 }
 
 var errStrategy = errors.New("unsupported strategy")
@@ -99,12 +100,12 @@ func (lb *LoadBalance) SupportUDP() bool {
 
 func strategyRoundRobin() strategyFn {
 	idx := 0
-	return func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
+	return func(lb *LoadBalance, proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
 		length := len(proxies)
 		for i := 0; i < length; i++ {
 			idx = (idx + 1) % length
 			proxy := proxies[idx]
-			if proxy.Alive() {
+			if proxy.Alive() && (lb.timeout < 1 || proxy.LastDelay() <= uint16(lb.timeout)) {
 				return proxy
 			}
 		}
@@ -115,13 +116,13 @@ func strategyRoundRobin() strategyFn {
 
 func strategyConsistentHashing() strategyFn {
 	maxRetry := 5
-	return func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
+	return func(lb *LoadBalance, proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
 		key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
 		buckets := int32(len(proxies))
 		for i := 0; i < maxRetry; i, key = i+1, key+1 {
 			idx := jumpHash(key, buckets)
 			proxy := proxies[idx]
-			if proxy.Alive() {
+			if proxy.Alive() && (lb.timeout < 1 || proxy.LastDelay() <= uint16(lb.timeout)) {
 				return proxy
 			}
 		}
@@ -132,7 +133,7 @@ func strategyConsistentHashing() strategyFn {
 
 func (lb *LoadBalance) Unwrap(metadata *C.Metadata) C.Proxy {
 	proxies := lb.proxies(true)
-	return lb.strategyFn(proxies, metadata)
+	return lb.strategyFn(lb, proxies, metadata)
 }
 
 func (lb *LoadBalance) proxies(touch bool) []C.Proxy {
@@ -170,5 +171,6 @@ func NewLoadBalance(options *GroupCommonOption, providers []provider.ProxyProvid
 		providers:  providers,
 		strategyFn: strategyFn,
 		disableUDP: options.DisableUDP,
+		timeout:    options.Timeout,
 	}, nil
 }
