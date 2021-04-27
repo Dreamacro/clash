@@ -6,19 +6,28 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Dreamacro/clash/common/queue"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/go-ping/ping"
 
 	"go.uber.org/atomic"
 )
 
 type Base struct {
-	name string
-	addr string
-	tp   C.AdapterType
-	udp  bool
+	name           string
+	addr           string
+	pingAddr       string
+	tp             C.AdapterType
+	udp            bool
+	timeout        int
+	maxloss        int
+	forbidDuration int
+	maxFail        int
+	failCount      int
+	downFrom       int64
 }
 
 func (b *Base) Name() string {
@@ -51,12 +60,60 @@ func (b *Base) Addr() string {
 	return b.addr
 }
 
+func (b *Base) PingAddr() string {
+	return b.pingAddr
+}
+
+func (b *Base) Timeout() int {
+	if b.timeout < 1 {
+		return 65535
+	} else {
+		return b.timeout
+	}
+}
+
+func (b *Base) MaxLoss() int {
+	if b.maxloss < 1 {
+		return 101
+	} else {
+		return b.maxloss
+	}
+}
+
+func (b *Base) ForbidDuration() int {
+	return b.forbidDuration
+}
+
+func (b *Base) DownFrom() int64 {
+	return b.downFrom
+}
+
+func (b *Base) SetDownFrom(t int64) {
+	b.downFrom = t
+}
+
+func (b *Base) FailCount() int {
+	return b.failCount
+}
+
+func (b *Base) SetFailCount(t int) {
+	b.failCount = t
+}
+
+func (b *Base) MaxFail() int {
+	return b.maxFail
+}
+
+func (b *Base) Forbid() bool {
+	return b.forbidDuration > 0 && (time.Now().Unix()-b.downFrom) < int64(b.forbidDuration)
+}
+
 func (b *Base) Unwrap(metadata *C.Metadata) C.Proxy {
 	return nil
 }
 
-func NewBase(name string, addr string, tp C.AdapterType, udp bool) *Base {
-	return &Base{name, addr, tp, udp}
+func NewBase(name string, addr string, pingAddr string, tp C.AdapterType, udp bool, timeout int, maxloss int, forbidDuration int, maxFail int) *Base {
+	return &Base{name, addr, pingAddr, tp, udp, timeout, maxloss, forbidDuration, maxFail, 0, 0}
 }
 
 type conn struct {
@@ -100,7 +157,7 @@ type Proxy struct {
 }
 
 func (p *Proxy) Alive() bool {
-	return p.alive.Load()
+	return p.alive.Load() && (!p.Forbid())
 }
 
 func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
@@ -112,7 +169,13 @@ func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
 func (p *Proxy) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
 	conn, err := p.ProxyAdapter.DialContext(ctx, metadata)
 	if err != nil {
-		p.alive.Store(false)
+		p.SetFailCount(p.FailCount() + 1)
+		if p.FailCount() >= p.MaxFail() {
+			p.alive.Store(false)
+			if p.ForbidDuration() > 0 && p.DownFrom() == 0 {
+				p.SetDownFrom(time.Now().Unix())
+			}
+		}
 	}
 	return conn, err
 }
@@ -144,6 +207,24 @@ func (p *Proxy) LastDelay() (delay uint16) {
 	return history.Delay
 }
 
+// LastLoss return last history record. if proxy is not alive, return the max value of 100%.
+func (p *Proxy) LastLoss() (delay uint16) {
+	var min uint16 = 0
+	if !p.alive.Load() {
+		return min
+	}
+
+	last := p.history.Last()
+	if last == nil {
+		return min
+	}
+	history := last.(C.DelayHistory)
+	if history.Delay == 0 {
+		return min
+	}
+	return history.Loss
+}
+
 func (p *Proxy) MarshalJSON() ([]byte, error) {
 	inner, err := p.ProxyAdapter.MarshalJSON()
 	if err != nil {
@@ -158,12 +239,29 @@ func (p *Proxy) MarshalJSON() ([]byte, error) {
 }
 
 // URLTest get the delay for the specified URL
-func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
+func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, l uint16, err error) {
 	defer func() {
-		p.alive.Store(err == nil)
+		if err != nil || t >= uint16(p.Timeout()) || l >= uint16(p.MaxLoss()) {
+			p.SetFailCount(p.FailCount() + 1)
+			if p.FailCount() >= p.MaxFail() {
+				p.alive.Store(false)
+				if p.ForbidDuration() > 0 && p.DownFrom() == 0 {
+					p.SetDownFrom(time.Now().Unix())
+				}
+			}
+		} else {
+			p.alive.Store(true)
+			p.SetFailCount(0)
+
+			if !p.Forbid() {
+				p.SetDownFrom(0)
+			}
+		}
 		record := C.DelayHistory{Time: time.Now()}
 		if err == nil {
 			record.Delay = t
+			record.Loss = l
+			record.DownFrom = p.DownFrom()
 		}
 		p.history.Put(record)
 		if p.history.Len() > 10 {
@@ -212,6 +310,36 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	}
 	resp.Body.Close()
 	t = uint16(time.Since(start) / time.Millisecond)
+	//ping check
+	host := p.PingAddr()
+	if host == "" && p.MaxLoss() > 0 && p.MaxLoss() <= 100 {
+		hosts := strings.Split(p.Addr(), ":")
+		if len(hosts) == 2 {
+			host = hosts[0]
+		}
+	}
+	l = 0
+	if host != "" {
+		pinger, err2 := ping.NewPinger(host)
+		pinger.SetPrivileged(true)
+		if err2 != nil {
+			return
+		}
+		pinger.Count = 10
+		pinger.Interval = 100 * time.Millisecond
+		pinger.Timeout = 2000 * time.Millisecond
+		err2 = pinger.Run() // Blocks until finished.
+		if err2 != nil {
+			return
+		}
+		stats := pinger.Statistics()
+		l = uint16(stats.PacketLoss)
+		if l < 100 { //ignore block ping server
+			t = t + (l*l/100)*(l*l/100)
+		} else {
+			l = 0
+		}
+	}
 	return
 }
 

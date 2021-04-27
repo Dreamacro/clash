@@ -29,6 +29,7 @@ type Trojan struct {
 type TrojanOption struct {
 	Name           string      `proxy:"name"`
 	Server         string      `proxy:"server"`
+	PingServer     string      `proxy:"ping-server,omitempty"`
 	Port           int         `proxy:"port"`
 	Password       string      `proxy:"password"`
 	ALPN           []string    `proxy:"alpn,omitempty"`
@@ -37,6 +38,10 @@ type TrojanOption struct {
 	UDP            bool        `proxy:"udp,omitempty"`
 	Network        string      `proxy:"network,omitempty"`
 	GrpcOpts       GrpcOptions `proxy:"grpc-opts,omitempty"`
+	Timeout        int         `proxy:"timeout,omitempty"`
+	MaxLoss        int         `proxy:"max-loss,omitempty"`
+	ForbidDuration int         `proxy:"forbid-duration,omitempty"`
+	MaxFail        int         `proxy:"max-fail,omitempty"`
 }
 
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
@@ -129,6 +134,9 @@ func (t *Trojan) MarshalJSON() ([]byte, error) {
 
 func NewTrojan(option TrojanOption) (*Trojan, error) {
 	addr := net.JoinHostPort(option.Server, strconv.Itoa(option.Port))
+	pingAddr := option.PingServer
+	timeout := option.Timeout
+	forbidDuration := option.ForbidDuration
 
 	tOption := &trojan.Option{
 		Password:           option.Password,
@@ -144,10 +152,15 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 
 	t := &Trojan{
 		Base: &Base{
-			name: option.Name,
-			addr: addr,
-			tp:   C.Trojan,
-			udp:  option.UDP,
+			name:           option.Name,
+			addr:           addr,
+			pingAddr:       pingAddr,
+			tp:             C.Trojan,
+			udp:            option.UDP,
+			timeout:        timeout,
+			maxloss:        option.MaxLoss,
+			forbidDuration: forbidDuration,
+			maxFail:        option.MaxFail,
 		},
 		instance: trojan.New(tOption),
 	}
