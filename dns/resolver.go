@@ -154,6 +154,8 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 				return nil, err
 			} else if m.Rcode == D.RcodeServerFailure || m.Rcode == D.RcodeRefused {
 				return nil, errors.New("server failure")
+			} else if m.Answer == nil {
+				return nil, resolver.ErrIPNotFound
 			}
 			return m, nil
 		})
