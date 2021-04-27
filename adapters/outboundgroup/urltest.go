@@ -65,7 +65,17 @@ func (u *URLTest) fast(touch bool) C.Proxy {
 	elm, _, _ := u.fastSingle.Do(func() (interface{}, error) {
 		proxies := u.proxies(touch)
 		fast := proxies[0]
+		oldFast := u.fastNode
+		u.fastNode = nil
 		min := fast.LastDelay()
+		if oldFast != nil {
+			for _, proxy := range proxies[:] {
+				if proxy.Name() == oldFast.Name() {
+					u.fastNode = oldFast
+					break
+				}
+			}
+		}
 		for _, proxy := range proxies[1:] {
 			if !proxy.Alive() {
 				continue
@@ -124,7 +134,7 @@ func parseURLTestOption(config map[string]interface{}) []urlTestOption {
 
 func NewURLTest(commonOptions *GroupCommonOption, providers []provider.ProxyProvider, options ...urlTestOption) *URLTest {
 	urlTest := &URLTest{
-		Base:       outbound.NewBase(commonOptions.Name, "", C.URLTest, false),
+		Base:       outbound.NewBase(commonOptions.Name, "", "", C.URLTest, false, 0, 0, 0, 1),
 		single:     singledo.NewSingle(defaultGetProxiesDuration),
 		fastSingle: singledo.NewSingle(time.Second * 10),
 		providers:  providers,

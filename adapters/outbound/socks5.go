@@ -27,12 +27,17 @@ type Socks5 struct {
 type Socks5Option struct {
 	Name           string `proxy:"name"`
 	Server         string `proxy:"server"`
+	PingServer     string `proxy:"ping-server,omitempty"`
 	Port           int    `proxy:"port"`
 	UserName       string `proxy:"username,omitempty"`
 	Password       string `proxy:"password,omitempty"`
 	TLS            bool   `proxy:"tls,omitempty"`
 	UDP            bool   `proxy:"udp,omitempty"`
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
+	Timeout        int    `proxy:"timeout,omitempty"`
+	MaxLoss        int    `proxy:"max-loss,omitempty"`
+	ForbidDuration int    `proxy:"forbid-duration,omitempty"`
+	MaxFail        int    `proxy:"max-fail,omitempty"`
 }
 
 func (ss *Socks5) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
@@ -146,13 +151,20 @@ func NewSocks5(option Socks5Option) *Socks5 {
 			ServerName:         option.Server,
 		}
 	}
-
+	pingAddr := option.PingServer
+	timeout := option.Timeout
+	forbidDuration := option.ForbidDuration
 	return &Socks5{
 		Base: &Base{
-			name: option.Name,
-			addr: net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
-			tp:   C.Socks5,
-			udp:  option.UDP,
+			name:           option.Name,
+			addr:           net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
+			pingAddr:       pingAddr,
+			tp:             C.Socks5,
+			udp:            option.UDP,
+			timeout:        timeout,
+			maxloss:        option.MaxLoss,
+			forbidDuration: forbidDuration,
+			maxFail:        option.MaxFail,
 		},
 		user:           option.UserName,
 		pass:           option.Password,

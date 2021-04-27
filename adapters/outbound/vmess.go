@@ -33,6 +33,7 @@ type Vmess struct {
 type VmessOption struct {
 	Name           string            `proxy:"name"`
 	Server         string            `proxy:"server"`
+	PingServer     string            `proxy:"ping-server,omitempty"`
 	Port           int               `proxy:"port"`
 	UUID           string            `proxy:"uuid"`
 	AlterID        int               `proxy:"alterId"`
@@ -47,6 +48,10 @@ type VmessOption struct {
 	WSHeaders      map[string]string `proxy:"ws-headers,omitempty"`
 	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
 	ServerName     string            `proxy:"servername,omitempty"`
+	Timeout        int               `proxy:"timeout,omitempty"`
+	MaxLoss        int               `proxy:"max-loss,omitempty"`
+	ForbidDuration int               `proxy:"forbid-duration,omitempty"`
+	MaxFail        int               `proxy:"max-fail,omitempty"`
 }
 
 type HTTPOptions struct {
@@ -258,13 +263,20 @@ func NewVmess(option VmessOption) (*Vmess, error) {
 			return nil, fmt.Errorf("TLS must be true with h2/grpc network")
 		}
 	}
-
+	pingAddr := option.PingServer
+	timeout := option.Timeout
+	forbidDuration := option.ForbidDuration
 	v := &Vmess{
 		Base: &Base{
-			name: option.Name,
-			addr: net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
-			tp:   C.Vmess,
-			udp:  option.UDP,
+			name:           option.Name,
+			addr:           net.JoinHostPort(option.Server, strconv.Itoa(option.Port)),
+			pingAddr:       pingAddr,
+			tp:             C.Vmess,
+			udp:            option.UDP,
+			timeout:        timeout,
+			maxloss:        option.MaxLoss,
+			forbidDuration: forbidDuration,
+			maxFail:        option.MaxFail,
 		},
 		client: client,
 		option: &option,
