@@ -64,6 +64,7 @@ type DNS struct {
 	DefaultNameserver []dns.NameServer `yaml:"default-nameserver"`
 	FakeIPRange       *fakeip.Pool
 	Hosts             *trie.DomainTrie
+	AssignNameServer  map[string]dns.NameServer
 }
 
 // FallbackFilter config
@@ -106,6 +107,7 @@ type RawDNS struct {
 	FakeIPRange       string            `yaml:"fake-ip-range"`
 	FakeIPFilter      []string          `yaml:"fake-ip-filter"`
 	DefaultNameserver []string          `yaml:"default-nameserver"`
+	AssignNameServer  map[string]string `yaml:"assign-nameserver"`
 }
 
 type RawFallbackFilter struct {
@@ -500,6 +502,22 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	return nameservers, nil
 }
 
+func parseAssignNameServer(cfg *RawDNS) (map[string]dns.NameServer, error) {
+	assign := make(map[string]dns.NameServer)
+
+	if len(cfg.AssignNameServer) != 0 {
+		for domain, server := range cfg.AssignNameServer {
+			nameservers, err := parseNameServer([]string{server})
+			if err != nil {
+				return nil, err
+			}
+			assign[domain] = nameservers[0]
+		}
+	}
+
+	return assign, nil
+}
+
 func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
 	ipNets := []*net.IPNet{}
 
@@ -534,6 +552,10 @@ func parseDNS(cfg RawDNS, hosts *trie.DomainTrie) (*DNS, error) {
 	}
 
 	if dnsCfg.Fallback, err = parseNameServer(cfg.Fallback); err != nil {
+		return nil, err
+	}
+
+	if dnsCfg.AssignNameServer, err = parseAssignNameServer(&cfg); err != nil {
 		return nil, err
 	}
 

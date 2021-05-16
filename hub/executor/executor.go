@@ -128,6 +128,7 @@ func updateDNS(c *config.DNS) {
 			Domain: c.FallbackFilter.Domain,
 		},
 		Default: c.DefaultNameserver,
+		Assign:  c.AssignNameServer,
 	}
 
 	r := dns.NewResolver(cfg)

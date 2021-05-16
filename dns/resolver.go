@@ -43,6 +43,7 @@ type Resolver struct {
 	fallbackIPFilters     []fallbackIPFilter
 	group                 singleflight.Group
 	lruCache              *cache.LruCache
+	assign                *trie.DomainTrie
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeA
@@ -131,6 +132,10 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			return r.ipExchange(m)
 		}
 
+		assignNameServers := r.assignNameServers(m)
+		if len(assignNameServers) != 0 {
+			return r.batchExchange(assignNameServers, m)
+		}
 		return r.batchExchange(r.main, m)
 	})
 
@@ -172,6 +177,20 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 	return
 }
 
+func (r *Resolver) assignNameServers(m *D.Msg) []dnsClient {
+	domain := r.msgToDomain(m)
+	if domain == "" {
+		return []dnsClient{}
+	}
+
+	record := r.assign.Search(strings.TrimRight(domain, "."))
+	if record == nil {
+		return []dnsClient{}
+	}
+
+	return record.Data.([]dnsClient)
+}
+
 func (r *Resolver) shouldOnlyQueryFallback(m *D.Msg) bool {
 	if r.fallback == nil || len(r.fallbackDomainFilters) == 0 {
 		return false
@@ -193,6 +212,12 @@ func (r *Resolver) shouldOnlyQueryFallback(m *D.Msg) bool {
 }
 
 func (r *Resolver) ipExchange(m *D.Msg) (msg *D.Msg, err error) {
+
+	assignNameServers := r.assignNameServers(m)
+	if len(assignNameServers) != 0 {
+		res := <-r.asyncExchange(assignNameServers, m)
+		return res.Msg, res.Error
+	}
 
 	onlyFallback := r.shouldOnlyQueryFallback(m)
 
@@ -293,6 +318,7 @@ type Config struct {
 	FallbackFilter FallbackFilter
 	Pool           *fakeip.Pool
 	Hosts          *trie.DomainTrie
+	Assign         map[string]NameServer
 }
 
 func NewResolver(config Config) *Resolver {
@@ -310,6 +336,13 @@ func NewResolver(config Config) *Resolver {
 
 	if len(config.Fallback) != 0 {
 		r.fallback = transform(config.Fallback, defaultResolver)
+	}
+
+	r.assign = trie.New()
+	if len(config.Assign) != 0 {
+		for domain, nameserver := range config.Assign {
+			r.assign.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
+		}
 	}
 
 	fallbackIPFilters := []fallbackIPFilter{}
