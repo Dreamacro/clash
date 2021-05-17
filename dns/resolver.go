@@ -43,7 +43,7 @@ type Resolver struct {
 	fallbackIPFilters     []fallbackIPFilter
 	group                 singleflight.Group
 	lruCache              *cache.LruCache
-	assign                *trie.DomainTrie
+	rule                  *trie.DomainTrie
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeA
@@ -132,9 +132,9 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			return r.ipExchange(m)
 		}
 
-		assignNameServers := r.assignNameServers(m)
-		if len(assignNameServers) != 0 {
-			return r.batchExchange(assignNameServers, m)
+		matched := r.matchResolverRule(m)
+		if len(matched) != 0 {
+			return r.batchExchange(matched, m)
 		}
 		return r.batchExchange(r.main, m)
 	})
@@ -177,13 +177,13 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 	return
 }
 
-func (r *Resolver) assignNameServers(m *D.Msg) []dnsClient {
+func (r *Resolver) matchResolverRule(m *D.Msg) []dnsClient {
 	domain := r.msgToDomain(m)
 	if domain == "" {
 		return []dnsClient{}
 	}
 
-	record := r.assign.Search(strings.TrimRight(domain, "."))
+	record := r.rule.Search(strings.TrimRight(domain, "."))
 	if record == nil {
 		return []dnsClient{}
 	}
@@ -213,9 +213,9 @@ func (r *Resolver) shouldOnlyQueryFallback(m *D.Msg) bool {
 
 func (r *Resolver) ipExchange(m *D.Msg) (msg *D.Msg, err error) {
 
-	assignNameServers := r.assignNameServers(m)
-	if len(assignNameServers) != 0 {
-		res := <-r.asyncExchange(assignNameServers, m)
+	matched := r.matchResolverRule(m)
+	if len(matched) != 0 {
+		res := <-r.asyncExchange(matched, m)
 		return res.Msg, res.Error
 	}
 
@@ -318,7 +318,7 @@ type Config struct {
 	FallbackFilter FallbackFilter
 	Pool           *fakeip.Pool
 	Hosts          *trie.DomainTrie
-	Assign         map[string]NameServer
+	Rule           map[string]NameServer
 }
 
 func NewResolver(config Config) *Resolver {
@@ -338,10 +338,10 @@ func NewResolver(config Config) *Resolver {
 		r.fallback = transform(config.Fallback, defaultResolver)
 	}
 
-	r.assign = trie.New()
-	if len(config.Assign) != 0 {
-		for domain, nameserver := range config.Assign {
-			r.assign.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
+	r.rule = trie.New()
+	if len(config.Rule) != 0 {
+		for domain, nameserver := range config.Rule {
+			r.rule.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
 		}
 	}
 
