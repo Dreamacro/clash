@@ -43,7 +43,7 @@ type Resolver struct {
 	fallbackIPFilters     []fallbackIPFilter
 	group                 singleflight.Group
 	lruCache              *cache.LruCache
-	rule                  *trie.DomainTrie
+	policy                *trie.DomainTrie
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeA
@@ -132,7 +132,7 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			return r.ipExchange(m)
 		}
 
-		if matched := r.matchResolverRule(m); len(matched) != 0 {
+		if matched := r.matchPolicy(m); len(matched) != 0 {
 			return r.batchExchange(matched, m)
 		}
 		return r.batchExchange(r.main, m)
@@ -176,13 +176,13 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 	return
 }
 
-func (r *Resolver) matchResolverRule(m *D.Msg) []dnsClient {
+func (r *Resolver) matchPolicy(m *D.Msg) []dnsClient {
 	domain := r.msgToDomain(m)
 	if domain == "" {
 		return nil
 	}
 
-	record := r.rule.Search(domain)
+	record := r.policy.Search(domain)
 	if record == nil {
 		return nil
 	}
@@ -212,7 +212,7 @@ func (r *Resolver) shouldOnlyQueryFallback(m *D.Msg) bool {
 
 func (r *Resolver) ipExchange(m *D.Msg) (msg *D.Msg, err error) {
 
-	if matched := r.matchResolverRule(m); len(matched) != 0 {
+	if matched := r.matchPolicy(m); len(matched) != 0 {
 		res := <-r.asyncExchange(matched, m)
 		return res.Msg, res.Error
 	}
@@ -316,7 +316,7 @@ type Config struct {
 	FallbackFilter FallbackFilter
 	Pool           *fakeip.Pool
 	Hosts          *trie.DomainTrie
-	Rule           map[string]NameServer
+	Policy         map[string]NameServer
 }
 
 func NewResolver(config Config) *Resolver {
@@ -336,10 +336,10 @@ func NewResolver(config Config) *Resolver {
 		r.fallback = transform(config.Fallback, defaultResolver)
 	}
 
-	r.rule = trie.New()
-	if len(config.Rule) != 0 {
-		for domain, nameserver := range config.Rule {
-			r.rule.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
+	r.policy = trie.New()
+	if len(config.Policy) != 0 {
+		for domain, nameserver := range config.Policy {
+			r.policy.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
 		}
 	}
 

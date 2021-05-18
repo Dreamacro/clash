@@ -128,7 +128,7 @@ func updateDNS(c *config.DNS) {
 			Domain: c.FallbackFilter.Domain,
 		},
 		Default: c.DefaultNameserver,
-		Rule:    c.ResolverRule,
+		Policy:  c.NameServerPolicy,
 	}
 
 	r := dns.NewResolver(cfg)
