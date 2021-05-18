@@ -132,8 +132,7 @@ func (r *Resolver) exchangeWithoutCache(m *D.Msg) (msg *D.Msg, err error) {
 			return r.ipExchange(m)
 		}
 
-		matched := r.matchResolverRule(m)
-		if len(matched) != 0 {
+		if matched := r.matchResolverRule(m); len(matched) != 0 {
 			return r.batchExchange(matched, m)
 		}
 		return r.batchExchange(r.main, m)
@@ -180,12 +179,12 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 func (r *Resolver) matchResolverRule(m *D.Msg) []dnsClient {
 	domain := r.msgToDomain(m)
 	if domain == "" {
-		return []dnsClient{}
+		return nil
 	}
 
-	record := r.rule.Search(strings.TrimRight(domain, "."))
+	record := r.rule.Search(domain)
 	if record == nil {
-		return []dnsClient{}
+		return nil
 	}
 
 	return record.Data.([]dnsClient)
@@ -213,8 +212,7 @@ func (r *Resolver) shouldOnlyQueryFallback(m *D.Msg) bool {
 
 func (r *Resolver) ipExchange(m *D.Msg) (msg *D.Msg, err error) {
 
-	matched := r.matchResolverRule(m)
-	if len(matched) != 0 {
+	if matched := r.matchResolverRule(m); len(matched) != 0 {
 		res := <-r.asyncExchange(matched, m)
 		return res.Msg, res.Error
 	}

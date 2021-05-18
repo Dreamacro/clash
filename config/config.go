@@ -502,17 +502,18 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	return nameservers, nil
 }
 
-func parseResolverRule(cfg *RawDNS) (map[string]dns.NameServer, error) {
-	rule := make(map[string]dns.NameServer)
+func parseResolverRule(resolverRule map[string]string) (map[string]dns.NameServer, error) {
+	rule := map[string]dns.NameServer{}
 
-	if len(cfg.ResolverRule) != 0 {
-		for domain, server := range cfg.ResolverRule {
-			nameservers, err := parseNameServer([]string{server})
-			if err != nil {
-				return nil, err
-			}
-			rule[domain] = nameservers[0]
+	for domain, server := range resolverRule {
+		nameservers, err := parseNameServer([]string{server})
+		if err != nil {
+			return nil, err
 		}
+		if _, valid := trie.ValidAndSplitDomain(domain); !valid {
+			return nil, fmt.Errorf("DNS ResoverRule invalid domain: %s", domain)
+		}
+		rule[domain] = nameservers[0]
 	}
 
 	return rule, nil
@@ -555,7 +556,7 @@ func parseDNS(cfg RawDNS, hosts *trie.DomainTrie) (*DNS, error) {
 		return nil, err
 	}
 
-	if dnsCfg.ResolverRule, err = parseResolverRule(&cfg); err != nil {
+	if dnsCfg.ResolverRule, err = parseResolverRule(cfg.ResolverRule); err != nil {
 		return nil, err
 	}
 
