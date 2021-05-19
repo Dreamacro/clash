@@ -177,6 +177,10 @@ func (r *Resolver) batchExchange(clients []dnsClient, m *D.Msg) (msg *D.Msg, err
 }
 
 func (r *Resolver) matchPolicy(m *D.Msg) []dnsClient {
+	if r.policy == nil {
+		return nil
+	}
+
 	domain := r.msgToDomain(m)
 	if domain == "" {
 		return nil
@@ -336,8 +340,8 @@ func NewResolver(config Config) *Resolver {
 		r.fallback = transform(config.Fallback, defaultResolver)
 	}
 
-	r.policy = trie.New()
 	if len(config.Policy) != 0 {
+		r.policy = trie.New()
 		for domain, nameserver := range config.Policy {
 			r.policy.Insert(domain, transform([]NameServer{nameserver}, defaultResolver))
 		}
