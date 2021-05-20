@@ -11,6 +11,7 @@ import (
 const (
 	Direct AdapterType = iota
 	Reject
+	RejectDrop
 
 	Shadowsocks
 	ShadowsocksR
