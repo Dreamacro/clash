@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Dreamacro/clash/adapters/outbound"
 	"github.com/Dreamacro/clash/adapters/outboundgroup"
@@ -132,6 +133,7 @@ type RawConfig struct {
 	ExternalUI         string       `yaml:"external-ui"`
 	Secret             string       `yaml:"secret"`
 	Interface          string       `yaml:"interface-name"`
+	RejectDelay        int          `yaml:"reject-delay"`
 
 	ProxyProvider map[string]map[string]interface{} `yaml:"proxy-providers"`
 	Hosts         map[string]string                 `yaml:"hosts"`
@@ -274,8 +276,12 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 	groupsConfig := cfg.ProxyGroup
 	providersConfig := cfg.ProxyProvider
 
+	if cfg.RejectDelay < 0 {
+		cfg.RejectDelay = 0
+	}
+
 	proxies["DIRECT"] = outbound.NewProxy(outbound.NewDirect())
-	proxies["REJECT"] = outbound.NewProxy(outbound.NewReject())
+	proxies["REJECT"] = outbound.NewProxy(outbound.NewReject(time.Second * time.Duration(cfg.RejectDelay)))
 	proxyList = append(proxyList, "DIRECT", "REJECT")
 
 	// parse proxy
