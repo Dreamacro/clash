@@ -39,7 +39,9 @@ func HandleConn(c net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
 			resp = authenticate(request, cache)
 
 			trusted = resp == nil
-		} else {
+		}
+
+		if trusted {
 			if request.Method == http.MethodConnect {
 				resp = responseWith(200)
 				resp.Status = "Connection established"
