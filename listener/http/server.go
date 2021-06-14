@@ -16,11 +16,20 @@ type Listener struct {
 }
 
 func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
+	return NewWithAuthenticate(addr, in, true)
+}
+
+func NewWithAuthenticate(addr string, in chan<- C.ConnContext, authenticate bool) (*Listener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	hl := &Listener{l, addr, false, NewProxy(in, cache.New(30*time.Second))}
+	hl := &Listener{
+		listener: l,
+		address:  addr,
+		closed:   false,
+		proxy:    NewProxyWithAuthenticate(in, cache.New(30*time.Second), authenticate),
+	}
 	go func() {
 		for {
 			c, err := hl.listener.Accept()
@@ -30,7 +39,7 @@ func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
 				}
 				continue
 			}
-			hl.proxy.ServeConn(c)
+			go hl.proxy.ServeConn(c)
 		}
 	}()
 

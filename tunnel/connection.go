@@ -1,92 +1,16 @@
 package tunnel
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"net"
-	"net/http"
-	"strings"
 	"time"
 
-	"github.com/Dreamacro/clash/adapter/inbound"
 	N "github.com/Dreamacro/clash/common/net"
 	"github.com/Dreamacro/clash/common/pool"
 	"github.com/Dreamacro/clash/component/resolver"
 	C "github.com/Dreamacro/clash/constant"
-	"github.com/Dreamacro/clash/context"
 )
-
-func handleHTTP(ctx *context.HTTPContext, outbound net.Conn) {
-	req := ctx.Request()
-	conn := ctx.Conn()
-
-	// make outbound close after inbound error or close
-	conn = &connLinker{conn, outbound}
-
-	inboundReader := bufio.NewReader(conn)
-	outboundReader := bufio.NewReader(outbound)
-
-	inbound.RemoveExtraHTTPHostPort(req)
-	host := req.Host
-	for {
-		keepAlive := strings.TrimSpace(strings.ToLower(req.Header.Get("Proxy-Connection"))) == "keep-alive"
-
-		req.RequestURI = ""
-		inbound.RemoveHopByHopHeaders(req.Header)
-		err := req.Write(outbound)
-		if err != nil {
-			break
-		}
-
-	handleResponse:
-		// resp will be closed after we call resp.Write()
-		// see https://golang.org/pkg/net/http/#Response.Write
-		resp, err := http.ReadResponse(outboundReader, req)
-		if err != nil {
-			break
-		}
-		inbound.RemoveHopByHopHeaders(resp.Header)
-
-		if resp.StatusCode == http.StatusContinue {
-			err = resp.Write(conn)
-			if err != nil {
-				break
-			}
-			goto handleResponse
-		}
-
-		// close conn when header `Connection` is `close`
-		if resp.Header.Get("Connection") == "close" {
-			keepAlive = false
-		}
-
-		if keepAlive {
-			resp.Header.Set("Proxy-Connection", "keep-alive")
-			resp.Header.Set("Connection", "keep-alive")
-			resp.Header.Set("Keep-Alive", "timeout=4")
-			resp.Close = false
-		} else {
-			resp.Close = true
-		}
-		err = resp.Write(conn)
-		if err != nil || resp.Close {
-			break
-		}
-
-		req, err = http.ReadRequest(inboundReader)
-		if err != nil {
-			break
-		}
-
-		inbound.RemoveExtraHTTPHostPort(req)
-		// Sometimes firefox just open a socket to process multiple domains in HTTP
-		// The temporary solution is close connection when encountering different HOST
-		if req.Host != host {
-			break
-		}
-	}
-}
 
 func handleUDPToRemote(packet C.UDPPacket, pc C.PacketConn, metadata *C.Metadata) error {
 	defer packet.Drop()

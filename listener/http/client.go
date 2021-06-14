@@ -31,7 +31,7 @@ func newClient(in chan<- C.ConnContext) *http.Client {
 
 				left, right := net.Pipe()
 
-				in <- inbound.NewHTTP(address, remoteAddr.(string), right)
+				in <- inbound.NewHTTP(address, remoteAddr.(net.Addr), right)
 
 				return left, nil
 			},

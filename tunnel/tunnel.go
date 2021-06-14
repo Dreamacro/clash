@@ -289,12 +289,7 @@ func handleTCPConn(ctx C.ConnContext) {
 		log.Infoln("[TCP] %s --> %v doesn't match any rule using DIRECT", metadata.SourceAddress(), metadata.String())
 	}
 
-	switch c := ctx.(type) {
-	case *context.HTTPContext:
-		handleHTTP(c, remoteConn)
-	default:
-		handleSocket(ctx, remoteConn)
-	}
+	handleSocket(ctx, remoteConn)
 }
 
 func shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
