@@ -1,4 +1,4 @@
-package mixed
+package net
 
 import (
 	"bufio"

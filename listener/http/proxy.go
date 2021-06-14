@@ -1,8 +1,6 @@
 package http
 
 import (
-	"bufio"
-	"context"
 	"encoding/base64"
 	"io"
 	"net"
@@ -12,27 +10,22 @@ import (
 
 	"github.com/Dreamacro/clash/adapter/inbound"
 	"github.com/Dreamacro/clash/common/cache"
+	N "github.com/Dreamacro/clash/common/net"
 	"github.com/Dreamacro/clash/component/auth"
 	C "github.com/Dreamacro/clash/constant"
 	authStore "github.com/Dreamacro/clash/listener/auth"
 	"github.com/Dreamacro/clash/log"
 )
 
-type Proxy struct {
-	client       *http.Client
-	cache        *cache.Cache
-	in           chan<- C.ConnContext
-	authenticate bool
-}
-
-func (p *Proxy) ServeConn(conn net.Conn) {
-	reader := bufio.NewReader(conn)
+func HandleConn(c net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
+	client := newClient(c.RemoteAddr(), in)
+	conn := N.NewBufferedConn(c)
 
 	keepAlive := true
-	activated := !p.authenticate
+	activated := cache == nil // disable authenticate if cache is nil
 
 	for keepAlive {
-		request, err := ReadRequest(reader, false)
+		request, err := ReadRequest(conn.Reader(), false)
 		if err != nil {
 			break
 		}
@@ -56,7 +49,7 @@ func (p *Proxy) ServeConn(conn net.Conn) {
 							"Proxy-Authenticate": []string{"Basic"},
 						},
 					}
-				} else if !p.canActivate(authStrings[1], authenticator) {
+				} else if !canActivate(authStrings[1], authenticator, cache) {
 					log.Infoln("Auth failed from %s", conn.RemoteAddr().String())
 
 					resp = &http.Response{
@@ -84,7 +77,7 @@ func (p *Proxy) ServeConn(conn net.Conn) {
 					return
 				}
 
-				p.in <- inbound.NewHTTPS(request, &httpsConn{conn, reader})
+				in <- inbound.NewHTTPS(request, conn)
 
 				return
 			}
@@ -109,7 +102,7 @@ func (p *Proxy) ServeConn(conn net.Conn) {
 					Header:     http.Header{},
 				}
 			} else {
-				resp, err = p.client.Do(request.WithContext(context.WithValue(request.Context(), remoteAddrKey, conn.RemoteAddr())))
+				resp, err = client.Do(request)
 				if err != nil {
 					resp = &http.Response{
 						StatusCode: http.StatusBadGateway,
@@ -153,8 +146,8 @@ func (p *Proxy) ServeConn(conn net.Conn) {
 	conn.Close()
 }
 
-func (p *Proxy) canActivate(loginStr string, authenticator auth.Authenticator) (ret bool) {
-	if result := p.cache.Get(loginStr); result != nil {
+func canActivate(loginStr string, authenticator auth.Authenticator, cache *cache.Cache) (ret bool) {
+	if result := cache.Get(loginStr); result != nil {
 		ret = result.(bool)
 		return
 	}
@@ -162,19 +155,6 @@ func (p *Proxy) canActivate(loginStr string, authenticator auth.Authenticator) (
 	login := strings.Split(string(loginData), ":")
 	ret = err == nil && len(login) == 2 && authenticator.Verify(login[0], login[1])
 
-	p.cache.Put(loginStr, ret, time.Minute)
+	cache.Put(loginStr, ret, time.Minute)
 	return
-}
-
-func NewProxy(in chan<- C.ConnContext, cache *cache.Cache) *Proxy {
-	return NewProxyWithAuthenticate(in, cache, true)
-}
-
-func NewProxyWithAuthenticate(in chan<- C.ConnContext, cache *cache.Cache, authenticate bool) *Proxy {
-	return &Proxy{
-		client:       newClient(in),
-		cache:        cache,
-		in:           in,
-		authenticate: authenticate,
-	}
 }

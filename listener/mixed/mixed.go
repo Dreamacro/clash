@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Dreamacro/clash/common/cache"
+	N "github.com/Dreamacro/clash/common/net"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/listener/http"
 	"github.com/Dreamacro/clash/listener/socks"
@@ -16,7 +17,6 @@ type Listener struct {
 	address  string
 	closed   bool
 	cache    *cache.Cache
-	http     *http.Proxy
 }
 
 func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
@@ -25,8 +25,7 @@ func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
 		return nil, err
 	}
 
-	c := cache.New(30 * time.Second)
-	ml := &Listener{l, addr, false, c, http.NewProxy(in, c)}
+	ml := &Listener{l, addr, false, cache.New(30 * time.Second)}
 	go func() {
 		for {
 			c, err := ml.listener.Accept()
@@ -36,7 +35,7 @@ func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
 				}
 				continue
 			}
-			go ml.handleConn(c, in)
+			go handleConn(c, in, ml.cache)
 		}
 	}()
 
@@ -52,8 +51,8 @@ func (l *Listener) Address() string {
 	return l.address
 }
 
-func (l *Listener) handleConn(conn net.Conn, in chan<- C.ConnContext) {
-	bufConn := NewBufferedConn(conn)
+func handleConn(conn net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
+	bufConn := N.NewBufferedConn(conn)
 	head, err := bufConn.Peek(1)
 	if err != nil {
 		return
@@ -64,5 +63,5 @@ func (l *Listener) handleConn(conn net.Conn, in chan<- C.ConnContext) {
 		return
 	}
 
-	l.http.ServeConn(bufConn)
+	http.HandleConn(bufConn, in, nil)
 }
