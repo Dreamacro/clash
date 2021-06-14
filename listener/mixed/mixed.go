@@ -63,5 +63,5 @@ func handleConn(conn net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
 		return
 	}
 
-	http.HandleConn(bufConn, in, nil)
+	http.HandleConn(bufConn, in, cache)
 }
