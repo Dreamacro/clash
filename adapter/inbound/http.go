@@ -7,17 +7,18 @@ import (
 
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/context"
+	"github.com/Dreamacro/clash/transport/socks5"
 )
 
 // NewHTTP receive normal http request and return HTTPContext
-func NewHTTP(request *http.Request, conn net.Conn) *context.HTTPContext {
-	metadata := parseHTTPAddr(request)
+func NewHTTP(target string, source string, conn net.Conn) *context.ConnContext {
+	metadata := parseSocksAddr(socks5.ParseAddr(target))
 	metadata.Type = C.HTTP
-	if ip, port, err := parseAddr(conn.RemoteAddr().String()); err == nil {
-		metadata.SrcIP = ip
+	if ip, port, err := net.SplitHostPort(source); err == nil {
+		metadata.SrcIP = net.ParseIP(ip)
 		metadata.SrcPort = port
 	}
-	return context.NewHTTPContext(conn, request, metadata)
+	return context.NewConnContext(conn, metadata)
 }
 
 // RemoveHopByHopHeaders remove hop-by-hop header

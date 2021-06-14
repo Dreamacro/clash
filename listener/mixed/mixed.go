@@ -16,6 +16,7 @@ type Listener struct {
 	address  string
 	closed   bool
 	cache    *cache.Cache
+	http     *http.Proxy
 }
 
 func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
@@ -24,7 +25,8 @@ func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
 		return nil, err
 	}
 
-	ml := &Listener{l, addr, false, cache.New(30 * time.Second)}
+	c := cache.New(30 * time.Second)
+	ml := &Listener{l, addr, false, c, http.NewProxy(in, c)}
 	go func() {
 		for {
 			c, err := ml.listener.Accept()
@@ -34,7 +36,7 @@ func New(addr string, in chan<- C.ConnContext) (*Listener, error) {
 				}
 				continue
 			}
-			go handleConn(c, in, ml.cache)
+			go ml.handleConn(c, in)
 		}
 	}()
 
@@ -50,7 +52,7 @@ func (l *Listener) Address() string {
 	return l.address
 }
 
-func handleConn(conn net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
+func (l *Listener) handleConn(conn net.Conn, in chan<- C.ConnContext) {
 	bufConn := NewBufferedConn(conn)
 	head, err := bufConn.Peek(1)
 	if err != nil {
@@ -62,5 +64,5 @@ func handleConn(conn net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
 		return
 	}
 
-	http.HandleConn(bufConn, in, cache)
+	l.http.ServeConn(bufConn)
 }
