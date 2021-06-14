@@ -32,7 +32,6 @@ func NewWithAuthenticate(addr string, in chan<- C.ConnContext, authenticate bool
 	hl := &Listener{
 		listener: l,
 		address:  addr,
-		closed:   false,
 	}
 	go func() {
 		for {
