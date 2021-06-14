@@ -1,6 +1,8 @@
 package http
 
 import (
+	"encoding/base64"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
@@ -44,4 +46,29 @@ func RemoveExtraHTTPHostPort(req *http.Request) {
 
 	req.Host = host
 	req.URL.Host = host
+}
+
+// ParseBasicProxyAuthorization parse header Proxy-Authorization and return base64-encoded credential
+func ParseBasicProxyAuthorization(request *http.Request) string {
+	value := request.Header.Get("Proxy-Authorization")
+	if !strings.HasPrefix(value, "Basic ") {
+		return ""
+	}
+
+	return value[6:] // value[len("Basic "):]
+}
+
+// DecodeBasicProxyAuthorization decode base64-encoded credential
+func DecodeBasicProxyAuthorization(credential string) (string, string, error) {
+	plain, err := base64.StdEncoding.DecodeString(credential)
+	if err != nil {
+		return "", "", err
+	}
+
+	login := strings.Split(string(plain), ":")
+	if len(login) != 2 {
+		return "", "", errors.New("invalid login")
+	}
+
+	return login[0], login[1], nil
 }
