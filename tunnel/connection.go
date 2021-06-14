@@ -86,31 +86,3 @@ func relay(leftConn, rightConn net.Conn) {
 	rightConn.SetReadDeadline(time.Now())
 	<-ch
 }
-
-// connLinker make the two net.Conn correlated, for temporary resolution of leaks.
-// There is no better way to do this for now.
-type connLinker struct {
-	net.Conn
-	linker net.Conn
-}
-
-func (conn *connLinker) Read(b []byte) (n int, err error) {
-	n, err = conn.Conn.Read(b)
-	if err != nil {
-		conn.linker.Close()
-	}
-	return n, err
-}
-
-func (conn *connLinker) Write(b []byte) (n int, err error) {
-	n, err = conn.Conn.Write(b)
-	if err != nil {
-		conn.linker.Close()
-	}
-	return n, err
-}
-
-func (conn *connLinker) Close() error {
-	conn.linker.Close()
-	return conn.Conn.Close()
-}
