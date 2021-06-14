@@ -19,6 +19,8 @@ import (
 
 func HandleConn(c net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
 	client := newClient(c.RemoteAddr(), in)
+	defer client.CloseIdleConnections()
+
 	conn := N.NewBufferedConn(c)
 
 	keepAlive := true
