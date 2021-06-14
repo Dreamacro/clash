@@ -1,9 +1,9 @@
 package http
 
 import (
-    "bufio"
-    "net/http"
-    _ "unsafe"
+	"bufio"
+	"net/http"
+	_ "unsafe"
 )
 
 //go:linkname ReadRequest net/http.readRequest
