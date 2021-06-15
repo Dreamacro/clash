@@ -75,11 +75,6 @@ func HandleConn(c net.Conn, in chan<- C.ConnContext, cache *cache.Cache) {
 			}
 		}
 
-		// close conn when header `Connection` is `close`
-		if strings.ToLower(resp.Header.Get("Connection")) == "close" {
-			keepAlive = false
-		}
-
 		RemoveHopByHopHeaders(resp.Header)
 
 		if keepAlive {
