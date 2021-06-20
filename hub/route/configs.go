@@ -6,6 +6,7 @@ import (
 
 	"github.com/Dreamacro/clash/component/resolver"
 	"github.com/Dreamacro/clash/config"
+	"github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/hub/executor"
 	P "github.com/Dreamacro/clash/listener"
 	"github.com/Dreamacro/clash/log"
@@ -116,6 +117,9 @@ func updateConfigs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		if req.Path == "" {
+			req.Path = constant.Path.Config()
+		}
 		if !filepath.IsAbs(req.Path) {
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, newError("path is not a absolute path"))
