@@ -30,6 +30,7 @@ func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
 		D.HandleFailed(w, r)
 		return
 	}
+	msg.Compress = true
 	w.WriteMsg(msg)
 }
 
