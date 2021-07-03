@@ -49,6 +49,7 @@ func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
 		answer = append(answer, toString(rr))
 	}
 	log.Debugln("Served DNS: %v -> %v", msg.Question[0].Name, strings.Join(answer, ", "))
+	msg.Compress = true
 	w.WriteMsg(msg)
 }
 

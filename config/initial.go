@@ -66,7 +66,7 @@ func Init(dir string) error {
 		if err != nil {
 			return fmt.Errorf("can't create file %s: %s", C.Path.Config(), err.Error())
 		}
-		f.Write([]byte(`port: 7890`))
+		f.Write([]byte(`mixed-port: 7890`))
 		f.Close()
 	}
 

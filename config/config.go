@@ -8,16 +8,17 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Dreamacro/clash/adapters/outbound"
-	"github.com/Dreamacro/clash/adapters/outboundgroup"
-	"github.com/Dreamacro/clash/adapters/provider"
+	"github.com/Dreamacro/clash/adapter"
+	"github.com/Dreamacro/clash/adapter/outbound"
+	"github.com/Dreamacro/clash/adapter/outboundgroup"
+	"github.com/Dreamacro/clash/adapter/provider"
 	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/component/fakeip"
 	"github.com/Dreamacro/clash/component/trie"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
 	"github.com/Dreamacro/clash/log"
-	R "github.com/Dreamacro/clash/rules"
+	R "github.com/Dreamacro/clash/rule"
 	T "github.com/Dreamacro/clash/tunnel"
 
 	yaml "gopkg.in/yaml.v2"
@@ -65,6 +66,7 @@ type DNS struct {
 	DefaultNameserver []dns.NameServer `yaml:"default-nameserver"`
 	FakeIPRange       *fakeip.Pool
 	Hosts             *trie.DomainTrie
+	NameServerPolicy  map[string]dns.NameServer
 }
 
 // FallbackFilter config
@@ -107,6 +109,7 @@ type RawDNS struct {
 	FakeIPRange       string            `yaml:"fake-ip-range"`
 	FakeIPFilter      []string          `yaml:"fake-ip-filter"`
 	DefaultNameserver []string          `yaml:"default-nameserver"`
+	NameServerPolicy  map[string]string `yaml:"nameserver-policy"`
 }
 
 type RawFallbackFilter struct {
@@ -275,13 +278,13 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 	groupsConfig := cfg.ProxyGroup
 	providersConfig := cfg.ProxyProvider
 
-	proxies["DIRECT"] = outbound.NewProxy(outbound.NewDirect())
-	proxies["REJECT"] = outbound.NewProxy(outbound.NewReject())
+	proxies["DIRECT"] = adapter.NewProxy(outbound.NewDirect())
+	proxies["REJECT"] = adapter.NewProxy(outbound.NewReject())
 	proxyList = append(proxyList, "DIRECT", "REJECT")
 
 	// parse proxy
 	for idx, mapping := range proxiesConfig {
-		proxy, err := outbound.ParseProxy(mapping)
+		proxy, err := adapter.ParseProxy(mapping)
 		if err != nil {
 			return nil, nil, fmt.Errorf("proxy %d: %w", idx, err)
 		}
@@ -340,7 +343,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 			return nil, nil, fmt.Errorf("proxy group %s: the duplicate name", groupName)
 		}
 
-		proxies[groupName] = outbound.NewProxy(group)
+		proxies[groupName] = adapter.NewProxy(group)
 	}
 
 	// initial compatible provider
@@ -369,7 +372,7 @@ func parseProxies(cfg *RawConfig) (proxies map[string]C.Proxy, providersMap map[
 		},
 		[]provider.ProxyProvider{pd},
 	)
-	proxies["GLOBAL"] = outbound.NewProxy(global)
+	proxies["GLOBAL"] = adapter.NewProxy(global)
 	return proxies, providersMap, nil
 }
 
@@ -503,6 +506,23 @@ func parseNameServer(servers []string) ([]dns.NameServer, error) {
 	return nameservers, nil
 }
 
+func parseNameServerPolicy(nsPolicy map[string]string) (map[string]dns.NameServer, error) {
+	policy := map[string]dns.NameServer{}
+
+	for domain, server := range nsPolicy {
+		nameservers, err := parseNameServer([]string{server})
+		if err != nil {
+			return nil, err
+		}
+		if _, valid := trie.ValidAndSplitDomain(domain); !valid {
+			return nil, fmt.Errorf("DNS ResoverRule invalid domain: %s", domain)
+		}
+		policy[domain] = nameservers[0]
+	}
+
+	return policy, nil
+}
+
 func parseFallbackIPCIDR(ips []string) ([]*net.IPNet, error) {
 	ipNets := []*net.IPNet{}
 
@@ -537,6 +557,10 @@ func parseDNS(cfg RawDNS, hosts *trie.DomainTrie) (*DNS, error) {
 	}
 
 	if dnsCfg.Fallback, err = parseNameServer(cfg.Fallback); err != nil {
+		return nil, err
+	}
+
+	if dnsCfg.NameServerPolicy, err = parseNameServerPolicy(cfg.NameServerPolicy); err != nil {
 		return nil, err
 	}
 

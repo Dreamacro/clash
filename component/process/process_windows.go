@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	getExTcpTable uintptr
-	getExUdpTable uintptr
+	getExTCPTable uintptr
+	getExUDPTable uintptr
 	queryProcName uintptr
 
 	once sync.Once
@@ -35,12 +35,12 @@ func initWin32API() error {
 		return fmt.Errorf("LoadLibrary iphlpapi.dll failed: %s", err.Error())
 	}
 
-	getExTcpTable, err = windows.GetProcAddress(h, tcpTableFunc)
+	getExTCPTable, err = windows.GetProcAddress(h, tcpTableFunc)
 	if err != nil {
 		return fmt.Errorf("GetProcAddress of %s failed: %s", tcpTableFunc, err.Error())
 	}
 
-	getExUdpTable, err = windows.GetProcAddress(h, udpTableFunc)
+	getExUDPTable, err = windows.GetProcAddress(h, udpTableFunc)
 	if err != nil {
 		return fmt.Errorf("GetProcAddress of %s failed: %s", udpTableFunc, err.Error())
 	}
@@ -76,10 +76,10 @@ func findProcessName(network string, ip net.IP, srcPort int) (string, error) {
 	var fn uintptr
 	switch network {
 	case TCP:
-		fn = getExTcpTable
+		fn = getExTCPTable
 		class = tcpTablePidConn
 	case UDP:
-		fn = getExUdpTable
+		fn = getExUDPTable
 		class = udpTablePid
 	default:
 		return "", ErrInvalidNetwork

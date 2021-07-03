@@ -22,7 +22,8 @@ PLATFORM_LIST = \
 	linux-mips64 \
 	linux-mips64le \
 	freebsd-386 \
-	freebsd-amd64
+	freebsd-amd64 \
+	freebsd-arm64
 
 WINDOWS_ARCH_LIST = \
 	windows-386 \
@@ -81,6 +82,9 @@ freebsd-386:
 
 freebsd-amd64:
 	GOARCH=amd64 GOOS=freebsd $(GOBUILD) -o $(BINDIR)/$(NAME)-$@
+
+freebsd-arm64:
+	GOARCH=arm64 GOOS=freebsd $(GOBUILD) -o $(BINDIR)/$(NAME)-$@
 
 windows-386:
 	GOARCH=386 GOOS=windows $(GOBUILD) -o $(BINDIR)/$(NAME)-$@.exe
