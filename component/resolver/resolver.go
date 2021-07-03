@@ -1,9 +1,12 @@
 package resolver
 
 import (
+	"context"
 	"errors"
+	"math/rand"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/Dreamacro/clash/component/trie"
 )
@@ -18,6 +21,9 @@ var (
 
 	// DefaultHosts aim to resolve hosts
 	DefaultHosts = trie.New()
+
+	// DefaultDNSTimeout defined the default dns request timeout
+	DefaultDNSTimeout = time.Second * 5
 )
 
 var (
@@ -52,18 +58,16 @@ func ResolveIPv4(host string) (net.IP, error) {
 		return DefaultResolver.ResolveIPv4(host)
 	}
 
-	ipAddrs, err := net.LookupIP(host)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDNSTimeout)
+	defer cancel()
+	ipAddrs, err := net.DefaultResolver.LookupIP(ctx, "ip4", host)
 	if err != nil {
 		return nil, err
+	} else if len(ipAddrs) == 0 {
+		return nil, ErrIPNotFound
 	}
 
-	for _, ip := range ipAddrs {
-		if ip4 := ip.To4(); ip4 != nil {
-			return ip4, nil
-		}
-	}
-
-	return nil, ErrIPNotFound
+	return ipAddrs[rand.Intn(len(ipAddrs))], nil
 }
 
 // ResolveIPv6 with a host, return ipv6
@@ -90,31 +94,29 @@ func ResolveIPv6(host string) (net.IP, error) {
 		return DefaultResolver.ResolveIPv6(host)
 	}
 
-	ipAddrs, err := net.LookupIP(host)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDNSTimeout)
+	defer cancel()
+	ipAddrs, err := net.DefaultResolver.LookupIP(ctx, "ip6", host)
 	if err != nil {
 		return nil, err
+	} else if len(ipAddrs) == 0 {
+		return nil, ErrIPNotFound
 	}
 
-	for _, ip := range ipAddrs {
-		if ip.To4() == nil {
-			return ip, nil
-		}
-	}
-
-	return nil, ErrIPNotFound
+	return ipAddrs[rand.Intn(len(ipAddrs))], nil
 }
 
-// ResolveIP with a host, return ip
-func ResolveIP(host string) (net.IP, error) {
+// ResolveIPWithResolver same as ResolveIP, but with a resolver
+func ResolveIPWithResolver(host string, r Resolver) (net.IP, error) {
 	if node := DefaultHosts.Search(host); node != nil {
 		return node.Data.(net.IP), nil
 	}
 
-	if DefaultResolver != nil {
+	if r != nil {
 		if DisableIPv6 {
-			return DefaultResolver.ResolveIPv4(host)
+			return r.ResolveIPv4(host)
 		}
-		return DefaultResolver.ResolveIP(host)
+		return r.ResolveIP(host)
 	} else if DisableIPv6 {
 		return ResolveIPv4(host)
 	}
@@ -130,4 +132,9 @@ func ResolveIP(host string) (net.IP, error) {
 	}
 
 	return ipAddr.IP, nil
+}
+
+// ResolveIP with a host, return ip
+func ResolveIP(host string) (net.IP, error) {
+	return ResolveIPWithResolver(host, DefaultResolver)
 }

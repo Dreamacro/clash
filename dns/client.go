@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Dreamacro/clash/component/dialer"
+	"github.com/Dreamacro/clash/component/resolver"
 
 	D "github.com/miekg/dns"
 )
@@ -28,8 +29,7 @@ func (c *client) ExchangeContext(ctx context.Context, m *D.Msg) (msg *D.Msg, err
 		// a default ip dns
 		ip = net.ParseIP(c.host)
 	} else {
-		var err error
-		if ip, err = c.r.ResolveIP(c.host); err != nil {
+		if ip, err = resolver.ResolveIPWithResolver(c.host, c.r); err != nil {
 			return nil, fmt.Errorf("use default dns resolve failed: %w", err)
 		}
 	}

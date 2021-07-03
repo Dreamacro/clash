@@ -30,6 +30,10 @@ func findProcessName(network string, ip net.IP, srcPort int) (string, error) {
 		}
 	})
 
+	if defaultSearcher == nil {
+		return "", ErrPlatformNotSupport
+	}
+
 	var spath string
 	isTCP := network == TCP
 	switch network {
@@ -173,7 +177,7 @@ func (s *searcher) searchSocketPid(socket uint64) (uint32, error) {
 }
 
 func newSearcher(major int) *searcher {
-	var s *searcher = nil
+	var s *searcher
 	switch major {
 	case 11:
 		s = &searcher{
@@ -190,6 +194,8 @@ func newSearcher(major int) *searcher {
 			udpInpOffset: 8,
 		}
 	case 12:
+		fallthrough
+	case 13:
 		s = &searcher{
 			headSize:     64,
 			tcpItemSize:  744,

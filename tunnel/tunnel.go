@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Dreamacro/clash/adapters/inbound"
-	"github.com/Dreamacro/clash/adapters/provider"
+	"github.com/Dreamacro/clash/adapter/inbound"
+	"github.com/Dreamacro/clash/adapter/provider"
 	"github.com/Dreamacro/clash/component/nat"
 	"github.com/Dreamacro/clash/component/resolver"
 	C "github.com/Dreamacro/clash/constant"
@@ -37,17 +37,14 @@ func init() {
 	go process()
 }
 
-// Add request to queue
-func Add(ctx C.ConnContext) {
-	tcpQueue <- ctx
+// TCPIn return fan-in queue
+func TCPIn() chan<- C.ConnContext {
+	return tcpQueue
 }
 
-// AddPacket add udp Packet to queue
-func AddPacket(packet *inbound.PacketAdapter) {
-	select {
-	case udpQueue <- packet:
-	default:
-	}
+// UDPIn return fan-in udp queue
+func UDPIn() chan<- *inbound.PacketAdapter {
+	return udpQueue
 }
 
 // Rules return all rules
@@ -121,6 +118,12 @@ func preHandleMetadata(metadata *C.Metadata) error {
 	// handle IP string on host
 	if ip := net.ParseIP(metadata.Host); ip != nil {
 		metadata.DstIP = ip
+		metadata.Host = ""
+		if ip.To4() != nil {
+			metadata.AddrType = C.AtypIPv4
+		} else {
+			metadata.AddrType = C.AtypIPv6
+		}
 	}
 
 	// preprocess enhanced-mode metadata
@@ -286,12 +289,7 @@ func handleTCPConn(ctx C.ConnContext) {
 		log.Infoln("[TCP] %s --> %v doesn't match any rule using DIRECT", metadata.SourceAddress(), metadata.String())
 	}
 
-	switch c := ctx.(type) {
-	case *context.HTTPContext:
-		handleHTTP(c, remoteConn)
-	default:
-		handleSocket(ctx, remoteConn)
-	}
+	handleSocket(ctx, remoteConn)
 }
 
 func shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
@@ -329,7 +327,7 @@ func match(metadata *C.Metadata) (C.Proxy, C.Rule, error) {
 			}
 
 			if metadata.NetWork == C.UDP && !adapter.SupportUDP() {
-				log.Debugln("%v UDP is not supported", adapter.Name())
+				log.Debugln("%s UDP is not supported", adapter.Name())
 				continue
 			}
 			return adapter, rule, nil

@@ -1,0 +1,40 @@
+{
+    "inbounds": [
+        {
+            "port": 10002,
+            "listen": "0.0.0.0",
+            "protocol": "trojan",
+            "settings": {
+                "clients": [
+                    {
+                        "password": "example",
+                        "email": "grpc@example.com"
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/ssl/v2ray/fullchain.pem",
+                            "keyFile": "/etc/ssl/v2ray/privkey.pem"
+                        }
+                    ]
+                },
+                "grpcSettings": {
+                    "serviceName": "example"
+                }
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom"
+        }
+    ],
+    "log": {
+        "loglevel": "debug"
+    }
+}

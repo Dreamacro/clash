@@ -6,9 +6,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/Dreamacro/clash/adapters/outbound"
-	"github.com/Dreamacro/clash/adapters/outboundgroup"
-	"github.com/Dreamacro/clash/adapters/provider"
+	"github.com/Dreamacro/clash/adapter"
+	"github.com/Dreamacro/clash/adapter/outboundgroup"
+	"github.com/Dreamacro/clash/adapter/provider"
 	"github.com/Dreamacro/clash/component/auth"
 	"github.com/Dreamacro/clash/component/dialer"
 	"github.com/Dreamacro/clash/component/profile"
@@ -18,9 +18,9 @@ import (
 	"github.com/Dreamacro/clash/config"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
+	P "github.com/Dreamacro/clash/listener"
+	authStore "github.com/Dreamacro/clash/listener/auth"
 	"github.com/Dreamacro/clash/log"
-	P "github.com/Dreamacro/clash/proxy"
-	authStore "github.com/Dreamacro/clash/proxy/auth"
 	"github.com/Dreamacro/clash/tunnel"
 )
 
@@ -128,6 +128,7 @@ func updateDNS(c *config.DNS) {
 			Domain: c.FallbackFilter.Domain,
 		},
 		Default: c.DefaultNameserver,
+		Policy:  c.NameServerPolicy,
 	}
 
 	r := dns.NewResolver(cfg)
@@ -187,23 +188,26 @@ func updateGeneral(general *config.General, force bool) {
 	bindAddress := general.BindAddress
 	P.SetBindAddress(bindAddress)
 
-	if err := P.ReCreateHTTP(general.Port); err != nil {
+	tcpIn := tunnel.TCPIn()
+	udpIn := tunnel.UDPIn()
+
+	if err := P.ReCreateHTTP(general.Port, tcpIn); err != nil {
 		log.Errorln("Start HTTP server error: %s", err.Error())
 	}
 
-	if err := P.ReCreateSocks(general.SocksPort); err != nil {
+	if err := P.ReCreateSocks(general.SocksPort, tcpIn, udpIn); err != nil {
 		log.Errorln("Start SOCKS5 server error: %s", err.Error())
 	}
 
-	if err := P.ReCreateRedir(general.RedirPort); err != nil {
+	if err := P.ReCreateRedir(general.RedirPort, tcpIn, udpIn); err != nil {
 		log.Errorln("Start Redir server error: %s", err.Error())
 	}
 
-	if err := P.ReCreateTProxy(general.TProxyPort); err != nil {
+	if err := P.ReCreateTProxy(general.TProxyPort, tcpIn, udpIn); err != nil {
 		log.Errorln("Start TProxy server error: %s", err.Error())
 	}
 
-	if err := P.ReCreateMixed(general.MixedPort); err != nil {
+	if err := P.ReCreateMixed(general.MixedPort, tcpIn, udpIn); err != nil {
 		log.Errorln("Start Mixed(http and socks5) server error: %s", err.Error())
 	}
 }
@@ -232,7 +236,7 @@ func patchSelectGroup(proxies map[string]C.Proxy) {
 	}
 
 	for name, proxy := range proxies {
-		outbound, ok := proxy.(*outbound.Proxy)
+		outbound, ok := proxy.(*adapter.Proxy)
 		if !ok {
 			continue
 		}

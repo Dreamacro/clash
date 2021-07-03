@@ -6,12 +6,13 @@ import (
 
 	"github.com/Dreamacro/clash/component/resolver"
 	"github.com/Dreamacro/clash/config"
+	"github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/hub/executor"
+	P "github.com/Dreamacro/clash/listener"
 	"github.com/Dreamacro/clash/log"
-	P "github.com/Dreamacro/clash/proxy"
 	"github.com/Dreamacro/clash/tunnel"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
 
@@ -66,11 +67,15 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ports := P.GetPorts()
-	P.ReCreateHTTP(pointerOrDefault(general.Port, ports.Port))
-	P.ReCreateSocks(pointerOrDefault(general.SocksPort, ports.SocksPort))
-	P.ReCreateRedir(pointerOrDefault(general.RedirPort, ports.RedirPort))
-	P.ReCreateTProxy(pointerOrDefault(general.TProxyPort, ports.TProxyPort))
-	P.ReCreateMixed(pointerOrDefault(general.MixedPort, ports.MixedPort))
+
+	tcpIn := tunnel.TCPIn()
+	udpIn := tunnel.UDPIn()
+
+	P.ReCreateHTTP(pointerOrDefault(general.Port, ports.Port), tcpIn)
+	P.ReCreateSocks(pointerOrDefault(general.SocksPort, ports.SocksPort), tcpIn, udpIn)
+	P.ReCreateRedir(pointerOrDefault(general.RedirPort, ports.RedirPort), tcpIn, udpIn)
+	P.ReCreateTProxy(pointerOrDefault(general.TProxyPort, ports.TProxyPort), tcpIn, udpIn)
+	P.ReCreateMixed(pointerOrDefault(general.MixedPort, ports.MixedPort), tcpIn, udpIn)
 
 	if general.Mode != nil {
 		tunnel.SetMode(*general.Mode)
@@ -112,6 +117,9 @@ func updateConfigs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		if req.Path == "" {
+			req.Path = constant.Path.Config()
+		}
 		if !filepath.IsAbs(req.Path) {
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, newError("path is not a absolute path"))
