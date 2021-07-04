@@ -139,10 +139,15 @@ func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
 		}
 	}
 
+	var paramStartIndex = strings.IndexRune(c.Path, '?')
+	if paramStartIndex == -1 {
+		paramStartIndex = len(c.Path)
+	}
+
 	uri := url.URL{
 		Scheme: scheme,
 		Host:   net.JoinHostPort(c.Host, c.Port),
-		Path:   c.Path,
+		Path:   c.Path[:paramStartIndex],
 	}
 
 	headers := http.Header{}
