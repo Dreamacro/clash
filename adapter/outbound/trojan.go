@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/Dreamacro/clash/transport/vmess"
 	"net"
+	"net/http"
 	"strconv"
 
 	"github.com/Dreamacro/clash/component/dialer"
@@ -18,6 +20,7 @@ import (
 type Trojan struct {
 	*Base
 	instance *trojan.Trojan
+	option   *TrojanOption
 
 	// for gun mux
 	gunTLSConfig *tls.Config
@@ -26,24 +29,48 @@ type Trojan struct {
 }
 
 type TrojanOption struct {
-	Name           string      `proxy:"name"`
-	Server         string      `proxy:"server"`
-	Port           int         `proxy:"port"`
-	Password       string      `proxy:"password"`
-	ALPN           []string    `proxy:"alpn,omitempty"`
-	SNI            string      `proxy:"sni,omitempty"`
-	SkipCertVerify bool        `proxy:"skip-cert-verify,omitempty"`
-	UDP            bool        `proxy:"udp,omitempty"`
-	Network        string      `proxy:"network,omitempty"`
-	GrpcOpts       GrpcOptions `proxy:"grpc-opts,omitempty"`
+	Name           string            `proxy:"name"`
+	Server         string            `proxy:"server"`
+	Port           int               `proxy:"port"`
+	Password       string            `proxy:"password"`
+	ALPN           []string          `proxy:"alpn,omitempty"`
+	SNI            string            `proxy:"sni,omitempty"`
+	SkipCertVerify bool              `proxy:"skip-cert-verify,omitempty"`
+	UDP            bool              `proxy:"udp,omitempty"`
+	Network        string            `proxy:"network,omitempty"`
+	GrpcOpts       GrpcOptions       `proxy:"grpc-opts,omitempty"`
+	WSPath         string            `proxy:"ws-path,omitempty"`
+	WSHeaders      map[string]string `proxy:"ws-headers,omitempty"`
 }
 
 // StreamConn implements C.ProxyAdapter
 func (t *Trojan) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
 	var err error
-	if t.transport != nil {
+	switch t.option.Network {
+	case "ws":
+		host, port, _ := net.SplitHostPort(t.addr)
+		wsOpts := &vmess.WebsocketConfig{
+			Host: host,
+			Port: port,
+			Path: t.option.WSPath,
+		}
+
+		if len(t.option.WSHeaders) != 0 {
+			header := http.Header{}
+			for key, value := range t.option.WSHeaders {
+				header.Add(key, value)
+			}
+			wsOpts.Headers = header
+		}
+
+		wsOpts.TLS = true
+		wsOpts.SkipCertVerify = t.option.SkipCertVerify
+		wsOpts.ServerName = t.option.SNI
+
+		c, err = vmess.StreamWebsocketConn(c, wsOpts)
+	case "grpc":
 		c, err = gun.StreamGunWithConn(c, t.gunTLSConfig, t.gunConfig)
-	} else {
+	default:
 		c, err = t.instance.StreamConn(c)
 	}
 
@@ -145,6 +172,7 @@ func NewTrojan(option TrojanOption) (*Trojan, error) {
 			udp:  option.UDP,
 		},
 		instance: trojan.New(tOption),
+		option:   &option,
 	}
 
 	if option.Network == "grpc" {
