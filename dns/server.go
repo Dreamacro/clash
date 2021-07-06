@@ -3,6 +3,7 @@ package dns
 import (
 	"errors"
 	"net"
+	"strings"
 
 	"github.com/Dreamacro/clash/common/sockopt"
 	"github.com/Dreamacro/clash/context"
@@ -23,6 +24,19 @@ type Server struct {
 	handler handler
 }
 
+func toString(rr D.RR) string {
+	switch t := rr.(type) {
+	case *D.A:
+		return "A:" + t.A.String()
+	case *D.AAAA:
+		return "AAAA:" + t.AAAA.String()
+	case *D.CNAME:
+		return "CNAME:" + t.Target
+	default:
+		return rr.String()
+	}
+}
+
 // ServeDNS implement D.Handler ServeDNS
 func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
 	msg, err := handlerWithContext(s.handler, r)
@@ -30,6 +44,11 @@ func (s *Server) ServeDNS(w D.ResponseWriter, r *D.Msg) {
 		D.HandleFailed(w, r)
 		return
 	}
+	var answer []string
+	for _, rr := range msg.Answer {
+		answer = append(answer, toString(rr))
+	}
+	log.Debugln("Served DNS: %v -> %v", msg.Question[0].Name, strings.Join(answer, ", "))
 	msg.Compress = true
 	w.WriteMsg(msg)
 }

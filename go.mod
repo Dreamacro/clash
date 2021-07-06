@@ -3,6 +3,7 @@ module github.com/Dreamacro/clash
 go 1.16
 
 require (
+	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Dreamacro/go-shadowsocks2 v0.1.7
 	github.com/go-chi/chi/v5 v5.0.3
 	github.com/go-chi/cors v1.2.0
@@ -18,5 +19,6 @@ require (
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 )

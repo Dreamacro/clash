@@ -30,6 +30,7 @@ type General struct {
 	Controller
 	Mode      T.TunnelMode `json:"mode"`
 	LogLevel  log.LogLevel `json:"log-level"`
+	LogFile   string       `json:"log-file"`
 	IPv6      bool         `json:"ipv6"`
 	Interface string       `json:"-"`
 }
@@ -128,6 +129,7 @@ type RawConfig struct {
 	BindAddress        string       `yaml:"bind-address"`
 	Mode               T.TunnelMode `yaml:"mode"`
 	LogLevel           log.LogLevel `yaml:"log-level"`
+	LogFile            string       `yaml:"log-file"`
 	IPv6               bool         `yaml:"ipv6"`
 	ExternalController string       `yaml:"external-controller"`
 	ExternalUI         string       `yaml:"external-ui"`
@@ -262,6 +264,7 @@ func parseGeneral(cfg *RawConfig) (*General, error) {
 		},
 		Mode:      cfg.Mode,
 		LogLevel:  cfg.LogLevel,
+		LogFile:   cfg.LogFile,
 		IPv6:      cfg.IPv6,
 		Interface: cfg.Interface,
 	}, nil

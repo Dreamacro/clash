@@ -89,7 +89,7 @@ func putMsgToCache(c *cache.LruCache, key string, msg *D.Msg) {
 	case len(msg.Extra) != 0:
 		ttl = msg.Extra[0].Header().Ttl
 	default:
-		log.Debugln("[DNS] response msg empty: %#v", msg)
+		log.Debugln("[DNS] response msg empty: %#v for %s", msg, key)
 		return
 	}
 
