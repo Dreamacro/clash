@@ -1,52 +1,67 @@
 package redir
 
 import (
-	"errors"
+	"fmt"
+	"github.com/Dreamacro/clash/transport/socks5"
 	"net"
 	"syscall"
 	"unsafe"
-
-	"github.com/Dreamacro/clash/transport/socks5"
 )
 
-const (
-	SO_ORIGINAL_DST      = 80 // from linux/include/uapi/linux/netfilter_ipv4.h
-	IP6T_SO_ORIGINAL_DST = 80 // from linux/include/uapi/linux/netfilter_ipv6/ip6_tables.h
-)
+// https://gist.github.com/gkoyuncu/f8aad43f66815dac7769
+// https://github.com/monsterxx03/pf_poc/blob/master/main.go
 
-func parserPacket(conn net.Conn) (socks5.Addr, error) {
-	c, ok := conn.(*net.TCPConn)
-	if !ok {
-		return nil, errors.New("only work with TCP connection")
-	}
+func parserPacket(c net.Conn) (socks5.Addr, error) {
+	const (
+		PfOut       = 2
+		DIOCNATLOOK = 0xc04c4417
+	)
 
-	rc, err := c.SyscallConn()
+	fd, err := syscall.Open("/dev/pf", 0, syscall.O_RDWR)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open /dev/df: %s", err)
 	}
+	defer syscall.Close(fd)
 
-	var addr socks5.Addr
+	/*
+		struct pfioc_natlook {
+			struct pf_addr   saddr;
+			struct pf_addr   daddr;
+			struct pf_addr   rsaddr;
+			struct pf_addr   rdaddr;
+			u_int16_t        sport;
+			u_int16_t        dport;
+			u_int16_t        rsport;
+			u_int16_t        rdport;
+			sa_family_t      af;
+			u_int8_t         proto;
+			u_int8_t         direction;
+		};
+	*/
+	nl := struct { // struct pfioc_natlook
+		saddr, daddr, rsaddr, rdaddr     [16]byte
+		sxport, dxport, rsxport, rdxport [2]byte
+		af, proto, direction             uint8
+	}{
+		af:        syscall.AF_INET,
+		proto:     syscall.IPPROTO_TCP,
+		direction: PfOut,
+	}
+	saddr := c.RemoteAddr().(*net.TCPAddr)
+	daddr := c.LocalAddr().(*net.TCPAddr)
+	copy(nl.saddr[:], saddr.IP)
+	copy(nl.daddr[:], daddr.IP)
+	nl.sxport[0], nl.sxport[1] = byte(saddr.Port>>8), byte(saddr.Port)
+	nl.dxport[0], nl.dxport[1] = byte(daddr.Port>>8), byte(daddr.Port)
 
-	rc.Control(func(fd uintptr) {
-		addr, err = getorigdst(fd)
-	})
-
-	return addr, err
-}
-
-// Call getorigdst() from linux/net/ipv4/netfilter/nf_conntrack_l3proto_ipv4.c
-func getorigdst(fd uintptr) (socks5.Addr, error) {
-	raw := syscall.RawSockaddrInet4{}
-	siz := unsafe.Sizeof(raw)
-	_, _, err := syscall.Syscall6(syscall.SYS_GETSOCKOPT, fd, syscall.IPPROTO_IP, SO_ORIGINAL_DST, uintptr(unsafe.Pointer(&raw)), uintptr(unsafe.Pointer(&siz)), 0)
-	if err != 0 {
-		return nil, err
+	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), DIOCNATLOOK, uintptr(unsafe.Pointer(&nl))); errno != 0 {
+		return nil, fmt.Errorf("ioctl failed: %s", errno)
 	}
 
 	addr := make([]byte, 1+net.IPv4len+2)
 	addr[0] = socks5.AtypIPv4
-	copy(addr[1:1+net.IPv4len], raw.Addr[:])
-	port := (*[2]byte)(unsafe.Pointer(&raw.Port)) // big-endian
-	addr[1+net.IPv4len], addr[1+net.IPv4len+1] = port[0], port[1]
+	copy(addr[1:1+net.IPv4len], nl.rdaddr[:4])
+	copy(addr[1+net.IPv4len:], nl.rdxport[:2])
+
 	return addr, nil
 }
