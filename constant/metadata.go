@@ -75,7 +75,7 @@ type Metadata struct {
 	DstPort  string  `json:"destinationPort"`
 	AddrType int     `json:"-"`
 	Host     string  `json:"host"`
-	Proc     string  `json:"process"`
+	Proc     string  `json:"processName"`
 }
 
 func (m *Metadata) RemoteAddress() string {
@@ -121,7 +121,9 @@ func (m *Metadata) ReadProcessName() {
 	if !hit {
 		srcPort, err := strconv.Atoi(m.SrcPort)
 		if err != nil {
-			processCache.Set(key, "")
+			processCache.Set(key, "<CannotRead>")
+			m.Proc = "<CannotRead>"
+			return
 		}
 
 		name, err := process.FindProcessName(m.NetWork.String(), m.SrcIP, srcPort)
