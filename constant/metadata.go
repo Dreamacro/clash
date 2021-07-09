@@ -2,9 +2,16 @@ package constant
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/Dreamacro/clash/common/cache"
+	"github.com/Dreamacro/clash/component/process"
+	"github.com/Dreamacro/clash/log"
 )
+
+var processCache = cache.NewLRUCache(cache.WithAge(2), cache.WithSize(64))
 
 // Socks addr type
 const (
@@ -68,6 +75,7 @@ type Metadata struct {
 	DstPort  string  `json:"destinationPort"`
 	AddrType int     `json:"-"`
 	Host     string  `json:"host"`
+	Proc     string  `json:"process"`
 }
 
 func (m *Metadata) RemoteAddress() string {
@@ -105,4 +113,25 @@ func (m *Metadata) String() string {
 
 func (m *Metadata) Valid() bool {
 	return m.Host != "" || m.DstIP != nil
+}
+
+func (m *Metadata) ReadProcessName() {
+	key := fmt.Sprintf("%s:%s:%s", m.NetWork.String(), m.SrcIP.String(), m.SrcPort)
+	cached, hit := processCache.Get(key)
+	if !hit {
+		srcPort, err := strconv.Atoi(m.SrcPort)
+		if err != nil {
+			processCache.Set(key, "")
+		}
+
+		name, err := process.FindProcessName(m.NetWork.String(), m.SrcIP, srcPort)
+		if err != nil {
+			log.Debugln("[Rule] find process name %s error: %s", Process.String(), err.Error())
+		}
+
+		processCache.Set(key, name)
+
+		cached = name
+	}
+	m.Proc = cached.(string)
 }

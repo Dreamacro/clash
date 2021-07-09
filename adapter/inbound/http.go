@@ -17,5 +17,6 @@ func NewHTTP(target string, source net.Addr, conn net.Conn) *context.ConnContext
 		metadata.SrcIP = ip
 		metadata.SrcPort = port
 	}
+	metadata.ReadProcessName()
 	return context.NewConnContext(conn, metadata)
 }
