@@ -16,5 +16,6 @@ func NewHTTPS(request *http.Request, conn net.Conn) *context.ConnContext {
 		metadata.SrcIP = ip
 		metadata.SrcPort = port
 	}
+	metadata.ReadProcessName()
 	return context.NewConnContext(conn, metadata)
 }

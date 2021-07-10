@@ -26,6 +26,7 @@ func NewPacket(target socks5.Addr, packet C.UDPPacket, source C.Type) *PacketAda
 		metadata.SrcPort = port
 	}
 
+	metadata.ReadProcessName()
 	return &PacketAdapter{
 		UDPPacket: packet,
 		metadata:  metadata,
