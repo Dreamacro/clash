@@ -70,13 +70,13 @@ func ApplyConfig(cfg *config.Config, force bool) {
 	defer mux.Unlock()
 
 	updateUsers(cfg.Users)
-	updateGeneral(cfg.General, force)
 	updateProxies(cfg.Proxies, cfg.Providers)
 	updateRules(cfg.Rules)
-	updateDNS(cfg.DNS)
 	updateHosts(cfg.Hosts)
-	updateExperimental(cfg)
 	updateProfile(cfg)
+	updateGeneral(cfg.General, force)
+	updateDNS(cfg.DNS)
+	updateExperimental(cfg)
 }
 
 func GetGeneral() *config.General {
