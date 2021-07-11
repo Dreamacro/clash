@@ -16,14 +16,14 @@ import (
 )
 
 // from https://github.com/vishvananda/netlink/blob/bca67dfc8220b44ef582c9da4e9172bf1c9ec973/nl/nl_linux.go#L52-L62
-func init() {
+var nativeEndian = func() binary.ByteOrder {
 	var x uint32 = 0x01020304
 	if *(*byte)(unsafe.Pointer(&x)) == 0x01 {
-		nativeEndian = binary.BigEndian
-	} else {
-		nativeEndian = binary.LittleEndian
+		return binary.BigEndian
 	}
-}
+
+	return binary.LittleEndian
+}()
 
 type SocketResolver func(network string, ip net.IP, srcPort int) (inode, uid int, err error)
 type ProcessNameResolver func(inode, uid int) (name string, err error)
@@ -39,8 +39,6 @@ const (
 	socketDiagByFamily      = 20
 	pathProc                = "/proc"
 )
-
-var nativeEndian binary.ByteOrder = binary.LittleEndian
 
 func findProcessName(network string, ip net.IP, srcPort int) (string, error) {
 	inode, uid, err := DefaultSocketResolver(network, ip, srcPort)

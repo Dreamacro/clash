@@ -8,11 +8,7 @@ import (
 	"sync"
 )
 
-var defaultAllocator *Allocator
-
-func init() {
-	defaultAllocator = NewAllocator()
-}
+var defaultAllocator = NewAllocator()
 
 // Allocator for incoming frames, optimized to prevent overwriting after zeroing
 type Allocator struct {
