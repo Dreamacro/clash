@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/Dreamacro/clash/component/dialer"
 	C "github.com/Dreamacro/clash/constant"
 )
 
@@ -35,49 +34,39 @@ type HttpOption struct {
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
-// StreamConn implements C.ProxyAdapter
-func (h *Http) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	if h.tlsConfig != nil {
-		cc := tls.Client(c, h.tlsConfig)
-		err := cc.Handshake()
-		c = cc
-		if err != nil {
-			return nil, fmt.Errorf("%s connect error: %w", h.addr, err)
-		}
-	}
-
-	if err := h.shakeHand(metadata, c); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
 // DialContext implements C.ProxyAdapter
-func (h *Http) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn, err error) {
-	c, err := dialer.DialContext(ctx, "tcp", h.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", h.addr, err)
-	}
-	tcpKeepAlive(c)
+func (h *Http) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return DialContextDecorated(ctx, network, h.addr, func(conn net.Conn) (net.Conn, error) {
+		if _, ok := conn.(net.PacketConn); ok {
+			return nil, fmt.Errorf("unsupported network: %s", network)
+		}
 
-	defer safeConnClose(c, err)
+		if h.tlsConfig != nil {
+			c := tls.Client(conn, h.tlsConfig)
+			err := c.Handshake()
+			if err != nil {
+				return nil, err
+			}
 
-	c, err = h.StreamConn(c, metadata)
-	if err != nil {
-		return nil, err
-	}
+			conn = c
+		}
 
-	return NewConn(c, h), nil
+		err := h.shakeHand(address, conn)
+		if err != nil {
+			return nil, err
+		}
+
+		return WithRouteHop(conn, h), nil
+	})
 }
 
-func (h *Http) shakeHand(metadata *C.Metadata, rw io.ReadWriter) error {
-	addr := metadata.RemoteAddress()
+func (h *Http) shakeHand(address string, rw io.ReadWriter) error {
 	req := &http.Request{
 		Method: http.MethodConnect,
 		URL: &url.URL{
-			Host: addr,
+			Host: address,
 		},
-		Host: addr,
+		Host: address,
 		Header: http.Header{
 			"Proxy-Connection": []string{"Keep-Alive"},
 		},

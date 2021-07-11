@@ -1,25 +1,24 @@
 package nat
 
 import (
+	"net"
 	"sync"
-
-	C "github.com/Dreamacro/clash/constant"
 )
 
 type Table struct {
 	mapping sync.Map
 }
 
-func (t *Table) Set(key string, pc C.PacketConn) {
+func (t *Table) Set(key string, pc net.PacketConn) {
 	t.mapping.Store(key, pc)
 }
 
-func (t *Table) Get(key string) C.PacketConn {
+func (t *Table) Get(key string) net.PacketConn {
 	item, exist := t.mapping.Load(key)
 	if !exist {
 		return nil
 	}
-	return item.(C.PacketConn)
+	return item.(net.PacketConn)
 }
 
 func (t *Table) GetOrCreateLock(key string) (*sync.Cond, bool) {

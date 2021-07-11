@@ -31,14 +31,13 @@ const (
 	DefaultTCPTimeout = 5 * time.Second
 )
 
-type Connection interface {
-	Chains() Chain
-	AppendToChains(adapter ProxyAdapter)
+type Route interface {
+	Hops() Hops
 }
 
-type Chain []string
+type Hops []string
 
-func (c Chain) String() string {
+func (c Hops) String() string {
 	switch len(c) {
 	case 0:
 		return ""
@@ -49,7 +48,7 @@ func (c Chain) String() string {
 	}
 }
 
-func (c Chain) Last() string {
+func (c Hops) Last() string {
 	switch len(c) {
 	case 0:
 		return ""
@@ -58,42 +57,17 @@ func (c Chain) Last() string {
 	}
 }
 
-type Conn interface {
-	net.Conn
-	Connection
-}
-
-type PacketConn interface {
-	net.PacketConn
-	Connection
-	// Deprecate WriteWithMetadata because of remote resolve DNS cause TURN failed
-	// WriteWithMetadata(p []byte, metadata *Metadata) (n int, err error)
-}
-
 type ProxyAdapter interface {
 	Name() string
 	Type() AdapterType
 
-	// StreamConn wraps a protocol around net.Conn with Metadata.
-	//
-	// Examples:
-	//	conn, _ := net.Dial("tcp", "host:port")
-	//	conn, _ = adapter.StreamConn(conn, metadata)
-	//
-	// It returns a C.Conn with protocol which start with
-	// a new session (if any)
-	StreamConn(c net.Conn, metadata *Metadata) (net.Conn, error)
-
-	// DialContext return a C.Conn with protocol which
+	// DialContext return a net.Conn with protocol which
 	// contains multiplexing-related reuse logic (if any)
-	DialContext(ctx context.Context, metadata *Metadata) (Conn, error)
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 
-	DialUDP(metadata *Metadata) (PacketConn, error)
 	SupportUDP() bool
 	MarshalJSON() ([]byte, error)
 	Addr() string
-	// Unwrap extracts the proxy from a proxy-group. It returns nil when nothing to extract.
-	Unwrap(metadata *Metadata) Proxy
 }
 
 type DelayHistory struct {
@@ -105,7 +79,7 @@ type Proxy interface {
 	ProxyAdapter
 	Alive() bool
 	DelayHistory() []DelayHistory
-	Dial(metadata *Metadata) (Conn, error)
+	Dial(network, address string) (net.Conn, error)
 	LastDelay() uint16
 	URLTest(ctx context.Context, url string) (uint16, error)
 }

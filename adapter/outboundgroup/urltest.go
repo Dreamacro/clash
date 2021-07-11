@@ -3,6 +3,7 @@ package outboundgroup
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"time"
 
 	"github.com/Dreamacro/clash/adapter/outbound"
@@ -34,26 +35,11 @@ func (u *URLTest) Now() string {
 }
 
 // DialContext implements C.ProxyAdapter
-func (u *URLTest) DialContext(ctx context.Context, metadata *C.Metadata) (c C.Conn, err error) {
-	c, err = u.fast(true).DialContext(ctx, metadata)
-	if err == nil {
-		c.AppendToChains(u)
-	}
-	return c, err
-}
-
-// DialUDP implements C.ProxyAdapter
-func (u *URLTest) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	pc, err := u.fast(true).DialUDP(metadata)
-	if err == nil {
-		pc.AppendToChains(u)
-	}
-	return pc, err
-}
-
-// Unwrap implements C.ProxyAdapter
-func (u *URLTest) Unwrap(metadata *C.Metadata) C.Proxy {
-	return u.fast(true)
+func (u *URLTest) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	ctx = outbound.WithDialContext(ctx, u.fast(true).DialContext)
+	return outbound.DialContextDecorated(ctx, network, address, func(conn net.Conn) (net.Conn, error) {
+		return outbound.WithRouteHop(conn, u), nil
+	})
 }
 
 func (u *URLTest) proxies(touch bool) []C.Proxy {

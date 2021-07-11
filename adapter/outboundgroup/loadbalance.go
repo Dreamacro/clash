@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-type strategyFn = func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy
+type strategyFn = func(proxies []C.Proxy, address string) C.Proxy
 
 type LoadBalance struct {
 	*outbound.Base
@@ -37,23 +37,21 @@ func parseStrategy(config map[string]interface{}) string {
 	return "consistent-hashing"
 }
 
-func getKey(metadata *C.Metadata) string {
-	if metadata.Host != "" {
-		// ip host
-		if ip := net.ParseIP(metadata.Host); ip != nil {
-			return metadata.Host
-		}
-
-		if etld, err := publicsuffix.EffectiveTLDPlusOne(metadata.Host); err == nil {
-			return etld
-		}
-	}
-
-	if metadata.DstIP == nil {
+func getKey(address string) string {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
 		return ""
 	}
 
-	return metadata.DstIP.String()
+	if net.ParseIP(host) != nil {
+		return host
+	}
+
+	if etld, err := publicsuffix.EffectiveTLDPlusOne(host); err == nil {
+		return etld
+	}
+
+	return host
 }
 
 func jumpHash(key uint64, buckets int32) int32 {
@@ -69,30 +67,11 @@ func jumpHash(key uint64, buckets int32) int32 {
 }
 
 // DialContext implements C.ProxyAdapter
-func (lb *LoadBalance) DialContext(ctx context.Context, metadata *C.Metadata) (c C.Conn, err error) {
-	defer func() {
-		if err == nil {
-			c.AppendToChains(lb)
-		}
-	}()
-
-	proxy := lb.Unwrap(metadata)
-
-	c, err = proxy.DialContext(ctx, metadata)
-	return
-}
-
-// DialUDP implements C.ProxyAdapter
-func (lb *LoadBalance) DialUDP(metadata *C.Metadata) (pc C.PacketConn, err error) {
-	defer func() {
-		if err == nil {
-			pc.AppendToChains(lb)
-		}
-	}()
-
-	proxy := lb.Unwrap(metadata)
-
-	return proxy.DialUDP(metadata)
+func (lb *LoadBalance) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	ctx = outbound.WithDialContext(ctx, lb.strategyFn(lb.proxies(true), address).DialContext)
+	return outbound.DialContextDecorated(ctx, network, address, func(conn net.Conn) (net.Conn, error) {
+		return outbound.WithRouteHop(conn, lb), nil
+	})
 }
 
 // SupportUDP implements C.ProxyAdapter
@@ -102,7 +81,7 @@ func (lb *LoadBalance) SupportUDP() bool {
 
 func strategyRoundRobin() strategyFn {
 	idx := 0
-	return func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
+	return func(proxies []C.Proxy, address string) C.Proxy {
 		length := len(proxies)
 		for i := 0; i < length; i++ {
 			idx = (idx + 1) % length
@@ -118,8 +97,8 @@ func strategyRoundRobin() strategyFn {
 
 func strategyConsistentHashing() strategyFn {
 	maxRetry := 5
-	return func(proxies []C.Proxy, metadata *C.Metadata) C.Proxy {
-		key := uint64(murmur3.Sum32([]byte(getKey(metadata))))
+	return func(proxies []C.Proxy, address string) C.Proxy {
+		key := uint64(murmur3.Sum32([]byte(getKey(address))))
 		buckets := int32(len(proxies))
 		for i := 0; i < maxRetry; i, key = i+1, key+1 {
 			idx := jumpHash(key, buckets)
@@ -131,12 +110,6 @@ func strategyConsistentHashing() strategyFn {
 
 		return proxies[0]
 	}
-}
-
-// Unwrap implements C.ProxyAdapter
-func (lb *LoadBalance) Unwrap(metadata *C.Metadata) C.Proxy {
-	proxies := lb.proxies(true)
-	return lb.strategyFn(proxies, metadata)
 }
 
 func (lb *LoadBalance) proxies(touch bool) []C.Proxy {

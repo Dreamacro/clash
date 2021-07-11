@@ -10,7 +10,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/Dreamacro/clash/component/dialer"
+	N "github.com/Dreamacro/clash/common/net"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/transport/socks5"
 )
@@ -35,109 +35,103 @@ type Socks5Option struct {
 	SkipCertVerify bool   `proxy:"skip-cert-verify,omitempty"`
 }
 
-// StreamConn implements C.ProxyAdapter
-func (ss *Socks5) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	if ss.tls {
-		cc := tls.Client(c, ss.tlsConfig)
-		err := cc.Handshake()
-		c = cc
-		if err != nil {
-			return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
-		}
-	}
-
-	var user *socks5.User
-	if ss.user != "" {
-		user = &socks5.User{
-			Username: ss.user,
-			Password: ss.pass,
-		}
-	}
-	if _, err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdConnect, user); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
 // DialContext implements C.ProxyAdapter
-func (ss *Socks5) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn, err error) {
-	c, err := dialer.DialContext(ctx, "tcp", ss.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
-	}
-	tcpKeepAlive(c)
+func (ss *Socks5) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	switch network {
+	case "udp", "udp4", "udp6":
+		ctx, cancel := context.WithTimeout(ctx, C.DefaultTCPTimeout)
+		defer cancel()
 
-	defer safeConnClose(c, err)
-
-	c, err = ss.StreamConn(c, metadata)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewConn(c, ss), nil
-}
-
-// DialUDP implements C.ProxyAdapter
-func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTCPTimeout)
-	defer cancel()
-	c, err := dialer.DialContext(ctx, "tcp", ss.addr)
-	if err != nil {
-		err = fmt.Errorf("%s connect error: %w", ss.addr, err)
-		return
-	}
-
-	if ss.tls {
-		cc := tls.Client(c, ss.tlsConfig)
-		err = cc.Handshake()
-		c = cc
-	}
-
-	defer safeConnClose(c, err)
-
-	tcpKeepAlive(c)
-	var user *socks5.User
-	if ss.user != "" {
-		user = &socks5.User{
-			Username: ss.user,
-			Password: ss.pass,
-		}
-	}
-
-	bindAddr, err := socks5.ClientHandshake(c, serializesSocksAddr(metadata), socks5.CmdUDPAssociate, user)
-	if err != nil {
-		err = fmt.Errorf("client hanshake error: %w", err)
-		return
-	}
-
-	pc, err := dialer.ListenPacket("udp", "")
-	if err != nil {
-		return
-	}
-
-	go func() {
-		io.Copy(ioutil.Discard, c)
-		c.Close()
-		// A UDP association terminates when the TCP connection that the UDP
-		// ASSOCIATE request arrived on terminates. RFC1928
-		pc.Close()
-	}()
-
-	// Support unspecified UDP bind address.
-	bindUDPAddr := bindAddr.UDPAddr()
-	if bindUDPAddr == nil {
-		err = errors.New("invalid UDP bind address")
-		return
-	} else if bindUDPAddr.IP.IsUnspecified() {
-		serverAddr, err := resolveUDPAddr("udp", ss.Addr())
+		addr, err := resolveUDPAddr(network, address)
 		if err != nil {
 			return nil, err
 		}
 
-		bindUDPAddr.IP = serverAddr.IP
+		control, err := DialContext(ctx, "tcp", ss.addr)
+		if err != nil {
+			return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
+		}
+
+		defer safeConnClose(control, err)
+
+		if ss.tls {
+			cc := tls.Client(control, ss.tlsConfig)
+			err = cc.Handshake()
+			if err != nil {
+				return nil, err
+			}
+			control = cc
+		}
+
+		var user *socks5.User
+		if ss.user != "" {
+			user = &socks5.User{
+				Username: ss.user,
+				Password: ss.pass,
+			}
+		}
+
+		bindAddr, err := socks5.ClientHandshake(control, socks5.ParseAddrToSocksAddr(addr), socks5.CmdUDPAssociate, user)
+		if err != nil {
+			err = fmt.Errorf("client hanshake error: %w", err)
+			return nil, err
+		}
+
+		// Support unspecified UDP bind address.
+		bindUDPAddr := bindAddr.UDPAddr()
+		if bindUDPAddr == nil {
+			err = errors.New("invalid UDP bind address")
+			return nil, err
+		} else if bindUDPAddr.IP.IsUnspecified() {
+			serverAddr, err := resolveUDPAddr("udp", ss.Addr())
+			if err != nil {
+				return nil, err
+			}
+
+			bindUDPAddr.IP = serverAddr.IP
+		}
+
+		conn, err := DialContextDecorated(ctx, network, bindUDPAddr.String(), func(conn net.Conn) (net.Conn, error) {
+			pc := &socksPacketConn{Conn: conn, rAddr: bindUDPAddr, tcpConn: control}
+			return N.NewStreamPacketConn(pc, addr), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		go func() {
+			io.Copy(ioutil.Discard, control)
+			control.Close()
+			// A UDP association terminates when the TCP connection that the UDP
+			// ASSOCIATE request arrived on terminates. RFC1928
+			conn.Close()
+		}()
+
+		return WithRouteHop(conn, ss), err
 	}
 
-	return newPacketConn(&socksPacketConn{PacketConn: pc, rAddr: bindUDPAddr, tcpConn: c}, ss), nil
+	return DialContextDecorated(ctx, network, ss.addr, func(conn net.Conn) (net.Conn, error) {
+		if ss.tls {
+			cc := tls.Client(conn, ss.tlsConfig)
+			err := cc.Handshake()
+			conn = cc
+			if err != nil {
+				return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
+			}
+		}
+
+		var user *socks5.User
+		if ss.user != "" {
+			user = &socks5.User{
+				Username: ss.user,
+				Password: ss.pass,
+			}
+		}
+		if _, err := socks5.ClientHandshake(conn, socks5.ParseAddr(address), socks5.CmdConnect, user); err != nil {
+			return nil, err
+		}
+		return WithRouteHop(conn, ss), nil
+	})
 }
 
 func NewSocks5(option Socks5Option) *Socks5 {
@@ -165,7 +159,7 @@ func NewSocks5(option Socks5Option) *Socks5 {
 }
 
 type socksPacketConn struct {
-	net.PacketConn
+	net.Conn
 	rAddr   net.Addr
 	tcpConn net.Conn
 }
@@ -175,11 +169,11 @@ func (uc *socksPacketConn) WriteTo(b []byte, addr net.Addr) (n int, err error) {
 	if err != nil {
 		return
 	}
-	return uc.PacketConn.WriteTo(packet, uc.rAddr)
+	return uc.Conn.Write(packet)
 }
 
 func (uc *socksPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
-	n, _, e := uc.PacketConn.ReadFrom(b)
+	n, e := uc.Conn.Read(b)
 	if e != nil {
 		return 0, nil, e
 	}
@@ -200,5 +194,5 @@ func (uc *socksPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 
 func (uc *socksPacketConn) Close() error {
 	uc.tcpConn.Close()
-	return uc.PacketConn.Close()
+	return uc.Conn.Close()
 }

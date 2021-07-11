@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/Dreamacro/clash/common/structure"
-	"github.com/Dreamacro/clash/component/dialer"
 	C "github.com/Dreamacro/clash/constant"
 	obfs "github.com/Dreamacro/clash/transport/simple-obfs"
 	"github.com/Dreamacro/clash/transport/snell"
@@ -48,40 +47,37 @@ func streamConn(c net.Conn, option streamOption) *snell.Snell {
 	return snell.StreamConn(c, option.psk, option.version)
 }
 
-// StreamConn implements C.ProxyAdapter
-func (s *Snell) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	c = streamConn(c, streamOption{s.psk, s.version, s.addr, s.obfsOption})
-	port, _ := strconv.Atoi(metadata.DstPort)
-	err := snell.WriteHeader(c, metadata.String(), uint(port), s.version)
-	return c, err
-}
-
 // DialContext implements C.ProxyAdapter
-func (s *Snell) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn, err error) {
+func (s *Snell) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if network != "tcp" && network != "tcp4" && network != "tcp6" {
+		return nil, fmt.Errorf("unsupported network: %s", network)
+	}
+
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+
+	p, _ := strconv.Atoi(port)
+
 	if s.version == snell.Version2 {
-		c, err := s.pool.Get()
+		c, err := s.pool.GetContext(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		port, _ := strconv.Atoi(metadata.DstPort)
-		if err = snell.WriteHeader(c, metadata.String(), uint(port), s.version); err != nil {
+		if err = snell.WriteHeader(c, host, uint(p), s.version); err != nil {
 			c.Close()
 			return nil, err
 		}
-		return NewConn(c, s), err
+		return WithRouteHop(c, s), err
 	}
 
-	c, err := dialer.DialContext(ctx, "tcp", s.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", s.addr, err)
-	}
-	tcpKeepAlive(c)
+	return DialContextDecorated(ctx, "tcp", s.addr, func(conn net.Conn) (net.Conn, error) {
+		conn = streamConn(conn, streamOption{s.psk, s.version, s.addr, s.obfsOption})
 
-	defer safeConnClose(c, err)
-
-	c, err = s.StreamConn(c, metadata)
-	return NewConn(c, s), err
+		return conn, snell.WriteHeader(conn, host, uint(p), s.version)
+	})
 }
 
 func NewSnell(option SnellOption) (*Snell, error) {
@@ -122,12 +118,11 @@ func NewSnell(option SnellOption) (*Snell, error) {
 
 	if option.Version == snell.Version2 {
 		s.pool = snell.NewPool(func(ctx context.Context) (*snell.Snell, error) {
-			c, err := dialer.DialContext(ctx, "tcp", addr)
+			c, err := DialContext(ctx, "tcp", addr)
 			if err != nil {
 				return nil, err
 			}
 
-			tcpKeepAlive(c)
 			return streamConn(c, streamOption{psk, option.Version, addr, obfsOption}), nil
 		})
 	}

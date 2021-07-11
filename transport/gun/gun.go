@@ -4,8 +4,8 @@
 package gun
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/binary"
 	"errors"
@@ -17,13 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/atomic"
+	N "github.com/Dreamacro/clash/common/net"
 	"golang.org/x/net/http2"
 )
 
 var (
 	ErrInvalidLength = errors.New("invalid length")
-	ErrSmallBuffer   = errors.New("buffer too small")
+	ErrClientOnly    = errors.New("stream client only")
 )
 
 var (
@@ -34,70 +34,129 @@ var (
 	bufferPool = sync.Pool{New: func() interface{} { return &bytes.Buffer{} }}
 )
 
-type DialFn = func(network, addr string) (net.Conn, error)
-
-type Conn struct {
-	response  *http.Response
-	request   *http.Request
-	transport *http2.Transport
-	writer    *io.PipeWriter
-	once      sync.Once
-	close     *atomic.Bool
-	err       error
-	remain    int
-	br        *bufio.Reader
-
-	// deadlines
-	deadline *time.Timer
-}
-
 type Config struct {
 	ServiceName string
 	Host        string
 }
 
-func (g *Conn) initRequest() {
-	response, err := g.transport.RoundTrip(g.request)
-	if err != nil {
-		g.err = err
-		g.writer.Close()
-		return
-	}
-
-	if !g.close.Load() {
-		g.response = response
-		g.br = bufio.NewReader(response.Body)
-	} else {
-		response.Body.Close()
-	}
+type Gun struct {
+	*Config
+	transport *http2.Transport
 }
 
-func (g *Conn) Read(b []byte) (n int, err error) {
-	g.once.Do(g.initRequest)
-	if g.err != nil {
-		return 0, g.err
+type Trunk struct {
+	conn   net.Conn
+	client *http2.ClientConn
+	gun    *Gun
+}
+
+type conn struct {
+	lAddr     net.Addr
+	rAddr     net.Addr
+	readable  sync.Mutex
+	reader    *N.BufferReadCloser
+	writer    io.WriteCloser
+	remain    int
+	deadLock  sync.Mutex
+	deadTimer *time.Timer
+}
+
+func (g *Gun) NewTrunk(conn net.Conn) (*Trunk, error) {
+	cc := tls.Client(conn, g.transport.TLSClientConfig)
+	if err := cc.Handshake(); err != nil {
+		return nil, err
 	}
 
-	if g.remain > 0 {
-		size := g.remain
+	if state := cc.ConnectionState(); state.NegotiatedProtocol != http2.NextProtoTLS {
+		return nil, fmt.Errorf("http2: unexpected ALPN protocol %s, want %s", state.NegotiatedProtocol, http2.NextProtoTLS)
+	}
+
+	conn = cc
+
+	client, err := g.transport.NewClientConn(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Trunk{
+		conn:   conn,
+		client: client,
+		gun:    g,
+	}, nil
+}
+
+func (t *Trunk) NewConn(ctx context.Context) (net.Conn, error) {
+	serviceName := "GunService"
+	if t.gun.ServiceName != "" {
+		serviceName = t.gun.ServiceName
+	}
+
+	reader, writer := io.Pipe()
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body:   reader,
+		URL: &url.URL{
+			Scheme: "https",
+			Host:   t.gun.Host,
+			Path:   fmt.Sprintf("/%s/Tun", serviceName),
+		},
+		Proto:      "HTTP/2",
+		ProtoMajor: 2,
+		ProtoMinor: 0,
+		Header:     defaultHeader,
+	}
+	request = request.WithContext(ctx)
+
+	c := &conn{
+		lAddr:  t.conn.LocalAddr(),
+		rAddr:  t.conn.RemoteAddr(),
+		writer: writer,
+	}
+
+	c.readable.Lock()
+	go func() {
+		defer c.readable.Unlock()
+
+		resp, err := t.client.RoundTrip(request)
+		if err != nil {
+			c.reader = N.NewBufferReadCloser(io.NopCloser(io.LimitReader(nil, 0)))
+
+			return
+		}
+
+		c.reader = N.NewBufferReadCloser(resp.Body)
+	}()
+
+	return c, nil
+}
+
+func (t *Trunk) Close() error {
+	t.client.Close()
+	return t.conn.Close()
+}
+
+func (c *conn) Read(b []byte) (n int, err error) {
+	c.readable.Lock()
+	defer c.readable.Unlock()
+
+	if c.remain > 0 {
+		size := c.remain
 		if len(b) < size {
 			size = len(b)
 		}
 
-		n, err = io.ReadFull(g.br, b[:size])
-		g.remain -= n
+		n, err = io.ReadFull(c.reader, b[:size])
+		c.remain -= n
 		return
-	} else if g.response == nil {
-		return 0, net.ErrClosed
 	}
 
 	// 0x00 grpclength(uint32) 0x0A uleb128 payload
-	_, err = g.br.Discard(6)
+	_, err = c.reader.Discard(6)
 	if err != nil {
 		return 0, err
 	}
 
-	protobufPayloadLen, err := binary.ReadUvarint(g.br)
+	protobufPayloadLen, err := binary.ReadUvarint(c.reader)
 	if err != nil {
 		return 0, ErrInvalidLength
 	}
@@ -107,20 +166,20 @@ func (g *Conn) Read(b []byte) (n int, err error) {
 		size = len(b)
 	}
 
-	n, err = io.ReadFull(g.br, b[:size])
+	n, err = io.ReadFull(c.reader, b[:size])
 	if err != nil {
 		return
 	}
 
 	remain := int(protobufPayloadLen) - n
 	if remain > 0 {
-		g.remain = remain
+		c.remain = remain
 	}
 
 	return n, nil
 }
 
-func (g *Conn) Write(b []byte) (n int, err error) {
+func (c *conn) Write(b []byte) (int, error) {
 	protobufHeader := [binary.MaxVarintLen64 + 1]byte{0x0A}
 	varuintSize := binary.PutUvarint(protobufHeader[1:], uint64(len(b)))
 	grpcHeader := make([]byte, 5)
@@ -134,106 +193,83 @@ func (g *Conn) Write(b []byte) (n int, err error) {
 	buf.Write(protobufHeader[:varuintSize+1])
 	buf.Write(b)
 
-	_, err = g.writer.Write(buf.Bytes())
-	if err == io.ErrClosedPipe && g.err != nil {
-		err = g.err
-	}
-
-	return len(b), err
+	return c.writer.Write(buf.Bytes())
 }
 
-func (g *Conn) Close() error {
-	g.close.Store(true)
-	if r := g.response; r != nil {
-		r.Body.Close()
-	}
+func (c *conn) Close() error {
+	c.writer.Close()
 
-	return g.writer.Close()
-}
+	c.readable.Lock()
+	defer c.readable.Unlock()
 
-func (g *Conn) LocalAddr() net.Addr                { return &net.TCPAddr{IP: net.IPv4zero, Port: 0} }
-func (g *Conn) RemoteAddr() net.Addr               { return &net.TCPAddr{IP: net.IPv4zero, Port: 0} }
-func (g *Conn) SetReadDeadline(t time.Time) error  { return g.SetDeadline(t) }
-func (g *Conn) SetWriteDeadline(t time.Time) error { return g.SetDeadline(t) }
+	c.reader.Close()
 
-func (g *Conn) SetDeadline(t time.Time) error {
-	d := time.Until(t)
-	if g.deadline != nil {
-		g.deadline.Reset(d)
-		return nil
-	}
-	g.deadline = time.AfterFunc(d, func() {
-		g.Close()
-	})
 	return nil
 }
 
-func NewHTTP2Client(dialFn DialFn, tlsConfig *tls.Config) *http2.Transport {
-	dialFunc := func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-		pconn, err := dialFn(network, addr)
-		if err != nil {
-			return nil, err
-		}
-
-		cn := tls.Client(pconn, cfg)
-		if err := cn.Handshake(); err != nil {
-			pconn.Close()
-			return nil, err
-		}
-		state := cn.ConnectionState()
-		if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
-			cn.Close()
-			return nil, fmt.Errorf("http2: unexpected ALPN protocol %s, want %s", p, http2.NextProtoTLS)
-		}
-		return cn, nil
-	}
-
-	return &http2.Transport{
-		DialTLS:            dialFunc,
-		TLSClientConfig:    tlsConfig,
-		AllowHTTP:          false,
-		DisableCompression: true,
-		PingTimeout:        0,
-	}
+func (c *conn) LocalAddr() net.Addr {
+	return c.lAddr
 }
 
-func StreamGunWithTransport(transport *http2.Transport, cfg *Config) (net.Conn, error) {
-	serviceName := "GunService"
-	if cfg.ServiceName != "" {
-		serviceName = cfg.ServiceName
+func (c *conn) RemoteAddr() net.Addr {
+	return c.rAddr
+}
+
+func (c *conn) SetDeadline(t time.Time) error {
+	c.deadLock.Lock()
+	defer c.deadLock.Unlock()
+
+	if c.deadTimer != nil {
+		c.deadTimer.Stop()
+		c.deadTimer = nil
 	}
 
-	reader, writer := io.Pipe()
-	request := &http.Request{
-		Method: http.MethodPost,
-		Body:   reader,
-		URL: &url.URL{
-			Scheme: "https",
-			Host:   cfg.Host,
-			Path:   fmt.Sprintf("/%s/Tun", serviceName),
+	if !t.IsZero() {
+		d := time.Until(t)
+		if d < 0 {
+			d = 0
+		}
+
+		c.deadTimer = time.AfterFunc(d, func() {
+			c.Close()
+		})
+	}
+
+	return nil
+}
+
+func (c *conn) SetReadDeadline(t time.Time) error {
+	return c.SetDeadline(t)
+}
+
+func (c *conn) SetWriteDeadline(t time.Time) error {
+	return c.SetDeadline(t)
+}
+
+func New(tlsCfg *tls.Config, cfg *Config) *Gun {
+	hasHttp2 := false
+	for _, proto := range tlsCfg.NextProtos {
+		if proto == http2.NextProtoTLS {
+			hasHttp2 = true
+			break
+		}
+	}
+	if !hasHttp2 {
+		tlsCfg.NextProtos = append([]string{http2.NextProtoTLS}, tlsCfg.NextProtos...)
+	}
+	if tlsCfg.ServerName == "" {
+		tlsCfg.ServerName = cfg.ServiceName
+	}
+	return &Gun{
+		Config: cfg,
+		transport: &http2.Transport{
+			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+				return nil, ErrClientOnly
+			},
+			TLSClientConfig:    tlsCfg,
+			AllowHTTP:          false,
+			DisableCompression: true,
+			PingTimeout:        0,
 		},
-		Proto:      "HTTP/2",
-		ProtoMajor: 2,
-		ProtoMinor: 0,
-		Header:     defaultHeader,
 	}
-
-	conn := &Conn{
-		request:   request,
-		transport: transport,
-		writer:    writer,
-		close:     atomic.NewBool(false),
-	}
-
-	go conn.once.Do(conn.initRequest)
-	return conn, nil
-}
-
-func StreamGunWithConn(conn net.Conn, tlsConfig *tls.Config, cfg *Config) (net.Conn, error) {
-	dialFn := func(network, addr string) (net.Conn, error) {
-		return conn, nil
-	}
-
-	transport := NewHTTP2Client(dialFn, tlsConfig)
-	return StreamGunWithTransport(transport, cfg)
 }

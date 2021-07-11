@@ -553,22 +553,16 @@ func testPacketConnTimeout(t *testing.T, pc net.PacketConn) error {
 }
 
 func testSuit(t *testing.T, proxy C.ProxyAdapter) {
-	conn, err := proxy.DialContext(context.Background(), &C.Metadata{
-		Host:     localIP.String(),
-		DstPort:  "10001",
-		AddrType: socks5.AtypDomainName,
-	})
+	address := net.JoinHostPort(localIP.String(), "10001")
+
+	conn, err := proxy.DialContext(context.Background(), "tcp", address)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 	defer conn.Close()
 	assert.NoError(t, testPingPongWithConn(t, conn))
 
-	conn, err = proxy.DialContext(context.Background(), &C.Metadata{
-		Host:     localIP.String(),
-		DstPort:  "10001",
-		AddrType: socks5.AtypDomainName,
-	})
+	conn, err = proxy.DialContext(context.Background(), "tcp", address)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -579,44 +573,29 @@ func testSuit(t *testing.T, proxy C.ProxyAdapter) {
 		return
 	}
 
-	pc, err := proxy.DialUDP(&C.Metadata{
-		NetWork:  C.UDP,
-		DstIP:    localIP,
-		DstPort:  "10001",
-		AddrType: socks5.AtypIPv4,
-	})
+	pc, err := proxy.DialContext(context.Background(), "udp", address)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 	defer pc.Close()
 
-	assert.NoError(t, testPingPongWithPacketConn(t, pc))
+	assert.NoError(t, testPingPongWithPacketConn(t, pc.(net.PacketConn)))
 
-	pc, err = proxy.DialUDP(&C.Metadata{
-		NetWork:  C.UDP,
-		DstIP:    localIP,
-		DstPort:  "10001",
-		AddrType: socks5.AtypIPv4,
-	})
+	pc, err = proxy.DialContext(context.Background(), "udp", address)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 	defer pc.Close()
 
-	assert.NoError(t, testLargeDataWithPacketConn(t, pc))
+	assert.NoError(t, testLargeDataWithPacketConn(t, pc.(net.PacketConn)))
 
-	pc, err = proxy.DialUDP(&C.Metadata{
-		NetWork:  C.UDP,
-		DstIP:    localIP,
-		DstPort:  "10001",
-		AddrType: socks5.AtypIPv4,
-	})
+	pc, err = proxy.DialContext(context.Background(), "udp", address)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
 	defer pc.Close()
 
-	assert.NoError(t, testPacketConnTimeout(t, pc))
+	assert.NoError(t, testPacketConnTimeout(t, pc.(net.PacketConn)))
 }
 
 func TestClash_Basic(t *testing.T) {

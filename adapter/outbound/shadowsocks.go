@@ -7,8 +7,8 @@ import (
 	"net"
 	"strconv"
 
+	N "github.com/Dreamacro/clash/common/net"
 	"github.com/Dreamacro/clash/common/structure"
-	"github.com/Dreamacro/clash/component/dialer"
 	C "github.com/Dreamacro/clash/constant"
 	obfs "github.com/Dreamacro/clash/transport/simple-obfs"
 	"github.com/Dreamacro/clash/transport/socks5"
@@ -53,55 +53,46 @@ type v2rayObfsOption struct {
 	Mux            bool              `obfs:"mux,omitempty"`
 }
 
-// StreamConn implements C.ProxyAdapter
-func (ss *ShadowSocks) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	switch ss.obfsMode {
-	case "tls":
-		c = obfs.NewTLSObfs(c, ss.obfsOption.Host)
-	case "http":
-		_, port, _ := net.SplitHostPort(ss.addr)
-		c = obfs.NewHTTPObfs(c, ss.obfsOption.Host, port)
-	case "websocket":
-		var err error
-		c, err = v2rayObfs.NewV2rayObfs(c, ss.v2rayOption)
-		if err != nil {
-			return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
-		}
-	}
-	c = ss.cipher.StreamConn(c)
-	_, err := c.Write(serializesSocksAddr(metadata))
-	return c, err
-}
-
 // DialContext implements C.ProxyAdapter
-func (ss *ShadowSocks) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn, err error) {
-	c, err := dialer.DialContext(ctx, "tcp", ss.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
-	}
-	tcpKeepAlive(c)
+func (ss *ShadowSocks) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return DialContextDecorated(ctx, network, ss.addr, func(conn net.Conn) (net.Conn, error) {
+		if pc, ok := conn.(net.PacketConn); ok {
+			addr, err := resolveUDPAddr(network, address)
+			if err != nil {
+				return nil, err
+			}
 
-	defer safeConnClose(c, err)
+			ssAddr, err := resolveUDPAddr(network, ss.addr)
+			if err != nil {
+				return nil, err
+			}
 
-	c, err = ss.StreamConn(c, metadata)
-	return NewConn(c, ss), err
-}
+			pc = ss.cipher.PacketConn(pc)
+			pc = &ssPacketConn{PacketConn: pc, rAddr: ssAddr}
 
-// DialUDP implements C.ProxyAdapter
-func (ss *ShadowSocks) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	pc, err := dialer.ListenPacket("udp", "")
-	if err != nil {
-		return nil, err
-	}
+			return WithRouteHop(N.NewStreamPacketConn(pc, addr), ss), nil
+		}
 
-	addr, err := resolveUDPAddr("udp", ss.addr)
-	if err != nil {
-		pc.Close()
-		return nil, err
-	}
+		switch ss.obfsMode {
+		case "tls":
+			conn = obfs.NewTLSObfs(conn, ss.obfsOption.Host)
+		case "http":
+			_, port, _ := net.SplitHostPort(ss.addr)
+			conn = obfs.NewHTTPObfs(conn, ss.obfsOption.Host, port)
+		case "websocket":
+			var err error
+			conn, err = v2rayObfs.NewV2rayObfs(conn, ss.v2rayOption)
+			if err != nil {
+				return nil, fmt.Errorf("%s connect error: %w", ss.addr, err)
+			}
+		}
 
-	pc = ss.cipher.PacketConn(pc)
-	return newPacketConn(&ssPacketConn{PacketConn: pc, rAddr: addr}, ss), nil
+		conn = ss.cipher.StreamConn(conn)
+
+		_, err := conn.Write(socks5.ParseAddr(address))
+
+		return WithRouteHop(conn, ss), err
+	})
 }
 
 func NewShadowSocks(option ShadowSocksOption) (*ShadowSocks, error) {

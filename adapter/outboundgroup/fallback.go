@@ -3,6 +3,7 @@ package outboundgroup
 import (
 	"context"
 	"encoding/json"
+	"net"
 
 	"github.com/Dreamacro/clash/adapter/outbound"
 	"github.com/Dreamacro/clash/common/singledo"
@@ -23,23 +24,11 @@ func (f *Fallback) Now() string {
 }
 
 // DialContext implements C.ProxyAdapter
-func (f *Fallback) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	proxy := f.findAliveProxy(true)
-	c, err := proxy.DialContext(ctx, metadata)
-	if err == nil {
-		c.AppendToChains(f)
-	}
-	return c, err
-}
-
-// DialUDP implements C.ProxyAdapter
-func (f *Fallback) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	proxy := f.findAliveProxy(true)
-	pc, err := proxy.DialUDP(metadata)
-	if err == nil {
-		pc.AppendToChains(f)
-	}
-	return pc, err
+func (f *Fallback) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	ctx = outbound.WithDialContext(ctx, f.findAliveProxy(true).DialContext)
+	return outbound.DialContextDecorated(ctx, network, address, func(conn net.Conn) (net.Conn, error) {
+		return outbound.WithRouteHop(conn, f), nil
+	})
 }
 
 // SupportUDP implements C.ProxyAdapter
@@ -63,12 +52,6 @@ func (f *Fallback) MarshalJSON() ([]byte, error) {
 		"now":  f.Now(),
 		"all":  all,
 	})
-}
-
-// Unwrap implements C.ProxyAdapter
-func (f *Fallback) Unwrap(metadata *C.Metadata) C.Proxy {
-	proxy := f.findAliveProxy(true)
-	return proxy
 }
 
 func (f *Fallback) proxies(touch bool) []C.Proxy {

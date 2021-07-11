@@ -12,7 +12,7 @@ import (
 	C "github.com/Dreamacro/clash/constant"
 )
 
-func handleUDPToRemote(packet C.UDPPacket, pc C.PacketConn, metadata *C.Metadata) error {
+func handleUDPToRemote(packet C.UDPPacket, pc net.PacketConn, metadata *C.Metadata) error {
 	defer packet.Drop()
 
 	// local resolve UDP dns

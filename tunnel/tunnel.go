@@ -216,7 +216,7 @@ func handleUDPConn(packet *inbound.PacketAdapter) {
 			return
 		}
 
-		rawPc, err := proxy.DialUDP(metadata)
+		c, err := proxy.Dial("udp", metadata.RemoteAddress())
 		if err != nil {
 			if rule == nil {
 				log.Warnln("[UDP] dial %s to %s error: %s", proxy.Name(), metadata.String(), err.Error())
@@ -225,12 +225,13 @@ func handleUDPConn(packet *inbound.PacketAdapter) {
 			}
 			return
 		}
-		ctx.InjectPacketConn(rawPc)
-		pc := statistic.NewUDPTracker(rawPc, statistic.DefaultManager, metadata, rule)
+		pc := c.(net.PacketConn)
+		ctx.InjectPacketConn(pc)
+		pc = statistic.NewUDPTracker(pc, statistic.DefaultManager, metadata, rule)
 
 		switch true {
 		case rule != nil:
-			log.Infoln("[UDP] %s --> %v match %s(%s) using %s", metadata.SourceAddress(), metadata.String(), rule.RuleType().String(), rule.Payload(), rawPc.Chains().String())
+			log.Infoln("[UDP] %s --> %v match %s(%s) using %s", metadata.SourceAddress(), metadata.String(), rule.RuleType().String(), rule.Payload(), pc.(C.Route).Hops().String())
 		case mode == Global:
 			log.Infoln("[UDP] %s --> %v using GLOBAL", metadata.SourceAddress(), metadata.String())
 		case mode == Direct:
@@ -266,7 +267,7 @@ func handleTCPConn(ctx C.ConnContext) {
 		return
 	}
 
-	remoteConn, err := proxy.Dial(metadata)
+	remoteConn, err := proxy.Dial("tcp", metadata.RemoteAddress())
 	if err != nil {
 		if rule == nil {
 			log.Warnln("[TCP] dial %s to %s error: %s", proxy.Name(), metadata.String(), err.Error())
@@ -280,7 +281,7 @@ func handleTCPConn(ctx C.ConnContext) {
 
 	switch true {
 	case rule != nil:
-		log.Infoln("[TCP] %s --> %v match %s(%s) using %s", metadata.SourceAddress(), metadata.String(), rule.RuleType().String(), rule.Payload(), remoteConn.Chains().String())
+		log.Infoln("[TCP] %s --> %v match %s(%s) using %s", metadata.SourceAddress(), metadata.String(), rule.RuleType().String(), rule.Payload(), remoteConn.(C.Route).Hops().String())
 	case mode == Global:
 		log.Infoln("[TCP] %s --> %v using GLOBAL", metadata.SourceAddress(), metadata.String())
 	case mode == Direct:

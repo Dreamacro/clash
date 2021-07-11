@@ -2,7 +2,6 @@ package snell
 
 import (
 	"context"
-	"net"
 	"time"
 
 	"github.com/Dreamacro/clash/component/pool"
@@ -14,11 +13,7 @@ type Pool struct {
 	pool *pool.Pool
 }
 
-func (p *Pool) Get() (net.Conn, error) {
-	return p.GetContext(context.Background())
-}
-
-func (p *Pool) GetContext(ctx context.Context) (net.Conn, error) {
+func (p *Pool) GetContext(ctx context.Context) (*PoolConn, error) {
 	elm, err := p.pool.GetContext(ctx)
 	if err != nil {
 		return nil, err
@@ -27,13 +22,13 @@ func (p *Pool) GetContext(ctx context.Context) (net.Conn, error) {
 	return &PoolConn{elm.(*Snell), p}, nil
 }
 
-func (p *Pool) Put(conn net.Conn) {
+func (p *Pool) Put(conn *PoolConn) {
 	if err := HalfClose(conn); err != nil {
 		conn.Close()
 		return
 	}
 
-	p.pool.Put(conn)
+	p.pool.Put(conn.Snell)
 }
 
 type PoolConn struct {
@@ -65,7 +60,7 @@ func (pc *PoolConn) Close() error {
 	// clash use SetReadDeadline to break bidirectional copy between client and server.
 	// reset it before reuse connection to avoid io timeout error.
 	pc.Snell.Conn.SetReadDeadline(time.Time{})
-	pc.pool.Put(pc.Snell)
+	pc.pool.Put(pc)
 	return nil
 }
 

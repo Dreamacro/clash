@@ -6,8 +6,9 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/Dreamacro/clash/component/dialer"
+	N "github.com/Dreamacro/clash/common/net"
 	C "github.com/Dreamacro/clash/constant"
+	"github.com/Dreamacro/clash/transport/socks5"
 	"github.com/Dreamacro/clash/transport/ssr/obfs"
 	"github.com/Dreamacro/clash/transport/ssr/protocol"
 
@@ -36,58 +37,50 @@ type ShadowSocksROption struct {
 	UDP           bool   `proxy:"udp,omitempty"`
 }
 
-// StreamConn implements C.ProxyAdapter
-func (ssr *ShadowSocksR) StreamConn(c net.Conn, metadata *C.Metadata) (net.Conn, error) {
-	c = ssr.obfs.StreamConn(c)
-	c = ssr.cipher.StreamConn(c)
-	var (
-		iv  []byte
-		err error
-	)
-	switch conn := c.(type) {
-	case *shadowstream.Conn:
-		iv, err = conn.ObtainWriteIV()
-		if err != nil {
-			return nil, err
-		}
-	case *shadowaead.Conn:
-		return nil, fmt.Errorf("invalid connection type")
-	}
-	c = ssr.protocol.StreamConn(c, iv)
-	_, err = c.Write(serializesSocksAddr(metadata))
-	return c, err
-}
-
 // DialContext implements C.ProxyAdapter
-func (ssr *ShadowSocksR) DialContext(ctx context.Context, metadata *C.Metadata) (_ C.Conn, err error) {
-	c, err := dialer.DialContext(ctx, "tcp", ssr.addr)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", ssr.addr, err)
-	}
-	tcpKeepAlive(c)
+func (ssr *ShadowSocksR) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return DialContextDecorated(ctx, network, ssr.addr, func(conn net.Conn) (net.Conn, error) {
+		if pc, ok := conn.(net.PacketConn); ok {
+			addr, err := resolveUDPAddr(network, address)
+			if err != nil {
+				return nil, err
+			}
 
-	defer safeConnClose(c, err)
+			ssrAddr, err := resolveUDPAddr(network, ssr.addr)
+			if err != nil {
+				return nil, err
+			}
 
-	c, err = ssr.StreamConn(c, metadata)
-	return NewConn(c, ssr), err
-}
+			pc = ssr.cipher.PacketConn(pc)
+			pc = ssr.protocol.PacketConn(pc)
+			pc = &ssPacketConn{PacketConn: pc, rAddr: ssrAddr}
 
-// DialUDP implements C.ProxyAdapter
-func (ssr *ShadowSocksR) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	pc, err := dialer.ListenPacket("udp", "")
-	if err != nil {
-		return nil, err
-	}
+			return WithRouteHop(N.NewStreamPacketConn(pc, addr), ssr), nil
+		}
 
-	addr, err := resolveUDPAddr("udp", ssr.addr)
-	if err != nil {
-		pc.Close()
-		return nil, err
-	}
+		conn = ssr.obfs.StreamConn(conn)
+		conn = ssr.cipher.StreamConn(conn)
 
-	pc = ssr.cipher.PacketConn(pc)
-	pc = ssr.protocol.PacketConn(pc)
-	return newPacketConn(&ssPacketConn{PacketConn: pc, rAddr: addr}, ssr), nil
+		var (
+			iv  []byte
+			err error
+		)
+		switch c := conn.(type) {
+		case *shadowstream.Conn:
+			iv, err = c.ObtainWriteIV()
+			if err != nil {
+				return nil, err
+			}
+		case *shadowaead.Conn:
+			return nil, fmt.Errorf("invalid connection type")
+		}
+
+		conn = ssr.protocol.StreamConn(conn, iv)
+
+		_, err = conn.Write(socks5.ParseAddr(address))
+
+		return WithRouteHop(conn, ssr), err
+	})
 }
 
 func NewShadowSocksR(option ShadowSocksROption) (*ShadowSocksR, error) {

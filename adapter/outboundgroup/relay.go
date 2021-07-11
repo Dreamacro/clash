@@ -3,12 +3,10 @@ package outboundgroup
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
+	"net"
 
 	"github.com/Dreamacro/clash/adapter/outbound"
 	"github.com/Dreamacro/clash/common/singledo"
-	"github.com/Dreamacro/clash/component/dialer"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/constant/provider"
 )
@@ -20,47 +18,28 @@ type Relay struct {
 }
 
 // DialContext implements C.ProxyAdapter
-func (r *Relay) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	proxies := r.proxies(metadata, true)
-	if len(proxies) == 0 {
-		return nil, errors.New("proxy does not exist")
-	}
-	first := proxies[0]
-	last := proxies[len(proxies)-1]
+func (r *Relay) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	var dialContext outbound.DialContextFunc
+	for _, proxy := range r.proxies(true) {
+		proxy := proxy
+		dial := dialContext
 
-	c, err := dialer.DialContext(ctx, "tcp", first.Addr())
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", first.Addr(), err)
-	}
-	tcpKeepAlive(c)
-
-	var currentMeta *C.Metadata
-	for _, proxy := range proxies[1:] {
-		currentMeta, err = addrToMetadata(proxy.Addr())
-		if err != nil {
-			return nil, err
+		dialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+			ctx = outbound.WithDialContext(ctx, dial)
+			return proxy.DialContext(ctx, network, address)
 		}
-
-		c, err = first.StreamConn(c, currentMeta)
-		if err != nil {
-			return nil, fmt.Errorf("%s connect error: %w", first.Addr(), err)
-		}
-
-		first = proxy
 	}
 
-	c, err = last.StreamConn(c, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("%s connect error: %w", last.Addr(), err)
-	}
-
-	return outbound.NewConn(c, r), nil
+	ctx = outbound.WithDialContext(ctx, dialContext)
+	return outbound.DialContextDecorated(ctx, network, address, func(conn net.Conn) (net.Conn, error) {
+		return outbound.WithRouteHop(conn, r), nil
+	})
 }
 
 // MarshalJSON implements C.ProxyAdapter
 func (r *Relay) MarshalJSON() ([]byte, error) {
 	var all []string
-	for _, proxy := range r.rawProxies(false) {
+	for _, proxy := range r.proxies(false) {
 		all = append(all, proxy.Name())
 	}
 	return json.Marshal(map[string]interface{}{
@@ -69,26 +48,12 @@ func (r *Relay) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (r *Relay) rawProxies(touch bool) []C.Proxy {
+func (r *Relay) proxies(touch bool) []C.Proxy {
 	elm, _, _ := r.single.Do(func() (interface{}, error) {
 		return getProvidersProxies(r.providers, touch), nil
 	})
 
 	return elm.([]C.Proxy)
-}
-
-func (r *Relay) proxies(metadata *C.Metadata, touch bool) []C.Proxy {
-	proxies := r.rawProxies(touch)
-
-	for n, proxy := range proxies {
-		subproxy := proxy.Unwrap(metadata)
-		for subproxy != nil {
-			proxies[n] = subproxy
-			subproxy = subproxy.Unwrap(metadata)
-		}
-	}
-
-	return proxies
 }
 
 func NewRelay(options *GroupCommonOption, providers []provider.ProxyProvider) *Relay {

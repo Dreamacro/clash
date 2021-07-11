@@ -3,10 +3,8 @@ package adapter
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/Dreamacro/clash/common/queue"
@@ -27,15 +25,15 @@ func (p *Proxy) Alive() bool {
 }
 
 // Dial implements C.Proxy
-func (p *Proxy) Dial(metadata *C.Metadata) (C.Conn, error) {
+func (p *Proxy) Dial(network, address string) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), C.DefaultTCPTimeout)
 	defer cancel()
-	return p.DialContext(ctx, metadata)
+	return p.DialContext(ctx, network, address)
 }
 
 // DialContext implements C.ProxyAdapter
-func (p *Proxy) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	conn, err := p.ProxyAdapter.DialContext(ctx, metadata)
+func (p *Proxy) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := p.ProxyAdapter.DialContext(ctx, network, address)
 	if err != nil {
 		p.alive.Store(false)
 	}
@@ -101,17 +99,7 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 		}
 	}()
 
-	addr, err := urlToMetadata(url)
-	if err != nil {
-		return
-	}
-
 	start := time.Now()
-	instance, err := p.DialContext(ctx, &addr)
-	if err != nil {
-		return
-	}
-	defer instance.Close()
 
 	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
@@ -120,9 +108,8 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 	req = req.WithContext(ctx)
 
 	transport := &http.Transport{
-		Dial: func(string, string) (net.Conn, error) {
-			return instance, nil
-		},
+		DialContext:       p.DialContext,
+		DisableKeepAlives: true,
 		// from http.DefaultTransport
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -136,6 +123,8 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 			return http.ErrUseLastResponse
 		},
 	}
+	defer client.CloseIdleConnections()
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return
@@ -147,32 +136,4 @@ func (p *Proxy) URLTest(ctx context.Context, url string) (t uint16, err error) {
 
 func NewProxy(adapter C.ProxyAdapter) *Proxy {
 	return &Proxy{adapter, queue.New(10), atomic.NewBool(true)}
-}
-
-func urlToMetadata(rawURL string) (addr C.Metadata, err error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return
-	}
-
-	port := u.Port()
-	if port == "" {
-		switch u.Scheme {
-		case "https":
-			port = "443"
-		case "http":
-			port = "80"
-		default:
-			err = fmt.Errorf("%s scheme not Support", rawURL)
-			return
-		}
-	}
-
-	addr = C.Metadata{
-		AddrType: C.AtypDomainName,
-		Host:     u.Hostname(),
-		DstIP:    nil,
-		DstPort:  port,
-	}
-	return
 }

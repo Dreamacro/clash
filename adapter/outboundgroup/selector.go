@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 
 	"github.com/Dreamacro/clash/adapter/outbound"
 	"github.com/Dreamacro/clash/common/singledo"
@@ -20,21 +21,11 @@ type Selector struct {
 }
 
 // DialContext implements C.ProxyAdapter
-func (s *Selector) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	c, err := s.selectedProxy(true).DialContext(ctx, metadata)
-	if err == nil {
-		c.AppendToChains(s)
-	}
-	return c, err
-}
-
-// DialUDP implements C.ProxyAdapter
-func (s *Selector) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	pc, err := s.selectedProxy(true).DialUDP(metadata)
-	if err == nil {
-		pc.AppendToChains(s)
-	}
-	return pc, err
+func (s *Selector) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	ctx = outbound.WithDialContext(ctx, s.selectedProxy(true).DialContext)
+	return outbound.DialContextDecorated(ctx, network, address, func(conn net.Conn) (net.Conn, error) {
+		return outbound.WithRouteHop(conn, s), nil
+	})
 }
 
 // SupportUDP implements C.ProxyAdapter
@@ -74,11 +65,6 @@ func (s *Selector) Set(name string) error {
 	}
 
 	return errors.New("proxy not exist")
-}
-
-// Unwrap implements C.ProxyAdapter
-func (s *Selector) Unwrap(metadata *C.Metadata) C.Proxy {
-	return s.selectedProxy(true)
 }
 
 func (s *Selector) selectedProxy(touch bool) C.Proxy {

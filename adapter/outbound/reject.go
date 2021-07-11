@@ -2,8 +2,6 @@ package outbound
 
 import (
 	"context"
-	"errors"
-	"io"
 	"net"
 	"time"
 
@@ -15,13 +13,8 @@ type Reject struct {
 }
 
 // DialContext implements C.ProxyAdapter
-func (r *Reject) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn, error) {
-	return NewConn(&NopConn{}, r), nil
-}
-
-// DialUDP implements C.ProxyAdapter
-func (r *Reject) DialUDP(metadata *C.Metadata) (C.PacketConn, error) {
-	return nil, errors.New("match reject rule")
+func (r *Reject) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return WithRouteHop(&NopConn{}, r), nil
 }
 
 func NewReject() *Reject {
@@ -36,12 +29,20 @@ func NewReject() *Reject {
 
 type NopConn struct{}
 
+func (rw *NopConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	return 0, nil, net.ErrClosed
+}
+
+func (rw *NopConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	return 0, net.ErrClosed
+}
+
 func (rw *NopConn) Read(b []byte) (int, error) {
-	return 0, io.EOF
+	return 0, net.ErrClosed
 }
 
 func (rw *NopConn) Write(b []byte) (int, error) {
-	return 0, io.EOF
+	return 0, net.ErrClosed
 }
 
 // Close is fake function for net.Conn

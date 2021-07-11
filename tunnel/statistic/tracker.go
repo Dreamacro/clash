@@ -21,13 +21,13 @@ type trackerInfo struct {
 	UploadTotal   *atomic.Int64 `json:"upload"`
 	DownloadTotal *atomic.Int64 `json:"download"`
 	Start         time.Time     `json:"start"`
-	Chain         C.Chain       `json:"chains"`
+	Chain         C.Hops        `json:"chains"`
 	Rule          string        `json:"rule"`
 	RulePayload   string        `json:"rulePayload"`
 }
 
 type tcpTracker struct {
-	C.Conn `json:"-"`
+	net.Conn `json:"-"`
 	*trackerInfo
 	manager *Manager
 }
@@ -57,7 +57,11 @@ func (tt *tcpTracker) Close() error {
 	return tt.Conn.Close()
 }
 
-func NewTCPTracker(conn C.Conn, manager *Manager, metadata *C.Metadata, rule C.Rule) *tcpTracker {
+func (tt *tcpTracker) Hops() C.Hops {
+	return tt.Chain
+}
+
+func NewTCPTracker(conn net.Conn, manager *Manager, metadata *C.Metadata, rule C.Rule) *tcpTracker {
 	uuid, _ := uuid.NewV4()
 
 	t := &tcpTracker{
@@ -67,7 +71,7 @@ func NewTCPTracker(conn C.Conn, manager *Manager, metadata *C.Metadata, rule C.R
 			UUID:          uuid,
 			Start:         time.Now(),
 			Metadata:      metadata,
-			Chain:         conn.Chains(),
+			Chain:         conn.LocalAddr().(C.Route).Hops(),
 			Rule:          "",
 			UploadTotal:   atomic.NewInt64(0),
 			DownloadTotal: atomic.NewInt64(0),
@@ -84,7 +88,7 @@ func NewTCPTracker(conn C.Conn, manager *Manager, metadata *C.Metadata, rule C.R
 }
 
 type udpTracker struct {
-	C.PacketConn `json:"-"`
+	net.PacketConn `json:"-"`
 	*trackerInfo
 	manager *Manager
 }
@@ -114,7 +118,11 @@ func (ut *udpTracker) Close() error {
 	return ut.PacketConn.Close()
 }
 
-func NewUDPTracker(conn C.PacketConn, manager *Manager, metadata *C.Metadata, rule C.Rule) *udpTracker {
+func (ut *udpTracker) Hops() C.Hops {
+	return ut.Chain
+}
+
+func NewUDPTracker(conn net.PacketConn, manager *Manager, metadata *C.Metadata, rule C.Rule) *udpTracker {
 	uuid, _ := uuid.NewV4()
 
 	ut := &udpTracker{
@@ -124,7 +132,7 @@ func NewUDPTracker(conn C.PacketConn, manager *Manager, metadata *C.Metadata, ru
 			UUID:          uuid,
 			Start:         time.Now(),
 			Metadata:      metadata,
-			Chain:         conn.Chains(),
+			Chain:         conn.LocalAddr().(C.Route).Hops(),
 			Rule:          "",
 			UploadTotal:   atomic.NewInt64(0),
 			DownloadTotal: atomic.NewInt64(0),

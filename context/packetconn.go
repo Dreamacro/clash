@@ -38,6 +38,6 @@ func (pc *PacketConnContext) PacketConn() net.PacketConn {
 }
 
 // InjectPacketConn injectPacketConn manually
-func (pc *PacketConnContext) InjectPacketConn(pconn C.PacketConn) {
+func (pc *PacketConnContext) InjectPacketConn(pconn net.PacketConn) {
 	pc.packetConn = pconn
 }
