@@ -1,12 +1,16 @@
 package vmess
 
 import (
+	"context"
 	"crypto/tls"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +28,17 @@ type websocketConn struct {
 	wMux sync.Mutex
 }
 
+// websocketEDConn for Xray's 0rtt ws
+type websocketEDConn struct {
+	net.Conn
+	realConn net.Conn
+	closed   bool
+	dialed   chan bool
+	cancel   context.CancelFunc
+	ctx      context.Context
+	config   *WebsocketConfig
+}
+
 type WebsocketConfig struct {
 	Host           string
 	Port           string
@@ -32,6 +47,7 @@ type WebsocketConfig struct {
 	TLS            bool
 	SkipCertVerify bool
 	ServerName     string
+	Ed             uint32
 }
 
 // Read implements net.Conn.Read()
@@ -113,7 +129,119 @@ func (wsc *websocketConn) SetWriteDeadline(t time.Time) error {
 	return wsc.conn.SetWriteDeadline(t)
 }
 
-func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
+func StreamWebsocketEDConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	conn = &websocketEDConn{
+		dialed:   make(chan bool, 1),
+		cancel:   cancel,
+		ctx:      ctx,
+		realConn: conn,
+		config:   c,
+	}
+	return conn, nil
+}
+
+func (wsedc *websocketEDConn) Close() error {
+	wsedc.closed = true
+	wsedc.cancel()
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.Close()
+}
+
+func (wsedc *websocketEDConn) Write(b []byte) (int, error) {
+	if wsedc.closed {
+		return 0, io.ErrClosedPipe
+	}
+	if wsedc.Conn == nil {
+		ed := b
+		if len(ed) > int(wsedc.config.Ed) {
+			ed = nil
+		}
+		var err error
+		if wsedc.Conn, err = StreamWebsocketConn(wsedc.realConn, wsedc.config, ed); err != nil {
+			wsedc.Close()
+			return 0, errors.New("failed to dial WebSocket: " + err.Error())
+		}
+		wsedc.dialed <- true
+		if ed != nil {
+			return len(ed), nil
+		}
+	}
+	return wsedc.Conn.Write(b)
+}
+
+func (wsedc *websocketEDConn) Read(b []byte) (int, error) {
+	if wsedc.closed {
+		return 0, io.ErrClosedPipe
+	}
+	if wsedc.Conn == nil {
+		select {
+		case <-wsedc.ctx.Done():
+			return 0, io.ErrUnexpectedEOF
+		case <-wsedc.dialed:
+		}
+	}
+	return wsedc.Conn.Read(b)
+}
+
+func (wsedc *websocketEDConn) LocalAddr() net.Addr {
+	if wsedc.Conn == nil {
+		return wsedc.realConn.LocalAddr()
+	}
+	return wsedc.Conn.LocalAddr()
+}
+
+func (wsedc *websocketEDConn) RemoteAddr() net.Addr {
+	if wsedc.Conn == nil {
+		return wsedc.realConn.RemoteAddr()
+	}
+	return wsedc.Conn.RemoteAddr()
+}
+
+func (wsedc *websocketEDConn) SetDeadline(t time.Time) error {
+	if err := wsedc.SetReadDeadline(t); err != nil {
+		return err
+	}
+	return wsedc.SetWriteDeadline(t)
+}
+
+func (wsedc *websocketEDConn) SetReadDeadline(t time.Time) error {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.SetReadDeadline(t)
+}
+
+func (wsedc *websocketEDConn) SetWriteDeadline(t time.Time) error {
+	if wsedc.Conn == nil {
+		return nil
+	}
+	return wsedc.Conn.SetWriteDeadline(t)
+}
+
+func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig, ed ...[]byte) (net.Conn, error) {
+	if len(ed) == 0 {
+		if c.Ed == 0 {
+			var _ed uint32
+			if u, err := url.Parse(c.Path); err == nil {
+				if q := u.Query(); q.Get("ed") != "" {
+					Ed, _ := strconv.Atoi(q.Get("ed"))
+					_ed = uint32(Ed)
+					q.Del("ed")
+					u.RawQuery = q.Encode()
+					c.Path = u.String()
+				}
+			}
+			c.Ed = _ed
+		}
+
+		if c.Ed != 0 {
+			return StreamWebsocketEDConn(conn, c)
+		}
+	}
+
 	dialer := &websocket.Dialer{
 		NetDial: func(network, addr string) (net.Conn, error) {
 			return conn, nil
@@ -150,6 +278,10 @@ func StreamWebsocketConn(conn net.Conn, c *WebsocketConfig) (net.Conn, error) {
 		for k := range c.Headers {
 			headers.Add(k, c.Headers.Get(k))
 		}
+	}
+
+	if len(ed) == 1 {
+		headers.Set("Sec-WebSocket-Protocol", base64.RawURLEncoding.EncodeToString(ed[0]))
 	}
 
 	wsConn, resp, err := dialer.Dial(uri.String(), headers)

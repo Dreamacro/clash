@@ -59,12 +59,12 @@ func (vc *Conn) Read(b []byte) (int, error) {
 func (vc *Conn) sendRequest() error {
 	timestamp := time.Now()
 
+	mbuf := &bytes.Buffer{}
+
 	if !vc.isAead {
 		h := hmac.New(md5.New, vc.id.UUID.Bytes())
 		binary.Write(h, binary.BigEndian, uint64(timestamp.Unix()))
-		if _, err := vc.Conn.Write(h.Sum(nil)); err != nil {
-			return err
-		}
+		mbuf.Write(h.Sum(nil))
 	}
 
 	buf := &bytes.Buffer{}
@@ -110,7 +110,8 @@ func (vc *Conn) sendRequest() error {
 
 		stream := cipher.NewCFBEncrypter(block, hashTimestamp(timestamp))
 		stream.XORKeyStream(buf.Bytes(), buf.Bytes())
-		_, err = vc.Conn.Write(buf.Bytes())
+		mbuf.Write(buf.Bytes())
+		_, err = vc.Conn.Write(mbuf.Bytes())
 		return err
 	}
 
